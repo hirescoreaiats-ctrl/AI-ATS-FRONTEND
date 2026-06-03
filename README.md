@@ -53,7 +53,7 @@ Publish directory: .
 Environment variable: VITE_API_BASE_URL=https://api.hirescoreai.com
 ```
 
-Deploy `index.html` as the main production entry.
+Deploy `index.html` as the main production entry. The Netlify redirect sends unknown paths such as `/pipeline` back to `index.html`, so the React enterprise page is not the default production app.
 
 ## Important Pages
 
