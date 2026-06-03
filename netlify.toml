@@ -1,9 +1,44 @@
 [build]
-  command = "echo Static frontend deploy"
-  publish = "."
+  command = "npm run build"
+  publish = "dist"
 
 [[redirects]]
-  from = "/*"
+  from = "/pipeline"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/candidates"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/talent-search"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/inbox"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/copilot"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/analytics"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/jobs"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/organization"
   to = "/index.html"
   status = 200
 

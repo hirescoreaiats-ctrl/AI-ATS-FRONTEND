@@ -48,12 +48,12 @@ WebSocket URLs are derived from the same API base. `https://api.hirescoreai.com`
 Use these settings:
 
 ```text
-Build command: echo Static frontend deploy
-Publish directory: .
+Build command: npm run build
+Publish directory: dist
 Environment variable: VITE_API_BASE_URL=https://api.hirescoreai.com
 ```
 
-Deploy `index.html` as the main production entry. The Netlify redirect sends unknown paths such as `/pipeline` back to `index.html`, so the React enterprise page is not the default production app.
+Deploy `index.html` as the main production entry. The build script copies the legacy AI ATS app into `dist/`, so the React enterprise page is not the default production app.
 
 ## Important Pages
 
@@ -71,7 +71,7 @@ The React migration starts at `enterprise.html`.
 
 ```bash
 npm install
-npm run build
+npm run build:react
 ```
 
 For today's hosting, deploy the static root directly unless you specifically want the React migration.
