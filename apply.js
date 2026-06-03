@@ -1,14 +1,17 @@
 (function(){
 var API = (function(){
-if(window.__HIRESCORE_API_BASE__){
-return String(window.__HIRESCORE_API_BASE__).replace(/\/$/, "")
+var configuredBase = window.API_BASE_URL || window.__HIRESCORE_API_BASE__
+if(configuredBase){
+return String(configuredBase).replace(/\/$/, "")
 }
 var isLocalFrontend =
 window.location.protocol === "file:" ||
 window.location.hostname === "localhost" ||
 window.location.hostname === "127.0.0.1"
-return isLocalFrontend ? "http://127.0.0.1:8000" : window.location.origin
+return isLocalFrontend ? "http://127.0.0.1:8000" : "https://api.hirescoreai.com"
 })()
+window.API_BASE_URL = API
+window.__HIRESCORE_API_BASE__ = API
 var params = new URLSearchParams(window.location.search)
 var jobId = params.get("job_id")
 var applicationSource = normalizeSource(params.get("source"))

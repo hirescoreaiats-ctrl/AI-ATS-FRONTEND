@@ -17,13 +17,43 @@ Recommended static hosts:
 
 ## Connect to Backend
 
-Edit `runtime-config.js` before deployment:
+Production defaults to:
 
-```js
-window.__HIRESCORE_API_BASE__ = "https://your-backend-domain.com";
+```text
+https://api.hirescoreai.com
 ```
 
-That backend URL should point to your DigitalOcean VPS API.
+For legacy HTML/JS pages, the central config is `config.js`. It uses:
+
+- `https://api.hirescoreai.com` on production hosts such as Netlify
+- `http://127.0.0.1:8000` on local/file development
+
+Optional runtime override:
+
+```js
+window.API_BASE_URL = "https://api.hirescoreai.com";
+window.__HIRESCORE_API_BASE__ = "https://api.hirescoreai.com";
+```
+
+For the Vite/React entrypoint, set this Netlify environment variable:
+
+```env
+VITE_API_BASE_URL=https://api.hirescoreai.com
+```
+
+WebSocket URLs are derived from the same API base. `https://api.hirescoreai.com` becomes `wss://api.hirescoreai.com`.
+
+## Netlify Deployment
+
+Use these settings:
+
+```text
+Build command: echo Static frontend deploy
+Publish directory: .
+Environment variable: VITE_API_BASE_URL=https://api.hirescoreai.com
+```
+
+Deploy `index.html` as the main production entry.
 
 ## Important Pages
 

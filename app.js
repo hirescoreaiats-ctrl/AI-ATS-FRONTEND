@@ -4133,7 +4133,7 @@ let c = currentResults[i]
 
 // agar backend se ho to force frontend
 let base = window.location.origin.includes("8000")
-? "http://127.0.0.1:5500"
+? (window.FRONTEND_BASE_URL || window.location.origin)
 : window.location.origin
 
 window.open(
@@ -7541,7 +7541,8 @@ function showSuccessModal(data){
 let jobId = data?.job_id || data
 let links = data?.apply_links || {}
 let posts = data?.generated_posts || {}
-let mainLink = links.main || data?.apply_link || ("http://127.0.0.1:5500/apply.html?job_id=" + jobId)
+let frontendBase = (window.FRONTEND_BASE_URL || window.location.origin).replace(/\/$/, "")
+let mainLink = links.main || data?.apply_link || (frontendBase + "/apply.html?job_id=" + jobId)
 latestSourcingData = {
 main: mainLink,
 linkedin: links.linkedin || "",

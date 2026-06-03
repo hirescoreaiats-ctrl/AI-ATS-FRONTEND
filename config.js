@@ -3,9 +3,13 @@
 // ===============================
 
 // Backend API URL
+const PRODUCTION_API_BASE = "https://api.hirescoreai.com";
+const LOCAL_API_BASE = "http://127.0.0.1:8000";
+
 const API = (() => {
-    if(window.__HIRESCORE_API_BASE__){
-        return String(window.__HIRESCORE_API_BASE__).replace(/\/$/, "");
+    const configuredBase = window.API_BASE_URL || window.__HIRESCORE_API_BASE__;
+    if(configuredBase){
+        return String(configuredBase).replace(/\/$/, "");
     }
 
     const isLocalFrontend =
@@ -13,8 +17,11 @@ const API = (() => {
         window.location.hostname === "localhost" ||
         window.location.hostname === "127.0.0.1";
 
-    return isLocalFrontend ? "http://127.0.0.1:8000" : window.location.origin;
+    return isLocalFrontend ? LOCAL_API_BASE : PRODUCTION_API_BASE;
 })();
+
+window.API_BASE_URL = API;
+window.__HIRESCORE_API_BASE__ = API;
 
 
 // ===============================

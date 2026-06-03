@@ -1,11 +1,15 @@
-const API_BASE = (import.meta.env.VITE_API_BASE || runtimeApiBase()).replace(/\/$/, "");
+const API_BASE = (
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.VITE_API_BASE ||
+  runtimeApiBase()
+).replace(/\/$/, "");
 
 function runtimeApiBase() {
   const isLocalFrontend =
     window.location.protocol === "file:" ||
     window.location.hostname === "localhost" ||
     window.location.hostname === "127.0.0.1";
-  return isLocalFrontend ? "http://127.0.0.1:8000" : window.location.origin;
+  return isLocalFrontend ? "http://127.0.0.1:8000" : "https://api.hirescoreai.com";
 }
 
 export async function apiGet(path) {
