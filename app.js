@@ -5035,6 +5035,9 @@ if(!resumeFiles.length){
 alert("Select a folder containing PDF or DOCX resumes.")
 return
 }
+if(resumeFiles.length > 100 && !confirm(`You selected ${resumeFiles.length} resumes. Upload will run in smaller requests and AI screening will continue in the background. Keep this tab open until upload finishes.`)){
+return
+}
 
 try{
 if(button){
@@ -5051,8 +5054,9 @@ button.innerText = `Uploading ${index + 1}/${resumeFiles.length}`
 }
 let formData = new FormData()
 formData.append("files", file, file.webkitRelativePath || file.name)
+formData.append("application_source", "folder")
 
-let syncRes = await fetch(API + "/jobs/" + encodeURIComponent(jobId) + "/resume-folder/upload", {
+let syncRes = await fetch(API + "/upload-resumes/" + encodeURIComponent(jobId), {
 method:"POST",
 headers:{
     "Authorization": "Bearer " + localStorage.getItem("token")
@@ -5063,9 +5067,9 @@ let syncData = await syncRes.json().catch(()=>({}))
 if(!syncRes.ok){
 throw new Error(syncData.detail || syncData.error || `Folder upload failed for ${file.name}.`)
 }
-totals.scanned += Number(syncData.scanned || 0)
-totals.imported += Number(syncData.imported || 0)
-totals.skipped += Number(syncData.skipped || 0)
+totals.scanned += 1
+totals.imported += Number(syncData.total_resumes || syncData.imported || 0)
+totals.skipped += Number(syncData.duplicates || syncData.skipped || 0)
 totals.failed += Number(syncData.failed || 0)
 if(Array.isArray(syncData.messages)){
 messages.push(...syncData.messages)
@@ -5074,7 +5078,7 @@ messages.push(...syncData.messages)
 
 let failedExamples = messages.filter(item => String(item.status || "").toLowerCase().includes("failed")).slice(0, 3)
 let failedText = failedExamples.length ? "\n\nFailed:\n" + failedExamples.map(item => `${item.file}: ${item.status}`).join("\n") : ""
-alert(`Resume folder uploaded.\nSelected: ${resumeFiles.length}\nScanned: ${totals.scanned || 0}\nImported: ${totals.imported || 0}\nSkipped: ${totals.skipped || 0}\nFailed: ${totals.failed || 0}${failedText}`)
+alert(`Resume folder queued.\nSelected: ${resumeFiles.length}\nUploaded: ${totals.imported || 0}\nSkipped/Duplicate: ${totals.skipped || 0}\nFailed: ${totals.failed || 0}\n\nAI screening will continue in background.${failedText}`)
 await loadJobs()
 if(typeof loadDashboard === "function"){
 loadDashboard()
