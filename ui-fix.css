@@ -4232,6 +4232,7 @@ display:flex;
 align-items:center;
 justify-content:space-between;
 gap:16px;
+flex-wrap:wrap;
 padding:18px;
 margin-bottom:18px;
 border:1px solid var(--ats-line);
@@ -4318,6 +4319,273 @@ background:#fff;
 border-color:var(--ats-primary-border);
 color:var(--ats-primary-strong);
 box-shadow:none;
+}
+
+#communicationResultsPage .ats-sender-card{
+display:grid;
+grid-template-columns:minmax(0,1fr) auto;
+align-items:center;
+gap:22px;
+padding:20px 22px;
+border:1px solid #dbeafe;
+border-radius:16px;
+background:
+linear-gradient(135deg,rgba(239,246,255,.78),rgba(255,255,255,.94) 42%),
+#ffffff;
+box-shadow:0 18px 42px rgba(15,23,42,.08);
+}
+
+#communicationResultsPage .ats-sender-card-main{
+display:grid!important;
+grid-template-columns:48px minmax(0,1fr);
+align-items:start!important;
+gap:14px!important;
+min-width:0;
+}
+
+#communicationResultsPage .ats-sender-card .ats-comm-panel-icon{
+width:48px;
+height:48px;
+border-radius:14px;
+background:linear-gradient(180deg,#eff6ff,#eef2ff);
+border-color:#bfdbfe;
+color:#1d4ed8;
+box-shadow:inset 0 1px 0 rgba(255,255,255,.8);
+}
+
+#communicationResultsPage .ats-sender-card-copy h3{
+margin:0 0 4px;
+font-size:20px;
+line-height:1.15;
+}
+
+#communicationResultsPage .ats-sender-card-copy p{
+max-width:none;
+margin:0;
+font-size:13.5px;
+font-weight:900;
+color:#475569;
+}
+
+#communicationResultsPage .ats-sender-card .ats-sender-email-row{
+margin-top:11px;
+}
+
+#communicationResultsPage .ats-sender-card .ats-sender-email-row input{
+width:min(420px,100%);
+height:44px;
+border-color:#c7d2fe;
+border-radius:12px;
+background:#fff;
+box-shadow:0 8px 20px rgba(15,23,42,.04);
+}
+
+#communicationResultsPage .ats-sender-card-help{
+display:block;
+max-width:680px;
+margin-top:9px;
+font-size:12.5px;
+font-weight:850;
+line-height:1.45;
+color:#64748b;
+}
+
+#communicationResultsPage .ats-sender-card-actions{
+display:grid;
+grid-template-columns:1fr;
+gap:10px;
+width:220px;
+}
+
+#communicationResultsPage .ats-sender-card-actions .ats-gmail-connect-btn{
+width:100%;
+min-height:42px;
+justify-content:center;
+border-radius:12px;
+padding:11px 14px;
+font-size:13.5px;
+white-space:normal;
+box-shadow:0 14px 28px rgba(37,99,235,.18);
+}
+
+#communicationResultsPage .ats-sender-card-actions .ats-gmail-connect-btn.is-secondary{
+background:rgba(255,255,255,.86);
+}
+
+#communicationResultsPage .ats-sender-card-actions .ats-gmail-connect-btn:hover{
+transform:translateY(-1px);
+}
+
+.ats-mail-composer{
+position:fixed;
+inset:0;
+z-index:80;
+display:flex;
+align-items:center;
+justify-content:center;
+padding:24px;
+background:rgba(15,23,42,.45);
+}
+
+.ats-mail-composer.hidden{
+display:none;
+}
+
+.ats-mail-composer-card{
+width:min(760px,94vw);
+max-height:90vh;
+overflow:auto;
+border:1px solid #dbeafe;
+border-radius:12px;
+background:#ffffff;
+box-shadow:0 28px 80px rgba(15,23,42,.28);
+padding:22px;
+}
+
+.ats-mail-composer-head{
+display:flex;
+align-items:flex-start;
+justify-content:space-between;
+gap:18px;
+margin-bottom:18px;
+padding-bottom:14px;
+border-bottom:1px solid #e5e7eb;
+}
+
+.ats-mail-composer-head span{
+display:block;
+font-size:11px;
+font-weight:950;
+letter-spacing:.08em;
+text-transform:uppercase;
+color:var(--ats-primary);
+}
+
+.ats-mail-composer-head h3{
+margin:5px 0;
+font-size:22px;
+font-weight:950;
+color:#0f172a;
+}
+
+.ats-mail-composer-head p{
+margin:0;
+font-size:13px;
+font-weight:800;
+color:#64748b;
+}
+
+.ats-mail-composer-head button,
+.ats-mail-composer-actions button{
+border:1px solid #111827;
+border-radius:8px;
+background:#111827;
+color:#ffffff;
+font-size:13px;
+font-weight:900;
+padding:11px 16px;
+cursor:pointer;
+}
+
+.ats-mail-composer label{
+display:block;
+margin-bottom:14px;
+font-size:12px;
+font-weight:950;
+letter-spacing:.04em;
+text-transform:uppercase;
+color:#334155;
+}
+
+.ats-mail-composer input,
+.ats-mail-composer select,
+.ats-mail-composer textarea{
+display:block;
+width:100%;
+margin-top:8px;
+border:1px solid #cbd5e1;
+border-radius:8px;
+background:#f8fafc;
+color:#0f172a;
+font-size:14px;
+font-weight:750;
+line-height:1.55;
+padding:12px 14px;
+}
+
+.ats-mail-composer textarea{
+min-height:280px;
+resize:vertical;
+font-family:Arial,sans-serif;
+}
+
+.ats-mail-composer input:focus,
+.ats-mail-composer select:focus,
+.ats-mail-composer textarea:focus{
+outline:3px solid rgba(37,99,235,.18);
+border-color:var(--ats-primary);
+background:#fff;
+}
+
+.ats-mail-composer-actions{
+display:flex;
+justify-content:flex-end;
+gap:12px;
+padding-top:4px;
+}
+
+.ats-mail-composer-actions button.is-secondary{
+background:#ffffff;
+border-color:var(--ats-primary-border);
+color:var(--ats-primary-strong);
+}
+
+.ats-smtp-card{
+width:min(820px,94vw);
+}
+
+.ats-smtp-grid{
+display:grid;
+grid-template-columns:repeat(2,minmax(0,1fr));
+gap:14px;
+}
+
+.ats-smtp-host-row{
+grid-column:1 / -1;
+}
+
+.ats-smtp-help{
+display:block;
+margin-top:8px;
+font-size:12px;
+font-weight:800;
+letter-spacing:0;
+line-height:1.45;
+text-transform:none;
+color:#64748b;
+}
+
+.ats-smtp-check{
+display:flex!important;
+align-items:center;
+gap:10px;
+margin:2px 0 16px;
+letter-spacing:0!important;
+text-transform:none!important;
+font-size:13px!important;
+color:#475569!important;
+}
+
+.ats-smtp-check input{
+width:auto!important;
+margin:0!important;
+}
+
+@media (max-width: 720px){
+.ats-smtp-grid{
+grid-template-columns:1fr;
+gap:0;
+}
 }
 
 .ats-comm-section{
@@ -4446,6 +4714,16 @@ flex-direction:column;
 align-items:stretch;
 }
 
+#communicationResultsPage .ats-sender-card{
+grid-template-columns:1fr;
+align-items:stretch;
+}
+
+#communicationResultsPage .ats-sender-card-actions{
+width:100%;
+grid-template-columns:repeat(3,minmax(0,1fr));
+}
+
 .ats-comm-detail-metrics{
 grid-template-columns:repeat(2,minmax(0,1fr));
 }
@@ -4457,6 +4735,14 @@ width:100%;
 }
 
 @media (max-width: 720px){
+.ats-sender-card-main{
+grid-template-columns:1fr!important;
+}
+
+#communicationResultsPage .ats-sender-card-actions{
+grid-template-columns:1fr;
+}
+
 .ats-comm-detail-metrics{
 grid-template-columns:1fr;
 }
@@ -10760,6 +11046,37 @@ color:#fff;
 font-size:13px;
 font-weight:900;
 cursor:pointer;
+}
+
+.ats-success-modal-close{
+display:inline-flex;
+align-items:center;
+justify-content:center;
+min-width:128px;
+min-height:44px;
+margin-top:24px;
+border:1px solid #111827;
+border-radius:8px;
+background:#111827;
+color:#ffffff;
+font-size:14px;
+font-weight:900;
+line-height:1;
+cursor:pointer;
+box-shadow:0 10px 22px rgba(15,23,42,.18);
+transition:background .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+
+.ats-success-modal-close:hover{
+background:#0f172a;
+border-color:#0f172a;
+box-shadow:0 14px 28px rgba(15,23,42,.24);
+transform:translateY(-1px);
+}
+
+.ats-success-modal-close:focus-visible{
+outline:3px solid rgba(37,99,235,.32);
+outline-offset:3px;
 }
 
 .ats-job-post-page{

@@ -17,6 +17,7 @@ let currentShortlistResults = []
 let shortlistAnalyticsCharts = {}
 let currentShortlistExplanation = null
 let latestSourcingData = null
+let currentMailComposer = null
 let candidateProfileReturnContext = {
 label: "Back to Candidates",
 action: "showPage('results')"
@@ -364,7 +365,17 @@ let status = safeText(candidate.status || candidate.current_stage || "").toLower
 let reason = safeText(candidate.ranking_reason || candidate.ai_confidence_reason || candidate.explanation || "").toLowerCase()
 let flags = normalizeList(candidate.recruiter_flags || candidate.parser_flags || candidate.risk_points || []).join(" ").toLowerCase()
 let combined = `${status} ${reason} ${flags}`
-if(combined.includes("parser quality") || combined.includes("profile needs review") || combined.includes("name_needs_review") || combined.includes("company_needs_review") || combined.includes("project_noise_detected")) return {label:"Profile needs review", className:"is-review"}
+let parserAction = safeText(candidate.parser_quality_action || "").toLowerCase()
+let criticalProfileSignals = [
+"profile needs review",
+"identity_mismatch",
+"name_needs_review",
+"company_needs_review",
+"project_noise_detected",
+"suspicious_last_company",
+"phone_needs_review"
+]
+if(parserAction === "manual_review_required" || criticalProfileSignals.some(signal => combined.includes(signal))) return {label:"Profile needs review", className:"is-review"}
 if(combined.includes("slightly_over_range") || combined.includes("slightly above")) return {label:"Slightly above range", className:"is-review"}
 if(combined.includes("strong_overqualified") || combined.includes("overqualified_review") || combined.includes("overqualified")) return {label:"Overqualified review", className:"is-review"}
 if(combined.includes("missing_core_skills") || combined.includes("missing or weak core") || combined.includes("skill validation")) return {label:"Skill validation needed", className:"is-review"}
@@ -416,6 +427,56 @@ return `<span class="ats-muted-copy">No skills found in this profile.</span>`
 return skills.slice(0,18).map(skill=>`<span>${safeHtml(skill)}</span>`).join("")
 }
 
+function candidateEvidenceRecordText(item, fallbackLabel="Evidence"){
+if(typeof item === "string") return safeText(item)
+if(!item || typeof item !== "object") return ""
+let name = safeText(item.name || item.title || item.role || item.company_name || fallbackLabel).trim()
+let company = safeText(item.company_name || "").trim()
+let years = Number(item.credited_years ?? item.years)
+let level = safeText(item.evidence_level || item.label || "").replace(/_/g," ").trim()
+let skills = Array.isArray(item.matched_skills) ? item.matched_skills.filter(Boolean).slice(0,6).join(", ") : ""
+let responsibilities = Array.isArray(item.matched_responsibilities) ? item.matched_responsibilities.filter(Boolean).slice(0,4).join(", ") : ""
+let evidenceText = safeText(item.evidence_text || item.description || item.summary || item.snippet || "").trim()
+let prefix = [name, company && company !== name ? company : ""].filter(Boolean).join(" at ")
+let details = []
+if(Number.isFinite(years) && years > 0) details.push(`${Number.isInteger(years) ? years : years.toFixed(1)} years credited`)
+if(level) details.push(level)
+if(skills) details.push(`Skills: ${skills}`)
+if(responsibilities) details.push(`Responsibilities: ${responsibilities}`)
+if(evidenceText) details.push(evidenceText)
+return [prefix || fallbackLabel, details.join(". ")].filter(Boolean).join(": ")
+}
+
+function candidateScreeningEvidenceItems(candidateOrProjects){
+if(candidateOrProjects && typeof candidateOrProjects === "object" && !Array.isArray(candidateOrProjects)){
+let candidate = candidateOrProjects
+let projectEvidence = Array.isArray(candidate.jd_aligned_project_evidence) ? candidate.jd_aligned_project_evidence : []
+let workEvidence = Array.isArray(candidate.jd_aligned_work_evidence) ? candidate.jd_aligned_work_evidence : []
+let manualProjects = Array.isArray(candidate.projects) ? candidate.projects : []
+let items = []
+projectEvidence.forEach(item => items.push({kind:"PRJ", text:candidateEvidenceRecordText(item, "Project evidence")}))
+if(!items.length){
+workEvidence.forEach(item => items.push({kind:"WORK", text:candidateEvidenceRecordText(item, "Work evidence")}))
+}
+if(!items.length){
+manualProjects.forEach(item => items.push({kind:"PRJ", text:candidateEvidenceRecordText(item, "Project")}))
+}
+return items.filter(item => safeText(item.text).trim())
+}
+
+let projects = candidateOrProjects
+if(typeof projects === "string"){
+try{
+projects = JSON.parse(projects)
+}catch{
+projects = projects.trim() ? [projects] : []
+}
+}
+return (Array.isArray(projects) ? projects : [])
+.map(item => ({kind:"PRJ", text:candidateEvidenceRecordText(item, "Project")}))
+.filter(item => safeText(item.text).trim())
+}
+
 function topCandidateProjectEvidence(projects=null, isLoading=false){
 if(isLoading){
 return `
@@ -428,35 +489,20 @@ return `
 `
 }
 
-if(typeof projects === "string"){
-try{
-projects = JSON.parse(projects)
-}catch{
-projects = projects.trim() ? [projects] : []
-}
-}
-
-let items = Array.isArray(projects) ? projects.filter(item=>safeText(item).trim()) : []
+let items = candidateScreeningEvidenceItems(projects)
 
 if(items.length === 0){
-items = ["No concrete project details were found in the stored resume text. Ask the candidate to share project examples during screening."]
+items = [{kind:"PRJ", text:"No JD-aligned project or work proof was found in the stored resume text. Ask the candidate to share examples during screening."}]
 }
 
 return `
 <div class="ats-project-evidence-list">
 ${items.slice(0,4).map(item=>{
-let text = ""
-if(item && typeof item === "object"){
-let tech = Array.isArray(item.technologies) && item.technologies.length
-? ` Tools: ${item.technologies.slice(0,6).join(", ")}.`
-: ""
-text = `${item.name || "Project"}: ${item.description || ""}${tech}`
-}else{
-text = safeText(item)
-}
+let text = safeText(item.text || item)
+let kind = safeText(item.kind || "PRJ")
 return `
 <div class="ats-project-evidence-item">
-<span>PRJ</span>
+<span>${safeHtml(kind)}</span>
 <p>${safeHtml(text)}</p>
 </div>
 `
@@ -911,11 +957,58 @@ if(connectedEmail && email.toLowerCase() !== connectedEmail){
 updateGmailConnectStatus()
 }
 
+function handleSenderVerificationFromUrl(){
+let params = new URLSearchParams(window.location.search)
+let verified = params.get("sender_verified")
+let email = params.get("email")
+if(!verified || !email) return
+localStorage.setItem("outreachSenderEmail", email)
+localStorage.setItem("outreachSenderMode", "smtp")
+localStorage.setItem("outreachSenderVerified", email)
+localStorage.removeItem("outreachSenderVerificationPending")
+window.history.replaceState({}, document.title, window.location.pathname)
+setTimeout(() => {
+    updateGmailConnectStatus()
+    alert("Business sender verified: " + email)
+}, 200)
+}
+
 function offerGoogleReconnect(message){
 let prompt = (message || "Google/Gmail permission is required.") + "\n\nConnect Gmail/Google now?"
 if(confirm(prompt)){
     connectGmailForOutreach()
 }
+}
+
+function connectGoogleForAssessmentAccess(){
+    if(typeof completeOAuthLogin === "function"){
+        completeOAuthLogin()
+    }
+
+    let token = localStorage.getItem("token")
+    if(!token){
+        alert("Please login first before connecting Google.")
+        return
+    }
+
+    let loginEmail = getRecruiterEmailFromSession()
+    if(!loginEmail){
+        alert("Recruiter login email not found. Please login again.")
+        return
+    }
+
+    localStorage.setItem("oauthReturnPage", window.currentJobId ? "communicationResults" : "communication")
+    if(window.currentJobId) localStorage.setItem("oauthReturnJobId", window.currentJobId)
+    if(window.currentJobTitle) localStorage.setItem("oauthReturnJobTitle", window.currentJobTitle)
+
+    window.location.href = API + "/gmail-connect?email=" + encodeURIComponent(loginEmail) + "&app_email=" + encodeURIComponent(loginEmail) + "&strict_sender=0"
+}
+
+function offerGoogleAssessmentReconnect(message){
+    let prompt = (message || "Google Forms permission is required.") + "\n\nConnect your recruiter Google account for assessment access now?"
+    if(confirm(prompt)){
+        connectGoogleForAssessmentAccess()
+    }
 }
 
 function setFieldIfBlank(id, value){
@@ -953,9 +1046,35 @@ let labelPattern = labels.map(label => label.replace(/[.*+?^${}()|[\]\\]/g, "\\$
 let stopLabels = [
 "job title","role","position","department","location","job location","experience","employment type","job type","work mode","salary","ctc","compensation","about the role","key responsibilities","responsibilities","requirements","skills","qualification","qualifications"
 ].join("|")
-let regex = new RegExp(`(?:${labelPattern})\\s*[:\\-]\\s*([\\s\\S]*?)(?=\\s+(?:${stopLabels})\\s*[:\\-]|\\n|$)`, "i")
+let regex = new RegExp(`(?:^|\\s)(?:${labelPattern})\\s*[:\\-]\\s*([\\s\\S]*?)(?=\\s*(?:\\||;|,)?\\s+(?:${stopLabels})\\s*[:\\-]|\\n|$)`, "i")
 let match = regex.exec(text || "")
-return match ? safeText(match[1]).replace(/\s+/g, " ").trim() : ""
+return match ? cleanJDAutofillValue(match[1]) : ""
+}
+
+function cleanJDAutofillValue(value){
+return safeText(value).replace(/\s+/g, " ").replace(/^[\s:|\-,;]+|[\s:|\-,;]+$/g, "").trim()
+}
+
+function cleanJDAutofillTitle(value){
+let text = cleanJDAutofillValue(value)
+let lowered = text.toLowerCase()
+if(!text || text.length < 3 || text.split(/\s+/).length > 8) return ""
+if(/\b(experience|years?|minimum|min|required|employment|full\s*-?\s*time|part\s*-?\s*time|location|salary|ctc|package)\b/i.test(lowered)) return ""
+if(/[.!?]$/.test(text)) return ""
+return text
+}
+
+function formatAutofillExperience(value){
+let text = cleanJDAutofillValue(value).replace(/^(required|minimum|min|experience|required experience)\s*[:\-]?\s*/i, "").trim()
+let range = text.match(/\b(\d+(?:\.\d+)?)\s*(?:-|to|\u2013|\u2014)\s*(\d+(?:\.\d+)?)\s*\+?\s*(?:years?|yrs?)?\b/i)
+if(range) return `${range[1]}-${range[2]} Years`
+let plus = text.match(/\b(\d+(?:\.\d+)?)\s*\+\s*(?:years?|yrs?)?\b/i)
+if(plus) return `${plus[1]}+ Years`
+let min = text.match(/\b(?:minimum|min|at least|required)\s*(\d+(?:\.\d+)?)\s*\+?\s*(?:years?|yrs?)\b/i)
+if(min) return `${min[1]}+ Years`
+let years = text.match(/\b(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\b/i)
+if(years) return `${years[1]}+ Years`
+return ""
 }
 
 function normalizeAutofillJobType(value){
@@ -983,11 +1102,11 @@ let modeRegex = new RegExp(`\\s*/?\\s*${workMode}\\s*$`, "i")
 location = location.replace(modeRegex, "").trim()
 }
 return {
-job_title: jdValueAfterLabel(text, ["Job Title", "Role", "Position"]),
+job_title: cleanJDAutofillTitle(jdValueAfterLabel(text, ["Job Title", "Role", "Position"])),
 department: jdValueAfterLabel(text, ["Department", "Team", "Function"]),
 location,
 work_mode: workMode,
-experience_required: jdValueAfterLabel(text, ["Experience", "Exp"]),
+experience_required: formatAutofillExperience(jdValueAfterLabel(text, ["Experience", "Experience Required", "Required Experience", "Exp"])),
 job_type: normalizeAutofillJobType(jdValueAfterLabel(text, ["Employment Type", "Job Type"])),
 salary_range: jdValueAfterLabel(text, ["Salary", "CTC", "Compensation", "Package"])
 }
@@ -1281,7 +1400,7 @@ return cards.map(([platform, label]) => `
 <article class="ats-generated-post-card ats-post-platform-${platform} ats-post-loading-card">
 <div class="ats-generated-post-head">
 <strong>${label}</strong>
-<div><span>AI writing...</span></div>
+<div><span>Loading saved post...</span></div>
 </div>
 <div class="ats-post-loading-lines">
 <i></i><i></i><i></i><i></i><i></i>
@@ -1349,7 +1468,7 @@ let body = document.getElementById("jobPostPageBody")
 if(!body) return
 
 if(title) title.textContent = `${job.job_title || "Job"} - Posts`
-if(subtitle) subtitle.textContent = `${job.company_name || "Company"} | AI is writing platform-specific posts.`
+if(subtitle) subtitle.textContent = `${job.company_name || "Company"} | Loading saved platform posts.`
 body.innerHTML = renderJobPostLoadingCards()
 showPage("jobPosts")
 
@@ -1374,7 +1493,7 @@ dashboardJobs[dashboardIndex] = {...dashboardJobs[dashboardIndex], ...enrichedJo
 }
 if(subtitle){
 subtitle.textContent = data.generated
-? `${enrichedJob.company_name || "Company"} | AI-written platform posts are ready to copy and publish.`
+? `${enrichedJob.company_name || "Company"} | ${data.cached ? "Saved" : "AI-written"} platform posts are ready to copy and publish.`
 : `${enrichedJob.company_name || "Company"} | AI unavailable, showing polished fallback posts.`
 }
 body.innerHTML = buildDashboardJobPosts(enrichedJob).map(renderDashboardJobPostCard).join("")
@@ -3732,7 +3851,7 @@ ${topCandidateSkillPills(skills)}
 <span>Resume proof</span>
 </div>
 <div id="topCandidateProjects">
-${topCandidateProjectEvidence(candidate.projects)}
+${topCandidateProjectEvidence(candidate)}
 </div>
 </div>
 
@@ -4782,7 +4901,7 @@ Posts
 <button
 onclick="configureJobResumeFolder('${safeJs(job.id)}')"
 class="ats-table-action ats-table-action-folder"
-title="${safeHtml(job.resume_folder_path ? `Folder: ${job.resume_folder_path}` : "Configure resume folder")}">
+title="Upload resumes from a local folder">
 
 Folder
 
@@ -4894,48 +5013,65 @@ renderApplicationsBySource(aggregateSourceCounts(jobsToCalculate))
 }
 
 async function configureJobResumeFolder(jobId){
-let job = (dashboardJobs || []).find(item => String(item.id) === String(jobId)) || {}
-let currentPath = job.resume_folder_path || ""
-let folderPath = prompt("Paste the local resume folder path for this job. New PDF, DOCX, or TXT resumes in this folder will be treated as applications.", currentPath)
-if(folderPath === null) return
-folderPath = folderPath.trim()
-if(!folderPath){
-alert("Folder path is required.")
+let button = typeof event !== "undefined" ? event.currentTarget : null
+let input = document.createElement("input")
+input.type = "file"
+input.multiple = true
+input.accept = ".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+input.setAttribute("webkitdirectory", "")
+input.setAttribute("directory", "")
+input.style.position = "fixed"
+input.style.left = "-9999px"
+document.body.appendChild(input)
+
+let selectedFiles = await new Promise(resolve => {
+input.addEventListener("change", () => resolve(Array.from(input.files || [])), {once:true})
+input.click()
+})
+document.body.removeChild(input)
+
+let resumeFiles = selectedFiles.filter(file => /\.(pdf|docx|txt)$/i.test(file.name || ""))
+if(!resumeFiles.length){
+alert("Select a folder containing PDF, DOCX, or TXT resumes.")
 return
 }
 
 try{
-let saveRes = await fetch(API + "/jobs/" + encodeURIComponent(jobId) + "/resume-folder", {
-method:"POST",
-headers:{
-...authHeaders(),
-"Content-Type":"application/json"
-},
-body:JSON.stringify({folder_path: folderPath})
-})
-let saveData = await saveRes.json().catch(()=>({}))
-if(!saveRes.ok){
-alert(saveData.detail || saveData.error || "Could not configure resume folder.")
-return
+if(button){
+button.disabled = true
+button.innerText = "Uploading..."
 }
 
-let syncRes = await fetch(API + "/jobs/" + encodeURIComponent(jobId) + "/resume-folder/sync", {
+let formData = new FormData()
+resumeFiles.forEach(file => {
+formData.append("files", file, file.webkitRelativePath || file.name)
+})
+
+let syncRes = await fetch(API + "/jobs/" + encodeURIComponent(jobId) + "/resume-folder/upload", {
 method:"POST",
-headers:authHeaders()
+headers:{
+    "Authorization": "Bearer " + localStorage.getItem("token")
+},
+body:formData
 })
 let syncData = await syncRes.json().catch(()=>({}))
 if(!syncRes.ok){
-alert(syncData.detail || syncData.error || "Folder saved, but sync failed.")
+alert(syncData.detail || syncData.error || "Folder upload failed.")
 return
 }
 
-alert(`Resume folder synced.\nScanned: ${syncData.scanned || 0}\nImported: ${syncData.imported || 0}\nSkipped: ${syncData.skipped || 0}\nFailed: ${syncData.failed || 0}`)
+alert(`Resume folder uploaded.\nSelected: ${resumeFiles.length}\nScanned: ${syncData.scanned || 0}\nImported: ${syncData.imported || 0}\nSkipped: ${syncData.skipped || 0}\nFailed: ${syncData.failed || 0}`)
 await loadJobs()
 if(typeof loadDashboard === "function"){
 loadDashboard()
 }
 }catch(error){
-alert("Could not configure or sync resume folder.")
+alert("Could not upload resume folder.")
+}finally{
+if(button && document.body.contains(button)){
+button.disabled = false
+button.innerText = "Folder"
+}
 }
 }
 
@@ -5615,6 +5751,7 @@ function checkLogin(){
 if(typeof completeOAuthLogin === "function"){
     completeOAuthLogin()
 }
+handleSenderVerificationFromUrl()
 
 let token = localStorage.getItem("token")
 let expired = typeof isTokenExpired === "function" ? isTokenExpired(token) : false
@@ -5652,12 +5789,142 @@ function connectGmailForOutreach(){
         document.getElementById("outreachSenderEmail")?.focus()
         return
     }
+    let domain = email.split("@")[1]?.toLowerCase() || ""
+    let isPlainGmail = domain === "gmail.com" || domain === "googlemail.com"
+    if(!isPlainGmail){
+        let proceed = confirm(
+            email + " must be a Google Workspace mailbox to connect with this button.\n\n" +
+            "If this mailbox is Zoho, Microsoft 365, cPanel, or another SMTP provider, click 'Use SMTP/Resend Sender' instead.\n\n" +
+            "Continue to Google account selection?"
+        )
+        if(!proceed) return
+    }
     localStorage.setItem("outreachSenderEmail", email)
+    localStorage.setItem("outreachSenderMode", "google")
     localStorage.setItem("oauthReturnPage", window.currentJobId ? "communicationResults" : "communication")
     if(window.currentJobId) localStorage.setItem("oauthReturnJobId", window.currentJobId)
     if(window.currentJobTitle) localStorage.setItem("oauthReturnJobTitle", window.currentJobTitle)
 
     window.location.href = API + "/gmail-connect?email=" + encodeURIComponent(email) + "&app_email=" + encodeURIComponent(loginEmail)
+}
+
+async function useBusinessSenderForOutreach(){
+    let email = getOutreachSenderEmail()
+    if(!email || !email.includes("@")){
+        alert("Please enter a valid company sender email first.")
+        document.getElementById("outreachSenderEmail")?.focus()
+        return
+    }
+    let modal = document.getElementById("smtpSenderModal")
+    if(!modal) return
+    let senderInput = document.getElementById("smtpSenderEmail")
+    let usernameInput = document.getElementById("smtpUsername")
+    let passwordInput = document.getElementById("smtpPassword")
+    if(senderInput) senderInput.value = email
+    if(usernameInput) usernameInput.value = email
+    if(passwordInput) passwordInput.value = ""
+    let providerInput = document.getElementById("smtpProvider")
+    if(providerInput) providerInput.value = guessSmtpProvider(email)
+    applySmtpPreset()
+    modal.classList.remove("hidden")
+    modal.setAttribute("aria-hidden", "false")
+    document.getElementById("smtpProvider")?.focus()
+}
+
+function closeSmtpSenderModal(){
+    let modal = document.getElementById("smtpSenderModal")
+    if(!modal) return
+    modal.classList.add("hidden")
+    modal.setAttribute("aria-hidden", "true")
+}
+
+function guessSmtpProvider(email){
+    let domain = safeText(email).split("@")[1]?.toLowerCase() || ""
+    if(domain.includes("gmail") || domain.includes("googlemail")) return "google"
+    if(domain.includes("outlook") || domain.includes("hotmail") || domain.includes("live") || domain.includes("office365")) return "office365"
+    if(domain.includes("zoho")) return "zoho"
+    if(domain.includes("secureserver") || domain.includes("godaddy")) return "godaddy"
+    return "google"
+}
+
+function applySmtpPreset(){
+    let provider = document.getElementById("smtpProvider")?.value || "google"
+    let hostInput = document.getElementById("smtpHost")
+    let portInput = document.getElementById("smtpPort")
+    let tlsInput = document.getElementById("smtpUseTls")
+    let presets = {
+        google:{host:"smtp.gmail.com", port:587, tls:true},
+        office365:{host:"smtp.office365.com", port:587, tls:true},
+        zoho:{host:"smtp.zoho.com", port:587, tls:true},
+        godaddy:{host:"smtpout.secureserver.net", port:587, tls:true}
+    }
+    let preset = presets[provider]
+    if(preset){
+        if(hostInput) hostInput.value = preset.host
+        if(portInput) portInput.value = preset.port
+        if(tlsInput) tlsInput.checked = preset.tls
+    }else if(hostInput && !safeText(hostInput.value).trim()){
+        hostInput.placeholder = "mail.yourdomain.com or provider SMTP host"
+    }
+}
+
+async function configureBusinessSmtpSender(){
+    let email = safeText(document.getElementById("smtpSenderEmail")?.value).trim()
+    let smtpHost = safeText(document.getElementById("smtpHost")?.value).trim()
+    let smtpPort = Number(document.getElementById("smtpPort")?.value || 587)
+    let smtpUsername = safeText(document.getElementById("smtpUsername")?.value).trim() || email
+    let smtpPassword = safeText(document.getElementById("smtpPassword")?.value).trim()
+    let useTls = document.getElementById("smtpUseTls")?.checked !== false
+    if(!email || !email.includes("@")){
+        alert("Please enter a valid sender email.")
+        document.getElementById("smtpSenderEmail")?.focus()
+        return
+    }
+    if(!smtpHost){
+        alert("Please enter SMTP host.")
+        document.getElementById("smtpHost")?.focus()
+        return
+    }
+    if(!smtpPassword){
+        alert("Please enter SMTP password or app password.")
+        document.getElementById("smtpPassword")?.focus()
+        return
+    }
+    let button = typeof event !== "undefined" ? event.currentTarget : null
+    setButtonLoading(button, true, "Sending...")
+    try{
+        let res = await fetch(API + "/outreach-sender/configure-smtp", {
+            method:"POST",
+            headers:authHeaders(),
+            body:JSON.stringify({
+                email,
+                smtp_host:smtpHost,
+                smtp_port:smtpPort || 587,
+                smtp_username:smtpUsername,
+                smtp_password:smtpPassword,
+                use_tls:useTls
+            })
+        })
+        let data = await res.json().catch(()=>({}))
+        if(!res.ok || data.error){
+            alert("Authorization mail failed: " + (data.detail || data.error || "SMTP details are incorrect"))
+            return
+        }
+        localStorage.setItem("outreachSenderEmail", email)
+        localStorage.setItem("outreachSenderMode", "smtp")
+        localStorage.setItem("outreachSenderVerificationPending", email)
+        localStorage.removeItem("outreachSenderVerified")
+        localStorage.removeItem("gmailConnected")
+        let mainInput = document.getElementById("outreachSenderEmail")
+        if(mainInput) mainInput.value = email
+        closeSmtpSenderModal()
+        updateGmailConnectStatus()
+        alert("Authorization mail sent to " + email + ". Open that inbox and approve the link.")
+    }catch(err){
+        alert("Authorization mail could not be sent. Please check SMTP host, port, username and app password.")
+    }finally{
+        setButtonLoading(button, false)
+    }
 }
 
 function updateGmailConnectStatus(){
@@ -5667,18 +5934,29 @@ function updateGmailConnectStatus(){
     let saved = localStorage.getItem("outreachSenderEmail") || localStorage.getItem("userEmail") || ""
     if(input && saved && !safeText(input.value).trim()) input.value = saved
     let email = getOutreachSenderEmail() || "your company email"
+    let mode = localStorage.getItem("outreachSenderMode") || ""
+    let verifiedEmail = safeText(localStorage.getItem("outreachSenderVerified")).trim().toLowerCase()
     let connectedEmail = safeText(localStorage.getItem("gmailConnectedEmail")).trim().toLowerCase()
     let isConnected = localStorage.getItem("gmailConnected") === "true" && (!connectedEmail || connectedEmail === email.toLowerCase())
     if(isConnected){
-        status.innerText = "Google Mail connected for outreach from " + email + "."
+        status.innerText = "Google Workspace/Gmail connected for outreach from " + email + "."
+    }else if(mode === "smtp" && verifiedEmail === email.toLowerCase()){
+        status.innerText = "Business sender verified: " + email + ". Candidate mail can use configured SMTP/Resend."
+    }else if(mode === "smtp"){
+        status.innerText = "Verification link sent to " + email + ". Open that inbox and approve the link before sending candidate mail."
     }else{
-        status.innerText = "Candidate emails will use " + email + " as sender/reply-to. Connect Google Mail if this is a Gmail or Google Workspace inbox."
+        status.innerText = "Use Google connect for Workspace/Gmail, or verify a business mailbox for SMTP/Resend sending."
     }
 }
 
 async function syncGmailReplies(options = {}){
     let silent = options.silent === true
     let reload = options.reload !== false
+
+    if(localStorage.getItem("outreachSenderMode") === "smtp"){
+        if(!silent) alert("Reply sync is available only for connected Gmail/Google Workspace inboxes. SMTP/Resend can send mail, but cannot sync inbox replies from Google.")
+        return
+    }
 
     if(!window.currentJobId){
         if(!silent) alert("Open a communication job first.")
@@ -7831,7 +8109,29 @@ function openCommunicationPage(jobId, jobTitle){
     // * NEW ADD
     loadCommunicationSplit(jobId)
 }
-async function sendMail(email, name, jobTitle, jobId){
+function defaultCandidateMailBody(name, jobTitle, companyName, hiringManager){
+let company = companyName || "our company"
+let sender = hiringManager || localStorage.getItem("username") || "Recruiting Team"
+return `Hi ${name || "Candidate"},
+
+Thank you for applying for the ${jobTitle || "open"} role at ${company}. We reviewed your profile and would like to move you to the next step in our hiring process.
+
+Please reply to this email with one of the following options:
+1. Interested - if you would like to continue with the next round.
+2. Not Interested - if you do not want to proceed at this time.
+
+If you are interested, we will share the next steps and schedule details shortly.
+
+Best regards,
+${sender}`
+}
+
+function closeMailComposer(){
+document.getElementById("mailComposerModal")?.classList.add("hidden")
+currentMailComposer = null
+}
+
+async function sendMail(email, name, jobTitle, jobId, candidateId = ""){
     let button = typeof event !== "undefined" ? event.target : null
     let senderEmail = getOutreachSenderEmail()
     if(!senderEmail || !senderEmail.includes("@")){
@@ -7840,11 +8140,90 @@ async function sendMail(email, name, jobTitle, jobId){
         return
     }
     localStorage.setItem("outreachSenderEmail", senderEmail)
-    setButtonLoading(button, true, "Sending...")
 
     try{
         let jobRes = await fetch(API + "/public-job/" + encodeURIComponent(jobId))
         let job = jobRes.ok ? await jobRes.json() : {}
+        currentMailComposer = {
+            email,
+            name,
+            candidateId,
+            jobId,
+            jobTitle,
+            senderEmail,
+            button,
+            companyName: job.company_name,
+            hiringManager: job.hiring_manager
+        }
+
+        let modal = document.getElementById("mailComposerModal")
+        let meta = document.getElementById("mailComposerMeta")
+        let subject = document.getElementById("mailComposerSubject")
+        let body = document.getElementById("mailComposerBody")
+        if(meta) meta.innerText = `${name || "Candidate"} | ${email} | From ${senderEmail}`
+        if(subject) subject.value = `${jobTitle || "Role"} - Next Step`
+        if(body) body.value = defaultCandidateMailBody(name, jobTitle, job.company_name, job.hiring_manager)
+        if(modal){
+            modal.classList.remove("hidden")
+            modal.setAttribute("aria-hidden", "false")
+        }
+    }catch(err){
+        alert("Could not prepare mail composer.")
+    }
+}
+
+async function generateMailDraftForComposer(){
+    if(!currentMailComposer){
+        alert("Select a candidate first.")
+        return
+    }
+    let button = typeof event !== "undefined" ? event.currentTarget : null
+    setButtonLoading(button, true, "Generating...")
+    try{
+        let res = await fetch(API + "/mail-draft", {
+            method:"POST",
+            headers:authHeaders(),
+            body:JSON.stringify({
+                email: currentMailComposer.email,
+                name: currentMailComposer.name,
+                job_id: currentMailComposer.jobId,
+                job_title: currentMailComposer.jobTitle,
+                company_name: currentMailComposer.companyName,
+                hiring_manager: currentMailComposer.hiringManager,
+                subject: document.getElementById("mailComposerSubject")?.value || ""
+            })
+        })
+        let data = await res.json().catch(()=>({}))
+        if(!res.ok || data.error){
+            alert("AI draft failed: " + (data.detail || data.error || "OpenAI is not configured"))
+            return
+        }
+        if(data.subject) document.getElementById("mailComposerSubject").value = data.subject
+        if(data.body) document.getElementById("mailComposerBody").value = data.body
+    }catch(err){
+        alert("AI draft failed.")
+    }finally{
+        setButtonLoading(button, false)
+    }
+}
+
+async function sendMailComposerMessage(){
+    if(!currentMailComposer){
+        alert("Select a candidate first.")
+        return
+    }
+    let subject = safeText(document.getElementById("mailComposerSubject")?.value).trim()
+    let body = safeText(document.getElementById("mailComposerBody")?.value).trim()
+    if(!subject || !body){
+        alert("Subject and message are required.")
+        return
+    }
+
+    let button = typeof event !== "undefined" ? event.currentTarget : null
+    setButtonLoading(button, true, "Sending...")
+
+    try{
+        let {email, name, candidateId, jobTitle, jobId, senderEmail, companyName, hiringManager} = currentMailComposer
 
         let res = await fetch(API + "/send-mail", {
             method: "POST",
@@ -7854,13 +8233,16 @@ async function sendMail(email, name, jobTitle, jobId){
             },
             body: JSON.stringify({
                 email: email,
+                candidate_id: candidateId,
                 name: name,
                 job_id: jobId,
                 job_title: jobTitle,
                 recruiter_email: senderEmail,
                 recruiter_name: localStorage.getItem("username"),
-                hiring_manager: job.hiring_manager,
-                company_name: job.company_name
+                hiring_manager: hiringManager,
+                company_name: companyName,
+                subject,
+                body
             })
         })
 
@@ -7872,6 +8254,7 @@ async function sendMail(email, name, jobTitle, jobId){
         }
 
         alert("Mail sent successfully to " + email + (data.reply_to ? "\nReply-To: " + data.reply_to : ""))
+        closeMailComposer()
 
         if(jobId){
             await loadCommunicationSplit(jobId)
@@ -7913,7 +8296,14 @@ async function sendAssessmentTest(candidateId, jobId){
         let data = await res.json()
         if(!res.ok || data.error){
             let message = data.detail || data.error || "Google Forms/Gmail is not configured"
-            if(res.status === 401 || /connect|gmail|google|forms/i.test(message)){
+            let usesSmtpSender = localStorage.getItem("outreachSenderMode") === "smtp"
+            let isFormsIssue = /forms|google forms/i.test(message)
+            let isGoogleSenderIssue = /gmail|google/i.test(message) && !/smtp|business/i.test(message)
+            if(isFormsIssue){
+                offerGoogleAssessmentReconnect("Test setup failed: " + message)
+                return
+            }
+            if(!usesSmtpSender && (res.status === 401 || isGoogleSenderIssue)){
                 offerGoogleReconnect("Test send failed: " + message)
                 return
             }
@@ -7921,7 +8311,8 @@ async function sendAssessmentTest(candidateId, jobId){
             return
         }
 
-        alert(data.message || "Test sent successfully")
+        let sentFrom = data.from ? " from " + data.from : ""
+        alert((data.message || "Test sent successfully") + sentFrom)
         await loadCommunicationSplit(jobId)
     }catch(err){
         alert("Test send failed. Please check Google Forms and Gmail configuration.")
@@ -7961,7 +8352,11 @@ async function syncAssessmentResults(jobId, options = {}){
         let data = await res.json()
         if(!res.ok || data.error){
             let message = data.detail || data.error || "Google Forms response access is not configured"
-            if(!silent && (res.status === 401 || /connect|gmail|google|forms/i.test(message))){
+            if(!silent && /forms|google forms/i.test(message)){
+                offerGoogleAssessmentReconnect("Result sync failed: " + message)
+                return
+            }
+            if(!silent && (res.status === 401 || /connect|gmail|google/i.test(message))){
                 offerGoogleReconnect("Result sync failed: " + message)
                 return
             }
@@ -8042,9 +8437,12 @@ function getInterviewRowModel(candidate){
     if(status === "Interview Scheduling") status = "Pending"
     let scheduledAt = candidate.scheduled_at ? new Date(candidate.scheduled_at) : null
     let hasValidDate = scheduledAt && !Number.isNaN(scheduledAt.getTime())
+    let isMissingTime = hasValidDate && scheduledAt.getHours() === 0 && scheduledAt.getMinutes() === 0 && scheduledAt.getSeconds() === 0
     let dateValue = hasValidDate ? scheduledAt.toISOString().slice(0,10) : ""
     let dateTime = hasValidDate
-        ? scheduledAt.toLocaleString([], {dateStyle:"medium", timeStyle:"short"})
+        ? (isMissingTime
+            ? scheduledAt.toLocaleDateString([], {dateStyle:"medium"}) + ", time not set"
+            : scheduledAt.toLocaleString([], {dateStyle:"medium", timeStyle:"short"}))
         : "Awaiting slot"
     return {
         ...candidate,
@@ -8065,6 +8463,18 @@ function openInterviewJoinLink(url){
     window.open(url, "_blank", "noopener")
 }
 
+function toDateTimeLocalValue(value){
+    if(!value) return ""
+    let parsed = new Date(value)
+    if(Number.isNaN(parsed.getTime())) return ""
+    let pad = n => String(n).padStart(2, "0")
+    return [
+        parsed.getFullYear(),
+        pad(parsed.getMonth() + 1),
+        pad(parsed.getDate())
+    ].join("-") + "T" + [pad(parsed.getHours()), pad(parsed.getMinutes())].join(":")
+}
+
 async function scheduleInterviewSlot(candidateId, jobId, currentLink = "", currentDateTime = ""){
     if(!candidateId || !jobId){
         alert("Candidate or job is missing.")
@@ -8079,15 +8489,24 @@ async function scheduleInterviewSlot(candidateId, jobId, currentLink = "", curre
         return
     }
 
-    let defaultDate = ""
-    if(currentDateTime){
-        let parsed = new Date(currentDateTime)
-        if(!Number.isNaN(parsed.getTime())){
-            defaultDate = parsed.toISOString().slice(0,16)
-        }
-    }
-    let scheduledAt = prompt("Interview date & time (YYYY-MM-DDTHH:mm). Leave blank if not fixed yet.", defaultDate)
+    let defaultDate = toDateTimeLocalValue(currentDateTime)
+    let scheduledAt = prompt("Interview date & time is required (YYYY-MM-DDTHH:mm)", defaultDate)
     if(scheduledAt === null) return
+    scheduledAt = scheduledAt.trim()
+    if(/^\d{4}-\d{2}-\d{2}$/.test(scheduledAt)){
+        let timeOnly = prompt("Please enter interview time (HH:mm)", "10:00")
+        if(timeOnly === null) return
+        timeOnly = timeOnly.trim()
+        if(!/^\d{2}:\d{2}$/.test(timeOnly)){
+            alert("Please enter time in HH:mm format.")
+            return
+        }
+        scheduledAt = scheduledAt + "T" + timeOnly
+    }
+    if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(scheduledAt)){
+        alert("Interview date and time is required. Example: 2026-06-06T15:30")
+        return
+    }
 
     try{
         let res = await fetch(API + "/schedule-interview-slot", {
@@ -8109,6 +8528,41 @@ async function scheduleInterviewSlot(candidateId, jobId, currentLink = "", curre
         await loadInterviewDashboard()
     }catch(err){
         alert("Could not save interview slot")
+    }
+}
+
+async function completeInterviewSlot(candidateId, jobId, candidateName = ""){
+    if(!candidateId || !jobId){
+        alert("Candidate or job is missing.")
+        return
+    }
+
+    let feedback = prompt("Add interview feedback or leave blank to mark complete", "")
+    if(feedback === null) return
+
+    let button = typeof event !== "undefined" ? event.currentTarget : null
+    setButtonLoading(button, true, "Saving...")
+    try{
+        let res = await fetch(API + "/complete-interview-slot", {
+            method:"POST",
+            headers: authHeaders(),
+            body: JSON.stringify({
+                candidate_id: candidateId,
+                job_id: jobId,
+                feedback: feedback.trim()
+            })
+        })
+        let data = await res.json()
+        if(!res.ok || data.error){
+            alert("Could not complete interview: " + (data.detail || data.error || "Invalid interview details"))
+            return
+        }
+        alert(data.message || ((candidateName || "Candidate") + " moved to Completed"))
+        await loadInterviewDashboard()
+    }catch(err){
+        alert("Could not complete interview")
+    }finally{
+        setButtonLoading(button, false)
     }
 }
 
@@ -8175,7 +8629,7 @@ function interviewCard(candidate){
                     `}
                     <button onclick="scheduleInterviewSlot('${safeJs(candidate.id)}','${safeJs(candidate.job_id)}','${safeJs(candidate.meeting_url || "")}','${safeJs(candidate.scheduled_at || "")}')" title="Reschedule">Reschedule</button>
                     <button onclick="alert('Interview details for ${safeJs(candidate.name || "Candidate")}')" title="View">View</button>
-                    <button onclick="alert('Feedback workflow is ready for this candidate.')" title="Feedback">Feedback</button>
+                    ${candidate.status === "Completed" ? "" : `<button onclick="completeInterviewSlot('${safeJs(candidate.id)}','${safeJs(candidate.job_id)}','${safeJs(candidate.name || "Candidate")}')" title="Complete">Complete</button>`}
                 </div>
             </div>
         </article>
@@ -8268,6 +8722,7 @@ function renderInterviewDashboard(){
                     `}
                     <button onclick="alert('Interview details for ${safeJs(c.name || "Candidate")}')" class="ats-interview-secondary-btn">Details</button>
                     <button onclick="scheduleInterviewSlot('${safeJs(c.id)}','${safeJs(c.job_id)}','${safeJs(c.meeting_url || "")}','${safeJs(c.scheduled_at || "")}')" class="ats-interview-primary-small">Reschedule</button>
+                    ${c.status === "Completed" ? "" : `<button onclick="completeInterviewSlot('${safeJs(c.id)}','${safeJs(c.job_id)}','${safeJs(c.name || "Candidate")}')" class="ats-interview-primary-small">Complete</button>`}
                 </div>
             </td>
         </tr>
@@ -8329,7 +8784,7 @@ async function loadCommunicationSplitLegacy(jobId){
                     ${c.status}
                 </td>
                 <td>
-                    <button onclick="sendMail('${c.email}','${c.name}','${window.currentJobTitle}','${jobId}')"
+                    <button onclick="sendMail('${c.email}','${c.name}','${window.currentJobTitle}','${jobId}','${c.id || ""}')"
                     style="background:#2563eb;color:white;padding:6px 10px;border-radius:6px;">
                     Send Mail
                     </button>
@@ -8723,7 +9178,7 @@ async function loadCommunicationSplit(jobId){
             <td><span class="ats-next-step">${safeHtml(c.next_step || "Send outreach")}</span></td>
             <td><span class="ats-status-pill ats-status-warn">${safeHtml(c.status)}</span></td>
             <td>
-                <button onclick="sendMail('${safeJs(c.email)}','${safeJs(c.name)}','${safeJs(window.currentJobTitle)}','${safeJs(jobId)}')"
+                <button onclick="sendMail('${safeJs(c.email)}','${safeJs(c.name)}','${safeJs(window.currentJobTitle)}','${safeJs(jobId)}','${safeJs(c.id || "")}')"
                 class="ats-send-btn bg-blue-600 text-white px-3 py-1 rounded text-sm">
                     Send Mail
                 </button>
