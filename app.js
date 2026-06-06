@@ -5017,7 +5017,7 @@ let button = typeof event !== "undefined" ? event.currentTarget : null
 let input = document.createElement("input")
 input.type = "file"
 input.multiple = true
-input.accept = ".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+input.accept = ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 input.setAttribute("webkitdirectory", "")
 input.setAttribute("directory", "")
 input.style.position = "fixed"
@@ -5030,9 +5030,9 @@ input.click()
 })
 document.body.removeChild(input)
 
-let resumeFiles = selectedFiles.filter(file => /\.(pdf|docx|txt)$/i.test(file.name || ""))
+let resumeFiles = selectedFiles.filter(file => /\.(pdf|docx)$/i.test(file.name || ""))
 if(!resumeFiles.length){
-alert("Select a folder containing PDF, DOCX, or TXT resumes.")
+alert("Select a folder containing PDF or DOCX resumes.")
 return
 }
 
@@ -5042,10 +5042,15 @@ button.disabled = true
 button.innerText = "Uploading..."
 }
 
+let totals = {scanned:0, imported:0, skipped:0, failed:0}
+let messages = []
+for(let index = 0; index < resumeFiles.length; index++){
+let file = resumeFiles[index]
+if(button){
+button.innerText = `Uploading ${index + 1}/${resumeFiles.length}`
+}
 let formData = new FormData()
-resumeFiles.forEach(file => {
 formData.append("files", file, file.webkitRelativePath || file.name)
-})
 
 let syncRes = await fetch(API + "/jobs/" + encodeURIComponent(jobId) + "/resume-folder/upload", {
 method:"POST",
@@ -5056,17 +5061,26 @@ body:formData
 })
 let syncData = await syncRes.json().catch(()=>({}))
 if(!syncRes.ok){
-alert(syncData.detail || syncData.error || "Folder upload failed.")
-return
+throw new Error(syncData.detail || syncData.error || `Folder upload failed for ${file.name}.`)
+}
+totals.scanned += Number(syncData.scanned || 0)
+totals.imported += Number(syncData.imported || 0)
+totals.skipped += Number(syncData.skipped || 0)
+totals.failed += Number(syncData.failed || 0)
+if(Array.isArray(syncData.messages)){
+messages.push(...syncData.messages)
+}
 }
 
-alert(`Resume folder uploaded.\nSelected: ${resumeFiles.length}\nScanned: ${syncData.scanned || 0}\nImported: ${syncData.imported || 0}\nSkipped: ${syncData.skipped || 0}\nFailed: ${syncData.failed || 0}`)
+let failedExamples = messages.filter(item => String(item.status || "").toLowerCase().includes("failed")).slice(0, 3)
+let failedText = failedExamples.length ? "\n\nFailed:\n" + failedExamples.map(item => `${item.file}: ${item.status}`).join("\n") : ""
+alert(`Resume folder uploaded.\nSelected: ${resumeFiles.length}\nScanned: ${totals.scanned || 0}\nImported: ${totals.imported || 0}\nSkipped: ${totals.skipped || 0}\nFailed: ${totals.failed || 0}${failedText}`)
 await loadJobs()
 if(typeof loadDashboard === "function"){
 loadDashboard()
 }
 }catch(error){
-alert("Could not upload resume folder.")
+alert("Could not upload resume folder.\n" + (error && error.message ? error.message : "Please check backend upload limits and try again."))
 }finally{
 if(button && document.body.contains(button)){
 button.disabled = false
