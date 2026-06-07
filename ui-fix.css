@@ -1723,6 +1723,30 @@ color:#b45309;
 border:1px solid #fde68a;
 }
 
+.ats-result-status.is-pending{
+background:#f8fafc;
+color:#475569;
+border:1px solid #cbd5e1;
+}
+
+.ats-result-status.is-processing{
+background:#eff6ff;
+color:#1d4ed8;
+border:1px solid #bfdbfe;
+}
+
+.ats-result-status.is-scored{
+background:#ecfeff;
+color:#0e7490;
+border:1px solid #a5f3fc;
+}
+
+.ats-result-status.is-failed{
+background:#fef2f2;
+color:#b91c1c;
+border:1px solid #fecaca;
+}
+
 .ats-result-status.is-rejected{
 background:#fef2f2;
 color:#b91c1c;
@@ -9530,6 +9554,30 @@ color:#047857;
 background:var(--ats-warning-soft);
 border-color:var(--ats-warning-border);
 color:var(--ats-warning);
+}
+
+#jobResultPage .ats-result-status.is-pending{
+background:#f8fafc;
+border-color:#cbd5e1;
+color:#475569;
+}
+
+#jobResultPage .ats-result-status.is-processing{
+background:#eff6ff;
+border-color:#bfdbfe;
+color:#1d4ed8;
+}
+
+#jobResultPage .ats-result-status.is-scored{
+background:#ecfeff;
+border-color:#a5f3fc;
+color:#0e7490;
+}
+
+#jobResultPage .ats-result-status.is-failed{
+background:var(--ats-danger-soft);
+border-color:var(--ats-danger-border);
+color:var(--ats-danger);
 }
 
 #jobResultPage .ats-result-status.is-rejected{

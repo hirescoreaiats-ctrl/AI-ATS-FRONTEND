@@ -5012,12 +5012,67 @@ renderApplicationsBySource(aggregateSourceCounts(jobsToCalculate))
 
 }
 
+const resumeProcessingPollers = {}
+
+async function fetchResumeProcessingProgress(jobId){
+let res = await fetch(API + "/resume-processing-progress/" + encodeURIComponent(jobId), {
+headers:{
+    "Authorization": "Bearer " + localStorage.getItem("token")
+}
+})
+let data = await res.json().catch(()=>({}))
+if(!res.ok){
+throw new Error(data.detail || data.error || "Could not load resume processing progress.")
+}
+return data
+}
+
+function startResumeProcessingProgress(jobId, button){
+if(resumeProcessingPollers[jobId]){
+clearInterval(resumeProcessingPollers[jobId])
+}
+let tick = async () => {
+try{
+let progress = await fetchResumeProcessingProgress(jobId)
+let processed = Number(progress.completed || 0) + Number(progress.failed || 0)
+let total = Number(progress.total || 0)
+if(button){
+button.disabled = true
+button.innerText = total ? `Processing ${processed}/${total}` : "Processing..."
+button.title = `${progress.processing || 0} currently processing, ${progress.pending || 0} pending, ${progress.needs_review || 0} need review`
+}
+await loadJobs()
+if(typeof loadDashboard === "function"){
+loadDashboard()
+}
+if(Number(progress.pending || 0) === 0 && Number(progress.processing || 0) === 0){
+clearInterval(resumeProcessingPollers[jobId])
+delete resumeProcessingPollers[jobId]
+if(button){
+button.disabled = false
+button.innerText = "Folder"
+button.title = "Configure resume folder"
+}
+}
+}catch(error){
+clearInterval(resumeProcessingPollers[jobId])
+delete resumeProcessingPollers[jobId]
+if(button){
+button.disabled = false
+button.innerText = "Folder"
+}
+}
+}
+tick()
+resumeProcessingPollers[jobId] = setInterval(tick, 4000)
+}
+
 async function configureJobResumeFolder(jobId){
 let button = typeof event !== "undefined" ? event.currentTarget : null
 let input = document.createElement("input")
 input.type = "file"
 input.multiple = true
-input.accept = ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+input.accept = ".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 input.setAttribute("webkitdirectory", "")
 input.setAttribute("directory", "")
 input.style.position = "fixed"
@@ -5030,12 +5085,16 @@ input.click()
 })
 document.body.removeChild(input)
 
-let resumeFiles = selectedFiles.filter(file => /\.(pdf|docx)$/i.test(file.name || ""))
+let resumeFiles = selectedFiles.filter(file => /\.(pdf|docx|doc)$/i.test(file.name || ""))
 if(!resumeFiles.length){
-alert("Select a folder containing PDF or DOCX resumes.")
+alert("Select a folder containing PDF, DOC, or DOCX resumes.")
 return
 }
-if(resumeFiles.length > 100 && !confirm(`You selected ${resumeFiles.length} resumes. Upload will run in smaller requests and AI screening will continue in the background. Keep this tab open until upload finishes.`)){
+if(resumeFiles.length > 100){
+alert("Maximum 100 resumes can be synced at once.")
+return
+}
+if(!confirm(`You selected ${resumeFiles.length} resumes. Upload will run in smaller requests and AI screening will continue in controlled batches. Keep this tab open until upload finishes.`)){
 return
 }
 
@@ -5055,6 +5114,7 @@ button.innerText = `Uploading ${index + 1}/${resumeFiles.length}`
 let formData = new FormData()
 formData.append("files", file, file.webkitRelativePath || file.name)
 formData.append("application_source", "folder")
+formData.append("folder_total_count", String(resumeFiles.length))
 
 let syncRes = await fetch(API + "/upload-resumes/" + encodeURIComponent(jobId), {
 method:"POST",
@@ -5078,7 +5138,8 @@ messages.push(...syncData.messages)
 
 let failedExamples = messages.filter(item => String(item.status || "").toLowerCase().includes("failed")).slice(0, 3)
 let failedText = failedExamples.length ? "\n\nFailed:\n" + failedExamples.map(item => `${item.file}: ${item.status}`).join("\n") : ""
-alert(`Resume folder queued.\nSelected: ${resumeFiles.length}\nUploaded: ${totals.imported || 0}\nSkipped/Duplicate: ${totals.skipped || 0}\nFailed: ${totals.failed || 0}\n\nAI screening will continue in background.${failedText}`)
+alert(`${totals.imported || 0} resumes uploaded. Processing has started.\nSelected: ${resumeFiles.length}\nSkipped/Duplicate: ${totals.skipped || 0}\nFailed: ${totals.failed || 0}\n\nProcessing runs in controlled batches.${failedText}`)
+startResumeProcessingProgress(jobId, button)
 await loadJobs()
 if(typeof loadDashboard === "function"){
 loadDashboard()
@@ -5086,7 +5147,7 @@ loadDashboard()
 }catch(error){
 alert("Could not upload resume folder.\n" + (error && error.message ? error.message : "Please check backend upload limits and try again."))
 }finally{
-if(button && document.body.contains(button)){
+if(button && document.body.contains(button) && !resumeProcessingPollers[jobId]){
 button.disabled = false
 button.innerText = "Folder"
 }
@@ -8074,6 +8135,12 @@ View Candidates
 
 function getDisplayStatus(c){
 
+  let processingStatus = safeText(c.processing_status).toLowerCase()
+  if(processingStatus === "pending") return "Pending Processing"
+  if(processingStatus === "processing") return "Processing"
+  if(processingStatus === "failed") return "Failed"
+  if(processingStatus === "completed" && !["shortlisted","rejected","communication"].includes(safeText(c.stage).toLowerCase())) return "Scored"
+
   // target STAGE FIRST
 
   if(c.stage === "communication")
@@ -8098,6 +8165,10 @@ function getDisplayStatus(c){
 
 function getStatusClass(status){
   let normalized = safeText(status).toLowerCase().replace(/\s+/g, "_")
+  if(normalized.includes("pending_processing")) return "is-pending"
+  if(normalized.includes("processing")) return "is-processing"
+  if(normalized.includes("scored")) return "is-scored"
+  if(normalized.includes("failed")) return "is-failed"
   if(normalized.includes("communication")) return "is-communication"
   if(normalized.includes("shortlist")) return "is-shortlisted"
   if(normalized.includes("reject")) return "is-rejected"
