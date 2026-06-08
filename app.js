@@ -5067,6 +5067,84 @@ tick()
 resumeProcessingPollers[jobId] = setInterval(tick, 4000)
 }
 
+function folderFileKey(file){
+return file.webkitRelativePath || file.name || "resume"
+}
+
+function sleep(ms){
+return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function ensureFolderUploadStatusPanel(){
+let panel = document.getElementById("folderUploadStatusPanel")
+if(panel) return panel
+panel = document.createElement("div")
+panel.id = "folderUploadStatusPanel"
+panel.style.position = "fixed"
+panel.style.right = "18px"
+panel.style.bottom = "18px"
+panel.style.zIndex = "9999"
+panel.style.width = "340px"
+panel.style.maxWidth = "calc(100vw - 36px)"
+panel.style.padding = "14px"
+panel.style.border = "1px solid #c7d2fe"
+panel.style.borderRadius = "12px"
+panel.style.background = "#ffffff"
+panel.style.boxShadow = "0 18px 45px rgba(15, 23, 42, .18)"
+panel.style.fontSize = "13px"
+panel.style.color = "#172033"
+document.body.appendChild(panel)
+return panel
+}
+
+function renderFolderUploadStatus(fileState, currentText){
+let panel = ensureFolderUploadStatusPanel()
+let values = Array.from(fileState.values())
+let total = values.length
+let uploaded = values.filter(item => item.status === "uploaded").length
+let skipped = values.filter(item => item.status === "skipped" || item.status === "duplicate").length
+let failed = values.filter(item => item.status === "failed").length
+let queued = values.filter(item => item.status === "queued" || item.status === "uploading").length
+let recentFailed = values.filter(item => item.status === "failed").slice(-3)
+panel.innerHTML = `
+<div style="font-weight:800;font-size:15px;margin-bottom:6px;">Folder upload</div>
+<div style="color:#5f6f8a;margin-bottom:10px;">${currentText || "Uploading resumes..."}</div>
+<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;text-align:center;">
+<div><b>${total}</b><br><span>Total</span></div>
+<div><b>${uploaded}</b><br><span>Uploaded</span></div>
+<div><b>${queued}</b><br><span>Queued</span></div>
+<div><b>${skipped}</b><br><span>Skipped</span></div>
+<div><b>${failed}</b><br><span>Failed</span></div>
+</div>
+${recentFailed.length ? `<div style="margin-top:10px;color:#991b1b;">${recentFailed.map(item => `${item.name}: ${item.reason || "failed"}`).join("<br>")}</div>` : ""}
+`
+}
+
+async function uploadResumeFolderBatch(jobId, batch, totalCount){
+let formData = new FormData()
+batch.forEach(file => {
+formData.append("files", file, folderFileKey(file))
+})
+formData.append("application_source", "folder")
+formData.append("folder_total_count", String(totalCount))
+
+let syncRes = await fetch(API + "/upload-resumes/" + encodeURIComponent(jobId), {
+method:"POST",
+headers:{
+    "Authorization": "Bearer " + localStorage.getItem("token")
+},
+body:formData
+})
+let syncData = await syncRes.json().catch(()=>({}))
+if(!syncRes.ok){
+let message = syncData.detail || syncData.error || syncData.message || `Folder upload failed with HTTP ${syncRes.status}.`
+let error = new Error(message)
+error.responseData = syncData
+throw error
+}
+return syncData
+}
+
 async function configureJobResumeFolder(jobId){
 let button = typeof event !== "undefined" ? event.currentTarget : null
 let input = document.createElement("input")
@@ -5104,41 +5182,88 @@ button.disabled = true
 button.innerText = "Uploading..."
 }
 
-let totals = {scanned:0, imported:0, skipped:0, failed:0}
-let messages = []
-for(let index = 0; index < resumeFiles.length; index++){
-let file = resumeFiles[index]
-if(button){
-button.innerText = `Uploading ${index + 1}/${resumeFiles.length}`
-}
-let formData = new FormData()
-formData.append("files", file, file.webkitRelativePath || file.name)
-formData.append("application_source", "folder")
-formData.append("folder_total_count", String(resumeFiles.length))
-
-let syncRes = await fetch(API + "/upload-resumes/" + encodeURIComponent(jobId), {
-method:"POST",
-headers:{
-    "Authorization": "Bearer " + localStorage.getItem("token")
-},
-body:formData
+let batchSize = 3
+let maxRetries = 2
+let fileState = new Map()
+resumeFiles.forEach(file => {
+fileState.set(folderFileKey(file), {name: folderFileKey(file), status:"queued", reason:""})
 })
-let syncData = await syncRes.json().catch(()=>({}))
-if(!syncRes.ok){
-throw new Error(syncData.detail || syncData.error || `Folder upload failed for ${file.name}.`)
+renderFolderUploadStatus(fileState, `0/${resumeFiles.length} sent`)
+
+for(let index = 0; index < resumeFiles.length; index += batchSize){
+let batch = resumeFiles.slice(index, index + batchSize)
+let batchLabel = `${index + 1}-${Math.min(index + batch.length, resumeFiles.length)}`
+batch.forEach(file => {
+let key = folderFileKey(file)
+fileState.set(key, {...fileState.get(key), status:"uploading", reason:""})
+})
+if(button){
+button.innerText = `Uploading ${Math.min(index + batch.length, resumeFiles.length)}/${resumeFiles.length}`
 }
-totals.scanned += 1
-totals.imported += Number(syncData.total_resumes || syncData.imported || 0)
-totals.skipped += Number(syncData.duplicates || syncData.skipped || 0)
-totals.failed += Number(syncData.failed || 0)
-if(Array.isArray(syncData.messages)){
-messages.push(...syncData.messages)
+renderFolderUploadStatus(fileState, `Uploading batch ${batchLabel}`)
+
+let pendingBatch = batch
+for(let attempt = 0; attempt <= maxRetries; attempt++){
+try{
+let syncData = await uploadResumeFolderBatch(jobId, pendingBatch, resumeFiles.length)
+let returnedFiles = Array.isArray(syncData.files) ? syncData.files : (Array.isArray(syncData.messages) ? syncData.messages : [])
+let returnedKeys = new Set()
+returnedFiles.forEach(item => {
+let key = item.filename || item.file
+if(!key) return
+returnedKeys.add(key)
+let status = String(item.status || "").toLowerCase()
+let normalized = status.includes("duplicate") ? "duplicate" : status.includes("skip") ? "skipped" : status.includes("fail") ? "failed" : "uploaded"
+fileState.set(key, {
+    name:key,
+    status:normalized,
+    reason:item.reason || ""
+})
+})
+pendingBatch.forEach(file => {
+let key = folderFileKey(file)
+if(!returnedKeys.has(key)){
+    fileState.set(key, {name:key, status:"uploaded", reason:""})
+}
+})
+let retryableKeys = returnedFiles
+.filter(item => String(item.status || "").toLowerCase().includes("fail") && item.retryable)
+.map(item => item.filename || item.file)
+.filter(Boolean)
+if(retryableKeys.length && attempt < maxRetries){
+pendingBatch = pendingBatch.filter(file => retryableKeys.includes(folderFileKey(file)))
+pendingBatch.forEach(file => {
+    let key = folderFileKey(file)
+    fileState.set(key, {...fileState.get(key), status:"queued", reason:"Retrying upload"})
+})
+renderFolderUploadStatus(fileState, `Retrying ${pendingBatch.length} file(s) from batch ${batchLabel}`)
+await sleep(900 * (attempt + 1))
+continue
+}
+renderFolderUploadStatus(fileState, `Batch ${batchLabel} uploaded`)
+break
+}catch(error){
+if(attempt < maxRetries){
+renderFolderUploadStatus(fileState, `Retrying batch ${batchLabel} after upload error`)
+await sleep(900 * (attempt + 1))
+continue
+}
+pendingBatch.forEach(file => {
+let key = folderFileKey(file)
+fileState.set(key, {name:key, status:"failed", reason:error && error.message ? error.message : "Upload failed"})
+})
+renderFolderUploadStatus(fileState, `Batch ${batchLabel} failed, continuing`)
+}
 }
 }
 
-let failedExamples = messages.filter(item => String(item.status || "").toLowerCase().includes("failed")).slice(0, 3)
-let failedText = failedExamples.length ? "\n\nFailed:\n" + failedExamples.map(item => `${item.file}: ${item.status}`).join("\n") : ""
-alert(`${totals.imported || 0} resumes uploaded. Processing has started.\nSelected: ${resumeFiles.length}\nSkipped/Duplicate: ${totals.skipped || 0}\nFailed: ${totals.failed || 0}\n\nProcessing runs in controlled batches.${failedText}`)
+let values = Array.from(fileState.values())
+let uploaded = values.filter(item => item.status === "uploaded").length
+let skipped = values.filter(item => item.status === "skipped" || item.status === "duplicate").length
+let failed = values.filter(item => item.status === "failed").length
+let failedExamples = values.filter(item => item.status === "failed").slice(0, 3)
+let failedText = failedExamples.length ? "\n\nFailed:\n" + failedExamples.map(item => `${item.name}: ${item.reason || "failed"}`).join("\n") : ""
+alert(`${uploaded || 0} resumes uploaded. Processing has started.\nSelected: ${resumeFiles.length}\nSkipped/Duplicate: ${skipped || 0}\nFailed: ${failed || 0}\n\nProcessing runs in controlled batches.${failedText}`)
 startResumeProcessingProgress(jobId, button)
 await loadJobs()
 if(typeof loadDashboard === "function"){
