@@ -51,8 +51,7 @@ body.ats-focus-page #candidateProfilePage,
 body.ats-focus-page #insightPage,
 body.ats-focus-page #shortlistAnalyticsPage,
 body.ats-focus-page #shortlistExplanationPage,
-body.ats-focus-page #interviewDashboardPage,
-body.ats-focus-page #supportPage{
+body.ats-focus-page #interviewDashboardPage{
 width:calc(100vw - 18rem - 88px);
 margin:24px 40px 36px calc(18rem + 24px);
 padding-left:0 !important;

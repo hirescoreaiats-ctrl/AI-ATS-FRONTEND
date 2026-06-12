@@ -890,8 +890,7 @@ document.body.classList.toggle(
 "allJobs",
 "communication",
 "communicationResults",
-"interviewDashboard",
-"support"
+"interviewDashboard"
 ].includes(page)
 )
 setActiveNavForPage(page)
