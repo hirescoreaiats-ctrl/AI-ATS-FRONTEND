@@ -12105,6 +12105,13 @@ object-fit:contain !important;
 display:block !important;
 }
 
+/* Desktop shell spacing: keep dashboard content clear of the fixed sidebar. */
+@media (min-width:769px){
+body > .w-full > .flex-1{
+margin-left:18rem !important;
+}
+}
+
 /* Support center */
 .ats-support-page{
 padding:32px 40px 48px;
