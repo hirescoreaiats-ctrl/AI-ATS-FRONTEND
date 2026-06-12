@@ -8,6 +8,8 @@ function assert(condition, message) {
 
 const html = readFileSync("index.html", "utf8");
 const app = readFileSync("app.js", "utf8");
+const vercel = readFileSync("vercel.json", "utf8");
+const netlify = readFileSync("netlify.toml", "utf8");
 
 assert(!html.includes('<span class="nav-text">Bulk Analyzer</span>'), "Bulk Analyzer nav item should be hidden");
 assert(html.includes("navigateToPage('support')"), "Support nav route should be present");
@@ -20,5 +22,7 @@ assert(app.includes('"supportPage"'), "Support page should be part of page switc
 assert(app.includes('"/support": "support"'), "Direct /support route should resolve to support page");
 assert(app.includes("submitSupportCase"), "Support form submit handler should exist");
 assert(app.includes('/api/v1/support/case'), "Support form should post to backend endpoint");
+assert(vercel.includes('"source": "/support"'), "Vercel should rewrite /support to index.html");
+assert(netlify.includes('from = "/support"'), "Netlify should rewrite /support to index.html");
 
 console.log("Support page regression checks passed.");

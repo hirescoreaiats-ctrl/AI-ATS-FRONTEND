@@ -3,6 +3,11 @@
   publish = "dist"
 
 [[redirects]]
+  from = "/support"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
   from = "/pipeline"
   to = "/index.html"
   status = 200

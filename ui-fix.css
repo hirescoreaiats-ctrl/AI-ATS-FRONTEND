@@ -12107,7 +12107,7 @@ display:block !important;
 
 /* Support center */
 .ats-support-page{
-padding:32px;
+padding:32px 40px 48px;
 max-width:1180px;
 margin:0 auto;
 }

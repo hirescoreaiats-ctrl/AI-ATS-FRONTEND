@@ -1,0 +1,40 @@
+{
+  "rewrites": [
+    {
+      "source": "/support",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/pipeline",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/candidates",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/talent-search",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/inbox",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/copilot",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/analytics",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/jobs",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/organization",
+      "destination": "/index.html"
+    }
+  ]
+}
