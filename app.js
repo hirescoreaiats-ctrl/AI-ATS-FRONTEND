@@ -26,6 +26,9 @@ let jdAutofillTimer = null
 let lastParsedJDText = ""
 let dashboardLoadPromise = null
 let lastDashboardLoadAt = 0
+if("scrollRestoration" in history){
+history.scrollRestoration = "manual"
+}
 
 function safeText(value){
 return String(value ?? "")
@@ -796,7 +799,14 @@ requestAnimationFrame(()=>{
 window.scrollTo({top:0,left:0,behavior:"auto"})
 let main = document.querySelector("body > .w-full > .flex-1")
 if(main) main.scrollTop = 0
+document.documentElement.scrollTop = 0
+document.body.scrollTop = 0
 })
+setTimeout(()=>{
+window.scrollTo(0,0)
+document.documentElement.scrollTop = 0
+document.body.scrollTop = 0
+}, 60)
 }
 
 function pageForCurrentPath(){
