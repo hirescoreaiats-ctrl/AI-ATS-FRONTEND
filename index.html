@@ -71,13 +71,6 @@ HireScore AI
 <small>Shortlist and review</small>
 </button>
 
-<button class="nav-btn" onclick="showPage('bulk')">
-<span class="ats-nav-icon" aria-hidden="true">BA</span>
-<span class="nav-text">Bulk Analyzer</span>
-<small>Batch AI screening</small>
-</button>
-
-
 <button class="nav-btn" onclick="showPage('communication')">
 <span class="ats-nav-icon" aria-hidden="true">CM</span>
 <span class="nav-text">Outreach</span>
@@ -88,6 +81,12 @@ HireScore AI
 <span class="ats-nav-icon" aria-hidden="true">ID</span>
 <span class="nav-text">Interview Dashboard</span>
 <small>Scheduling pipeline</small>
+</button>
+
+<button class="nav-btn" onclick="navigateToPage('support')">
+<span class="ats-nav-icon" aria-hidden="true">SP</span>
+<span class="nav-text">Support</span>
+<small>Help and support cases</small>
 </button>
 
 </div>
@@ -2774,6 +2773,113 @@ Message
 <tbody id="interviewDashboardTable"></tbody>
 </table>
 </div>
+</section>
+</div>
+
+<div id="supportPage" class="hidden ats-support-page">
+<section class="ats-support-hero">
+<div>
+<span class="ats-page-kicker">Support</span>
+<h2>Support Center</h2>
+<p>Need help with HireScore AI? Submit a support case and our team will get back to you.</p>
+</div>
+<div class="ats-support-hero-badge">
+<span>SP</span>
+<strong>Response team</strong>
+<small>Live chat is coming soon. For now, please submit a support case.</small>
+</div>
+</section>
+
+<section class="ats-support-options">
+<article>
+<span>CASE</span>
+<h3>Submit a Support Case</h3>
+<p>Share issue details so the team can investigate quickly.</p>
+</article>
+<article>
+<span>MAIL</span>
+<h3>Email Support</h3>
+<p>Cases are routed to hirescoreaiats@gmail.com.</p>
+</article>
+<article>
+<span>HELP</span>
+<h3>Product Help</h3>
+<p>Get help with jobs, uploads, scoring, and dashboards.</p>
+</article>
+<article>
+<span>ACCT</span>
+<h3>Billing / Account Help</h3>
+<p>Ask about access, pricing, billing, and login issues.</p>
+</article>
+</section>
+
+<section class="ats-support-form-card">
+<div class="ats-support-form-head">
+<div>
+<h3>Create Support Case</h3>
+<p>Required fields help us route your request to the right team.</p>
+</div>
+<span>Secure request</span>
+</div>
+
+<div id="supportSuccess" class="ats-support-alert is-success hidden">Support case submitted successfully. Our team will contact you soon.</div>
+<div id="supportError" class="ats-support-alert is-error hidden">Unable to submit support case right now. Please try again.</div>
+
+<form id="supportForm" class="ats-support-form" onsubmit="submitSupportCase(event)" novalidate>
+<label>
+Full Name
+<input id="supportFullName" type="text" autocomplete="name" required>
+<small id="supportFullNameError"></small>
+</label>
+<label>
+Work Email
+<input id="supportEmail" type="email" autocomplete="email" required>
+<small id="supportEmailError"></small>
+</label>
+<label>
+Company Name <span>optional</span>
+<input id="supportCompany" type="text" autocomplete="organization">
+</label>
+<label>
+Issue Type
+<select id="supportIssueType" required>
+<option value="">Select issue type</option>
+<option>Account/Login Issue</option>
+<option>Job Creation Issue</option>
+<option>Resume Upload Issue</option>
+<option>Candidate Scoring Issue</option>
+<option>Dashboard/Data Issue</option>
+<option>Billing/Pricing</option>
+<option>Feature Request</option>
+<option>Other</option>
+</select>
+<small id="supportIssueTypeError"></small>
+</label>
+<label>
+Priority
+<select id="supportPriority" required>
+<option>Low</option>
+<option selected>Medium</option>
+<option>High</option>
+<option>Urgent</option>
+</select>
+<small id="supportPriorityError"></small>
+</label>
+<label class="ats-support-full">
+Subject
+<input id="supportSubject" type="text" maxlength="160" required>
+<small id="supportSubjectError"></small>
+</label>
+<label class="ats-support-full">
+Message / Issue Description
+<textarea id="supportMessage" rows="7" required placeholder="Describe what happened, expected behavior, job/candidate name if relevant, and any error shown."></textarea>
+<small id="supportMessageError"></small>
+</label>
+<div class="ats-support-form-actions">
+<p>Live chat is coming soon. For now, please submit a support case.</p>
+<button id="supportSubmitBtn" type="submit">Submit Support Case</button>
+</div>
+</form>
 </section>
 </div>
 </div>  <!-- pagesContainer -->

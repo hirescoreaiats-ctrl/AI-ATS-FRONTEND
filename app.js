@@ -778,10 +778,10 @@ allJobs: "Recruiter",
 insight: "Recruiter",
 shortlistAnalytics: "Recruiter",
 shortlistExplanation: "Recruiter",
-bulk: "Bulk Analyzer",
 communication: "Outreach",
 communicationResults: "Outreach",
-interviewDashboard: "Interview Dashboard"
+interviewDashboard: "Interview Dashboard",
+support: "Support"
 }
 
 let label = navMap[page]
@@ -799,6 +799,29 @@ if(main) main.scrollTop = 0
 })
 }
 
+function pageForCurrentPath(){
+let path = window.location.pathname.replace(/\/+$/,"").toLowerCase()
+let routes = {
+    "/support": "support"
+}
+return routes[path] || "dashboard"
+}
+
+function navigateToPage(page){
+let routes = {
+    support: "/support"
+}
+let nextPath = routes[page]
+if(nextPath && window.history?.pushState && window.location.pathname !== nextPath){
+    window.history.pushState({page}, "", nextPath)
+}
+showPage(page)
+}
+
+window.addEventListener("popstate", () => {
+showPage(pageForCurrentPath())
+})
+
 function showPage(page){
 
 // hide pages
@@ -809,6 +832,7 @@ let pages=[
 "jobPage",
 "editJobPage",
 "bulkPage",
+"supportPage",
 "resultsPage",
 "jobResultPage",
 "applyJobPage",
@@ -856,7 +880,8 @@ document.body.classList.toggle(
 "allJobs",
 "communication",
 "communicationResults",
-"interviewDashboard"
+"interviewDashboard",
+"support"
 ].includes(page)
 )
 setActiveNavForPage(page)
@@ -897,6 +922,10 @@ if(page === "bulk"){
     restoreBulkSessionFromStorage()
 }
 
+if(page === "support"){
+    hydrateSupportDefaults()
+}
+
 // EDIT JOB PAGE
 if(page==="editJob"){
 loadEditJobs()
@@ -932,6 +961,100 @@ if(tokenEmail){
 }
 
 return localStorage.getItem("userEmail") || ""
+}
+
+function getRecruiterNameFromSession(){
+let token = localStorage.getItem("token")
+let payload = typeof parseJwt === "function" ? parseJwt(token) : null
+return payload?.name || localStorage.getItem("userName") || ""
+}
+
+function supportField(id){
+return document.getElementById(id)
+}
+
+function hideSupportMessages(){
+supportField("supportSuccess")?.classList.add("hidden")
+supportField("supportError")?.classList.add("hidden")
+}
+
+function setSupportError(fieldId, message=""){
+let field = supportField(fieldId)
+let error = supportField(fieldId + "Error")
+if(field) field.classList.toggle("is-invalid", Boolean(message))
+if(error) error.innerText = message
+}
+
+function hydrateSupportDefaults(){
+let email = supportField("supportEmail")
+let name = supportField("supportFullName")
+if(email && !email.value){
+    email.value = getRecruiterEmailFromSession()
+}
+if(name && !name.value){
+    name.value = getRecruiterNameFromSession()
+}
+}
+
+function supportPayload(){
+return {
+    full_name: safeText(supportField("supportFullName")?.value).trim(),
+    email: safeText(supportField("supportEmail")?.value).trim(),
+    company_name: safeText(supportField("supportCompany")?.value).trim(),
+    issue_type: safeText(supportField("supportIssueType")?.value).trim(),
+    priority: safeText(supportField("supportPriority")?.value).trim(),
+    subject: safeText(supportField("supportSubject")?.value).trim(),
+    message: safeText(supportField("supportMessage")?.value).trim()
+}
+}
+
+function validateSupportForm(payload){
+let valid = true
+let checks = {
+    supportFullName: payload.full_name ? "" : "Full name is required.",
+    supportEmail: /.+@.+\..+/.test(payload.email) ? "" : "Valid work email is required.",
+    supportIssueType: payload.issue_type ? "" : "Select an issue type.",
+    supportPriority: payload.priority ? "" : "Select a priority.",
+    supportSubject: payload.subject ? "" : "Subject is required.",
+    supportMessage: payload.message ? "" : "Message is required."
+}
+
+Object.entries(checks).forEach(([fieldId, message])=>{
+    setSupportError(fieldId, message)
+    if(message) valid = false
+})
+return valid
+}
+
+async function submitSupportCase(event){
+event.preventDefault()
+hideSupportMessages()
+let payload = supportPayload()
+if(!validateSupportForm(payload)) return
+
+let button = supportField("supportSubmitBtn")
+setButtonLoading(button, true, "Submitting...")
+
+try{
+    let res = await fetch(API + "/api/v1/support/case", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(payload)
+    })
+    let data = await res.json().catch(()=>({}))
+    if(!res.ok){
+        throw new Error(data.detail || "Support case failed")
+    }
+    supportField("supportSuccess")?.classList.remove("hidden")
+    supportField("supportForm")?.reset()
+    let priority = supportField("supportPriority")
+    if(priority) priority.value = "Medium"
+    hydrateSupportDefaults()
+}catch(error){
+    supportField("supportError")?.classList.remove("hidden")
+}finally{
+    setButtonLoading(button, false)
+}
 }
 
 function getOutreachSenderEmail(){
@@ -9607,7 +9730,7 @@ window.onload = function(){
     }
 
     checkLogin()
-    showPage("dashboard")
+    showPage(pageForCurrentPath())
     bindJDAutofill()
 
 }

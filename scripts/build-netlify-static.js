@@ -38,6 +38,7 @@ writeFileSync(
     "/analytics /index.html 200",
     "/jobs /index.html 200",
     "/organization /index.html 200",
+    "/support /index.html 200",
     ""
   ].join("\n"),
   "utf8"

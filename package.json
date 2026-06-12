@@ -7,6 +7,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "node scripts/build-netlify-static.js",
     "build:react": "vite build",
+    "test:support": "node scripts/test-support-page.mjs",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
