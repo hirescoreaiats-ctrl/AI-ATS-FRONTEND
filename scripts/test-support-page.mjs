@@ -25,6 +25,7 @@ assert(app.includes("submitSupportCase"), "Support form submit handler should ex
 assert(app.includes('/api/v1/support/case'), "Support form should post to backend endpoint");
 assert(app.includes("ats-support-mode"), "Support page should use dedicated layout mode");
 assert(css.includes("body.ats-support-mode .ats-top-banner"), "Support layout should hide the top banner");
+assert(css.includes("margin:24px 40px 48px calc(18rem + 24px)"), "Support page should clear the fixed desktop sidebar");
 assert(vercel.includes('"source": "/support"'), "Vercel should rewrite /support to index.html");
 assert(netlify.includes('from = "/support"'), "Netlify should rewrite /support to index.html");
 assert(html.includes('id="createJobStatus"'), "Create Job form should expose submit status");

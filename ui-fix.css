@@ -113,7 +113,7 @@ padding-top:0 !important;
 }
 
 body.ats-support-mode > .w-full > .flex-1{
-margin-left:18rem !important;
+margin-left:0 !important;
 padding:24px 32px 44px !important;
 min-height:100vh !important;
 height:auto !important;
@@ -12229,6 +12229,23 @@ margin:0 auto;
 padding:0 0 48px;
 position:relative;
 z-index:1;
+}
+
+@media (min-width:769px){
+body.ats-support-mode > .w-full{
+padding:0 !important;
+}
+
+body.ats-support-mode > .w-full > .flex-1{
+margin-left:0 !important;
+padding:0 !important;
+}
+
+body.ats-support-mode .ats-support-page{
+width:calc(100vw - 18rem - 88px);
+max-width:1180px;
+margin:24px 40px 48px calc(18rem + 24px);
+}
 }
 
 .ats-support-hero{
