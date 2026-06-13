@@ -8,6 +8,7 @@ function assert(condition, message) {
 
 const html = readFileSync("index.html", "utf8");
 const app = readFileSync("app.js", "utf8");
+const css = readFileSync("ui-fix.css", "utf8");
 const vercel = readFileSync("vercel.json", "utf8");
 const netlify = readFileSync("netlify.toml", "utf8");
 
@@ -22,7 +23,13 @@ assert(app.includes('"supportPage"'), "Support page should be part of page switc
 assert(app.includes('"/support": "support"'), "Direct /support route should resolve to support page");
 assert(app.includes("submitSupportCase"), "Support form submit handler should exist");
 assert(app.includes('/api/v1/support/case'), "Support form should post to backend endpoint");
+assert(app.includes("ats-support-mode"), "Support page should use dedicated layout mode");
+assert(css.includes("body.ats-support-mode .ats-top-banner"), "Support layout should hide the top banner");
 assert(vercel.includes('"source": "/support"'), "Vercel should rewrite /support to index.html");
 assert(netlify.includes('from = "/support"'), "Netlify should rewrite /support to index.html");
+assert(html.includes('id="createJobStatus"'), "Create Job form should expose submit status");
+assert(app.includes("setCreateJobStatus"), "Create Job submit status helper should exist");
+assert(app.includes('"Creating Job..."'), "Create Job button should show loading state");
+assert(css.includes(".ats-create-job-status"), "Create Job status should be styled");
 
 console.log("Support page regression checks passed.");

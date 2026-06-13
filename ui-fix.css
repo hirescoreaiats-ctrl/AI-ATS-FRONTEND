@@ -104,6 +104,26 @@ body.ats-candidate-profile-mode .ats-candidate-hero-panel{
 min-width:0;
 }
 
+body.ats-support-mode .ats-top-banner{
+display:none !important;
+}
+
+body.ats-support-mode > .w-full{
+padding-top:0 !important;
+}
+
+body.ats-support-mode > .w-full > .flex-1{
+margin-left:18rem !important;
+padding:24px 32px 44px !important;
+min-height:100vh !important;
+height:auto !important;
+overflow:visible !important;
+}
+
+body.ats-support-mode #pagesContainer{
+min-height:calc(100vh - 48px);
+}
+
 /* Top 10 candidate ranking board */
 .ats-top10-page{
 width:calc(100vw - 18rem - 88px);
@@ -9709,6 +9729,67 @@ padding:22px;
 grid-column:1 / -1;
 }
 
+.ats-create-job-status{
+flex:1 1 360px;
+min-height:42px;
+display:flex;
+align-items:center;
+gap:10px;
+border-radius:8px;
+padding:10px 13px;
+font-size:13px;
+font-weight:850;
+line-height:1.35;
+border:1px solid #bfdbfe;
+background:#eff6ff;
+color:#1d4ed8;
+}
+
+.ats-create-job-status.hidden{
+display:none !important;
+}
+
+.ats-create-job-status::before{
+content:"";
+width:10px;
+height:10px;
+border-radius:999px;
+background:#2563eb;
+box-shadow:0 0 0 4px rgba(37,99,235,.12);
+flex:0 0 auto;
+}
+
+.ats-create-job-status.is-loading::before{
+animation:atsCreateJobPulse 1s ease-in-out infinite;
+}
+
+.ats-create-job-status.is-success{
+border-color:#bbf7d0;
+background:#ecfdf5;
+color:#047857;
+}
+
+.ats-create-job-status.is-success::before{
+background:#16a34a;
+box-shadow:0 0 0 4px rgba(22,163,74,.12);
+}
+
+.ats-create-job-status.is-error{
+border-color:#fecaca;
+background:#fef2f2;
+color:#b91c1c;
+}
+
+.ats-create-job-status.is-error::before{
+background:#ef4444;
+box-shadow:0 0 0 4px rgba(239,68,68,.12);
+}
+
+@keyframes atsCreateJobPulse{
+0%,100%{transform:scale(.85);opacity:.55;}
+50%{transform:scale(1.1);opacity:1;}
+}
+
 .ats-job-panel-head{
 display:flex;
 align-items:flex-start;
@@ -9882,6 +9963,7 @@ white-space:nowrap;
 
 .ats-job-submit-bar{
 display:flex;
+align-items:center;
 justify-content:flex-end;
 gap:10px;
 padding:16px;
@@ -9911,6 +9993,19 @@ min-width:160px;
 background:#2563eb;
 color:white;
 box-shadow:0 10px 20px rgba(37,99,235,.2);
+}
+
+.ats-job-submit-bar .create-btn.is-loading{
+background:#1d4ed8 !important;
+box-shadow:0 12px 24px rgba(37,99,235,.24);
+cursor:progress;
+}
+
+.ats-job-submit-bar .create-btn:disabled,
+.ats-job-secondary-btn:disabled{
+opacity:.76;
+cursor:not-allowed;
+transform:none !important;
 }
 
 .ats-job-secondary-btn{
@@ -11303,6 +11398,15 @@ padding-right:12px;
 padding-top:96px;
 }
 
+body.ats-support-mode > .w-full{
+padding-top:96px !important;
+}
+
+body.ats-support-mode > .w-full > .flex-1{
+margin-left:0 !important;
+padding:16px 0 32px !important;
+}
+
 .ats-job-hero{
 flex-direction:column;
 padding:20px;
@@ -11319,6 +11423,11 @@ grid-template-columns:1fr;
 .ats-job-submit-bar{
 position:static;
 flex-direction:column-reverse;
+}
+
+.ats-create-job-status{
+width:100%;
+flex:0 0 auto;
 }
 
 .ats-job-submit-bar .create-btn,
@@ -12114,9 +12223,12 @@ margin-left:18rem !important;
 
 /* Support center */
 .ats-support-page{
-padding:32px 40px 48px;
+width:min(100%,1180px);
 max-width:1180px;
 margin:0 auto;
+padding:0 0 48px;
+position:relative;
+z-index:1;
 }
 
 .ats-support-hero{
@@ -12383,7 +12495,7 @@ grid-template-columns:1fr;
 
 @media (max-width:640px){
 .ats-support-page{
-padding:18px;
+padding:0 0 28px;
 }
 
 .ats-support-options{

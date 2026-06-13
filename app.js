@@ -745,12 +745,19 @@ setButtonLoading(button, false)
 function setButtonLoading(button, isLoading, text="Loading..."){
 if(!button) return
 if(isLoading){
+if(!button.dataset.originalText){
 button.dataset.originalText = button.innerText
+}
+button.dataset.loading = "true"
 button.disabled = true
+button.classList.add("is-loading")
 button.innerText = text
 }else{
 button.disabled = false
 button.innerText = button.dataset.originalText || button.innerText
+delete button.dataset.originalText
+delete button.dataset.loading
+button.classList.remove("is-loading")
 }
 }
 
@@ -873,6 +880,7 @@ target.classList.remove("hidden")
 }
 
 document.body.classList.toggle("ats-candidate-profile-mode", page === "candidateProfile")
+document.body.classList.toggle("ats-support-mode", page === "support")
 if(page === "candidateProfile"){
 let dashboardPage = document.getElementById("dashboardPage")
 if(dashboardPage) dashboardPage.classList.remove("hidden")
@@ -1643,9 +1651,30 @@ document.getElementById("jobPostModal")?.classList.add("hidden")
 }
 // ---------------- CREATE JOB ----------------
 
+function setCreateJobStatus(type="", message=""){
+let status = document.getElementById("createJobStatus")
+if(!status) return
+status.classList.remove("hidden", "is-loading", "is-success", "is-error")
+if(!message){
+status.classList.add("hidden")
+status.textContent = ""
+return
+}
+status.classList.add(`is-${type || "loading"}`)
+status.textContent = message
+}
+
+function createJobSubmitButton(event){
+return event?.submitter
+    || event?.target?.querySelector?.(".create-btn")
+    || document.querySelector("#jobPage .ats-job-submit-bar .create-btn")
+    || document.querySelector("#jobPage .job-form .create-btn")
+}
+
 async function createJob(event){
 
 if(event) event.preventDefault()
+let submitButton = createJobSubmitButton(event)
 
 let jobTitle=document.getElementById("jobTitle").value
 let company=document.getElementById("company").value
@@ -1666,6 +1695,7 @@ let sourceTrackingEnabled=document.getElementById("sourceTrackingEnabled")?.chec
 
 if(!jobTitle || !company || !location || !jd){
 
+setCreateJobStatus("error", "Please fill required fields before creating the job.")
 alert("Please fill required fields")
 
 return
@@ -1674,7 +1704,10 @@ return
 
 
 // API REQUEST
+setCreateJobStatus("loading", "Creating job and preparing the apply link...")
+setButtonLoading(submitButton, true, "Creating Job...")
 
+try{
 let res=await fetch(API+"/create-job",{
 
 method:"POST",
@@ -1706,14 +1739,17 @@ source_tracking_enabled:sourceTrackingEnabled
 })
 
 
-let data=await res.json()
+let data=await res.json().catch(()=>({}))
 
 if(!res.ok || data.error){
-alert(data.detail || data.error || "Could not create job")
+let message = data.detail || data.error || "Could not create job"
+setCreateJobStatus("error", message)
+alert(message)
 return
 }
 
 // SHOW SUCCESS CARD
+setCreateJobStatus("success", "Job created successfully. Opening sharing details...")
 
 showSuccessModal(data)
 
@@ -1725,6 +1761,12 @@ if(applyLinkInput) applyLinkInput.value=data.apply_link
 
 let openJobBtn = document.getElementById("openJobBtn")
 if(openJobBtn) openJobBtn.href=data.apply_link
+}catch(error){
+setCreateJobStatus("error", "Unable to create job right now. Please try again.")
+alert("Unable to create job right now. Please try again.")
+}finally{
+setButtonLoading(submitButton, false)
+}
 
 }
 
