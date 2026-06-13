@@ -12524,3 +12524,44 @@ grid-template-columns:1fr;
 padding:20px;
 }
 }
+
+/* Final support layout guard: center inside the workspace area, not under the fixed sidebar. */
+@media (min-width:769px){
+body.ats-support-mode > .w-full{
+padding:0 !important;
+width:100vw !important;
+max-width:none !important;
+}
+
+body.ats-support-mode > .w-full > .flex-1{
+margin-left:0 !important;
+padding:0 !important;
+width:100vw !important;
+max-width:none !important;
+overflow:visible !important;
+}
+
+body.ats-support-mode #pagesContainer{
+width:100vw !important;
+max-width:none !important;
+}
+
+body.ats-support-mode .ats-support-page{
+width:min(1180px, calc(100vw - 18rem - 64px)) !important;
+max-width:min(1180px, calc(100vw - 18rem - 64px)) !important;
+margin-top:24px !important;
+margin-right:auto !important;
+margin-bottom:48px !important;
+margin-left:calc(18rem + max(24px, ((100vw - 18rem - 1180px) / 2))) !important;
+padding:0 0 48px !important;
+}
+}
+
+@media (max-width:768px){
+body.ats-support-mode .ats-support-page{
+width:auto !important;
+max-width:none !important;
+margin:0 !important;
+padding:0 0 28px !important;
+}
+}

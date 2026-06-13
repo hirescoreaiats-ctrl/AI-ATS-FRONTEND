@@ -18,6 +18,7 @@ assert(html.includes('<span class="nav-text">Support</span>'), "Support nav labe
 assert(html.includes('id="supportPage"'), "Support page container should exist");
 assert(html.includes('id="supportForm"'), "Support form should exist");
 assert(html.includes("Live chat is coming soon"), "Live chat coming soon note should be shown");
+assert(html.includes("ui-fix.css?v=support-layout-3"), "Support CSS cache-bust version should be updated");
 assert(app.includes('support: "Support"'), "Support active nav mapping should exist");
 assert(app.includes('"supportPage"'), "Support page should be part of page switching");
 assert(app.includes('"/support": "support"'), "Direct /support route should resolve to support page");
@@ -25,7 +26,7 @@ assert(app.includes("submitSupportCase"), "Support form submit handler should ex
 assert(app.includes('/api/v1/support/case'), "Support form should post to backend endpoint");
 assert(app.includes("ats-support-mode"), "Support page should use dedicated layout mode");
 assert(css.includes("body.ats-support-mode .ats-top-banner"), "Support layout should hide the top banner");
-assert(css.includes("margin:24px 40px 48px calc(18rem + 24px)"), "Support page should clear the fixed desktop sidebar");
+assert(css.includes("margin-left:calc(18rem + max(24px"), "Support page should center within the sidebar-free workspace");
 assert(vercel.includes('"source": "/support"'), "Vercel should rewrite /support to index.html");
 assert(netlify.includes('from = "/support"'), "Netlify should rewrite /support to index.html");
 assert(html.includes('id="createJobStatus"'), "Create Job form should expose submit status");
