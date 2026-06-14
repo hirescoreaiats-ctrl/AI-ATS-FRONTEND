@@ -428,7 +428,7 @@ body {
 }
 
 .project-item h3 {
-    margin: 0 0 8px;
+    margin: 8px 0 8px;
     font-size: 16px;
 }
 
@@ -436,6 +436,37 @@ body {
     margin: 0;
     color: var(--text);
     line-height: 1.58;
+}
+
+.evidence-label {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    border-radius: 8px;
+    padding: 0 8px;
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.evidence-label.is-direct {
+    color: #064e3b;
+    background: var(--green-soft);
+}
+
+.evidence-label.is-supporting {
+    color: #17315f;
+    background: var(--brand-soft);
+}
+
+.evidence-label.is-transferable {
+    color: #703900;
+    background: var(--amber-soft);
+}
+
+.evidence-label.is-weak {
+    color: var(--red);
+    background: var(--red-soft);
 }
 
 .experience-grid {
@@ -617,6 +648,19 @@ body {
     margin-top: 18px;
     padding-top: 18px;
     border-top: 1px solid var(--line);
+}
+
+.more-skills {
+    margin: 10px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.verdict-reason {
+    margin: 10px 0 0;
+    color: var(--muted);
+    line-height: 1.6;
 }
 
 .skill-block h3 {

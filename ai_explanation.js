@@ -57,6 +57,218 @@
     }
 }
 
+const EMPTY_REPORT = {
+    summary: "",
+    strengths: [],
+    concerns: [],
+    recommendation: "",
+    ranking_reason: "",
+    experience_summary: {},
+    follow_up_questions: [],
+    data_quality_notes: [],
+};
+
+const PARSER_FLAG_MESSAGES = {
+    ai_parse_recovered: "Resume parse was repaired after an initial extraction issue.",
+    phone_needs_review: "Phone number may need manual verification.",
+    name_needs_review: "Candidate name may need manual verification.",
+    company_needs_review: "Company name may need manual verification.",
+    education_needs_review: "Education details may need manual verification.",
+    experience_needs_review: "Experience dates or work-history details may need manual verification.",
+    profile_needs_review: "Profile details may need recruiter verification.",
+    missing_mandatory_skills: "Some mandatory skills need recruiter validation.",
+    keyword_only_match: "Some matched skills appear only as keywords and should be verified.",
+    parser_manual_review: "Resume extraction quality requires manual recruiter review.",
+    section_boundary_low_confidence: "Resume sections were difficult to separate; review extracted fields.",
+    project_noise_detected: "Some project details may include noisy extracted text.",
+};
+
+function formatCandidateExplanation(input) {
+    const parsed = parseReportInput(input);
+    if (parsed == null) return { ...EMPTY_REPORT };
+
+    if (Array.isArray(parsed)) {
+        return { ...EMPTY_REPORT, strengths: normalizeTextList(parsed) };
+    }
+
+    if (typeof parsed === "object") {
+        return normalizeReportObject(parsed);
+    }
+
+    const text = removeJsonNoise(String(parsed || ""));
+    if (!text) return { ...EMPTY_REPORT };
+    const sectioned = parseExplanation(text);
+    return {
+        ...EMPTY_REPORT,
+        summary: cleanReportText(sectioned.summary || firstUsefulSentence(text)),
+        strengths: normalizeTextList(sectioned.strengths),
+        concerns: normalizeTextList(sectioned.gaps).filter(item => !isParserFlagText(item)),
+        recommendation: cleanReportText(sectioned.verdict),
+        ranking_reason: cleanReportText(verdictFromPlainText(text)),
+        data_quality_notes: parserNotesFromText(text),
+    };
+}
+
+function parseReportInput(input) {
+    if (input === null || input === undefined) return null;
+    if (typeof input === "object") return input;
+    const text = String(input || "").trim();
+    if (!text) return "";
+    const parsed = tryParseJsonDeep(text);
+    return parsed === undefined ? text : parsed;
+}
+
+function tryParseJsonDeep(text) {
+    let value = text;
+    for (let index = 0; index < 3; index += 1) {
+        if (typeof value !== "string") return value;
+        const clean = value.trim();
+        if (!looksLikeJson(clean)) return index === 0 ? undefined : value;
+        try {
+            value = JSON.parse(clean);
+        } catch {
+            const extracted = extractJsonObject(clean);
+            if (!extracted) return index === 0 ? undefined : value;
+            try {
+                value = JSON.parse(extracted);
+            } catch {
+                return index === 0 ? undefined : value;
+            }
+        }
+    }
+    return value;
+}
+
+function looksLikeJson(value) {
+    const text = String(value || "").trim();
+    return (text.startsWith("{") && text.endsWith("}")) || (text.startsWith("[") && text.endsWith("]"));
+}
+
+function extractJsonObject(value) {
+    const text = String(value || "");
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    return start >= 0 && end > start ? text.slice(start, end + 1) : "";
+}
+
+function normalizeReportObject(data) {
+    const summary = firstCleanText(
+        data.summary,
+        data.overall_summary,
+        data.profile_summary,
+        data.detailed_assessment,
+        data.explanation
+    );
+    const rawConcerns = normalizeTextList(data.concerns || data.gaps || data.risks || data.gaps_to_verify);
+    const parserNotes = uniqueItems([
+        ...normalizeTextList(data.data_quality_notes || data.parser_notes || data.parser_quality_notes),
+        ...rawConcerns.filter(isParserFlagText).map(humanizeParserFlag),
+        ...normalizeTextList(data.parser_flags || data.parser_quality_flags).map(humanizeParserFlag),
+    ]);
+
+    return {
+        summary,
+        strengths: normalizeTextList(data.strengths || data.key_strengths || data.evidence || data.strength_evidence),
+        concerns: rawConcerns.filter(item => !isParserFlagText(item)).map(cleanReportText).filter(Boolean),
+        recommendation: firstCleanText(data.recommendation, data.verdict, data.final_recommendation),
+        ranking_reason: firstCleanText(data.ranking_reason, data.reason, data.recruiter_verdict),
+        experience_summary: normalizeExperienceSummary(data.experience_summary || data.experience || {}),
+        follow_up_questions: normalizeTextList(data.follow_up_questions || data.next_steps || data.questions),
+        data_quality_notes: parserNotes,
+    };
+}
+
+function normalizeExperienceSummary(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+    return {
+        total_years: finiteOrUndefined(value.total_years ?? value.total_experience_years),
+        relevant_years: finiteOrUndefined(value.relevant_years ?? value.jd_relevant_experience_years),
+        label: cleanReportText(value.label || value.experience_fit || value.experience_relevance_label || ""),
+    };
+}
+
+function finiteOrUndefined(value) {
+    const number = toNumber(value);
+    return Number.isFinite(number) ? number : undefined;
+}
+
+function firstCleanText(...values) {
+    for (const value of values) {
+        const cleaned = cleanReportText(value);
+        if (cleaned) return cleaned;
+    }
+    return "";
+}
+
+function normalizeTextList(value) {
+    if (value === null || value === undefined) return [];
+    if (typeof value === "string") {
+        const parsed = tryParseJsonDeep(value);
+        if (parsed !== undefined && parsed !== value) return normalizeTextList(parsed);
+        return toListItems(removeJsonNoise(value)).map(cleanReportText).filter(Boolean);
+    }
+    if (Array.isArray(value)) {
+        return uniqueItems(value.flatMap(item => {
+            if (item === null || item === undefined) return [];
+            if (typeof item === "object") {
+                return [firstCleanText(item.summary, item.description, item.reason, item.text, item.title)];
+            }
+            return normalizeTextList(String(item));
+        })).filter(Boolean);
+    }
+    if (typeof value === "object") {
+        return normalizeTextList(Object.values(value));
+    }
+    return [cleanReportText(value)].filter(Boolean);
+}
+
+function cleanReportText(value) {
+    if (value === null || value === undefined) return "";
+    if (typeof value === "object") {
+        return firstCleanText(value.summary, value.description, value.reason, value.text, value.title);
+    }
+    return removeJsonNoise(String(value || ""))
+        .replace(/^["':,\s]+|["',\s]+$/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+function removeJsonNoise(value) {
+    let text = String(value || "").replace(/\r/g, "\n").trim();
+    const parsed = tryParseJsonDeep(text);
+    if (parsed !== undefined && typeof parsed === "object") {
+        return firstCleanText(parsed.summary, parsed.ranking_reason, parsed.recommendation);
+    }
+    return text
+        .replace(/^\{+|\}+$/g, "")
+        .replace(/"?(summary|strengths|concerns|recommendation|ranking_reason|experience_summary|follow_up_questions|data_quality_notes)"?\s*:\s*/gi, "$1: ")
+        .replace(/[\[\]{}]/g, " ")
+        .replace(/\\n/g, "\n")
+        .replace(/\\"/g, "\"")
+        .replace(/"\s*,\s*"/g, ". ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+function isParserFlagText(value) {
+    return /(?:parser flag|parser_flags?|ai_parse_recovered|phone_needs_review|name_needs_review|missing_mandatory_skills|keyword_only_match|needs_review|parse was repaired)/i.test(String(value || ""));
+}
+
+function humanizeParserFlag(value) {
+    const raw = String(value || "").replace(/^parser flag:\s*/i, "").trim();
+    const key = raw.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    return PARSER_FLAG_MESSAGES[key] || cleanReportText(raw.replace(/_/g, " "));
+}
+
+function parserNotesFromText(value) {
+    const notes = [];
+    const text = String(value || "");
+    Object.keys(PARSER_FLAG_MESSAGES).forEach(flag => {
+        if (new RegExp(`\\b${flag}\\b`, "i").test(text)) notes.push(PARSER_FLAG_MESSAGES[flag]);
+    });
+    return uniqueItems(notes);
+}
+
 function showReport(box, loader, explanationData, candidateData, sourceLabel = "") {
     loader.style.display = "none";
     box.classList.remove("hidden");
@@ -124,9 +336,23 @@ async function parseJsonResponse(response) {
 }
 
 function renderAnalysis(explanationData, candidate, sourceLabel = "") {
-    const sections = parseExplanation(explanationData.explanation || "");
+    const report = formatCandidateExplanation(explanationData.explanation ?? explanationData.ai_report ?? explanationData.recruiter_report);
+    const sections = {
+        summary: report.summary,
+        strengths: report.strengths,
+        gaps: uniqueItems([...report.concerns, ...report.follow_up_questions]),
+        verdict: report.recommendation,
+        ranking_reason: report.ranking_reason,
+        experience_summary: report.experience_summary || {},
+    };
     const candidateFromResponse = explanationData.candidate || {};
     candidate = mergeCandidateData(candidateFromResponse, candidate || {});
+    const dataQualityNotes = uniqueItems([
+        ...report.data_quality_notes,
+        ...normalizeTextList(candidate.parser_flags || candidate.parser_quality_flags || candidate.recruiter_flags)
+            .filter(isParserFlagText)
+            .map(humanizeParserFlag),
+    ]);
     const positiveEvidenceText = [
         sections.summary,
         ...sections.strengths,
@@ -135,7 +361,7 @@ function renderAnalysis(explanationData, candidate, sourceLabel = "") {
         positiveEvidenceText,
         ...sections.gaps,
         sections.verdict,
-        explanationData.explanation || "",
+        sections.ranking_reason,
     ].join(" ");
     const directProjects = normalizeProjects(explanationData.projects);
     const missingSkills = uniqueItems([
@@ -143,12 +369,19 @@ function renderAnalysis(explanationData, candidate, sourceLabel = "") {
         ...extractMissingSkillNames(sections.gaps.join(" ")),
     ]);
     const projectSeed = sections.strengths.length ? sections.strengths : [sections.summary];
-    const projects = directProjects.length ? directProjects : projectsFromEvidence(projectSeed);
-    const matchedSkills = uniqueItems([
+    const projects = sortProjectEvidenceByRelevance(
+        directProjects.length ? directProjects : projectsFromEvidence(projectSeed),
+        evidenceText,
+        candidate.job_title || ""
+    );
+    const allMatchedSkills = uniqueItems([
         ...splitSkillText(candidate.matched_skills),
         ...splitSkillText(candidate.key_skills),
         ...extractTechnologies(positiveEvidenceText),
     ]).filter(skill => !hasSkillOverlap(skill, missingSkills));
+    const prioritizedSkillData = prioritizeMatchedSkills(allMatchedSkills, candidate, evidenceText);
+    const matchedSkills = prioritizedSkillData.visible;
+    const hiddenMatchedSkillCount = prioritizedSkillData.hiddenCount;
     const storedScore = firstPositive(
         toNumber(candidate.final_score),
         toNumber(candidate.score),
@@ -180,6 +413,7 @@ function renderAnalysis(explanationData, candidate, sourceLabel = "") {
         roleSignal,
         score,
         isEstimatedScore,
+        reportExperience: sections.experience_summary,
     });
 
     return `
@@ -219,7 +453,7 @@ function renderAnalysis(explanationData, candidate, sourceLabel = "") {
 
         <section class="metric-strip">
             ${metricCard("Confidence", Number.isFinite(confidence) ? `${Math.round(confidence)}%` : "Needs review", "Model confidence in the screening evidence.")}
-            ${metricCard("Matched skills", matchedSkills.length || 0, "Skills found in both resume and job context.")}
+            ${metricCard("Matched skills", allMatchedSkills.length || 0, "Skills found in both resume and job context.")}
             ${metricCard("Follow-up", followUpSignal, "What the recruiter should verify next.")}
         </section>
 
@@ -237,13 +471,18 @@ function renderAnalysis(explanationData, candidate, sourceLabel = "") {
 
                 <div class="analysis-card skill-card">
                     ${cardHeader("Skill Coverage", "Matched and missing skills to guide recruiter follow-up.", "Skills")}
-                    ${renderSkillCloud("Matched skills", matchedSkills, "No matched skills available.")}
+                    ${renderSkillCloud("Matched skills", matchedSkills, "No matched skills available.", hiddenMatchedSkillCount)}
                     ${renderSkillCloud("Missing skills", missingSkills, "No missing skills listed.")}
                 </div>
 
                 <div class="analysis-card gaps-card">
                     ${cardHeader("Gaps To Verify", "Weak areas or questions for screening.", `${sections.gaps.length} gaps`)}
-                    ${renderEvidenceList(sections.gaps, true, "No specific gaps were returned by the AI model.")}
+                    ${renderEvidenceList(sections.gaps, true, "No major gaps found. Recruiter should still verify role depth during screening.")}
+                </div>
+
+                <div class="analysis-card data-quality-card">
+                    ${cardHeader("Data Quality Notes", "Parser and extraction notes that may need manual review.", `${dataQualityNotes.length} notes`)}
+                    ${renderEvidenceList(dataQualityNotes, true, "No data quality issues detected from the resume parse.")}
                 </div>
             </div>
 
@@ -261,7 +500,8 @@ function renderAnalysis(explanationData, candidate, sourceLabel = "") {
 
             <section class="verdict-card ${verdictClass}">
                 ${cardHeader("Recruiter Verdict", "Decision support based on the saved AI evidence.", "Final")}
-                <p class="verdict-text">${escapeHtml(sections.verdict || "No final verdict was returned.")}</p>
+                <p class="verdict-text">${escapeHtml(sections.verdict || "Review candidate manually.")}</p>
+                ${sections.ranking_reason ? `<p class="verdict-reason">${escapeHtml(shortRankingReason(sections.ranking_reason))}</p>` : ""}
             </section>
         </section>
     `;
@@ -298,29 +538,34 @@ function cardHeader(title, subtitle, count) {
     `;
 }
 
-function buildExecutiveSummary({ candidate, sections, matchedSkills, missingSkills, projects, roleSignal, score, isEstimatedScore }) {
-    const role = candidate.designation || candidate.job_title || roleSignal || "this role";
+function buildExecutiveSummary({ candidate, sections, matchedSkills, missingSkills, projects, roleSignal, score, isEstimatedScore, reportExperience }) {
+    const role = candidate.job_title || "this role";
+    const designation = candidate.designation || roleSignal || "candidate";
     const baseSummary = cleanSummarySentence(sections.summary);
     const scoreText = Number.isFinite(score)
-        ? `${isEstimatedScore ? "estimated " : ""}match around ${Math.round(score)}%`
+        ? `${isEstimatedScore ? "estimated " : ""}${Math.round(score)}% match score`
         : "score needs recruiter review";
-    const tools = matchedSkills.slice(0, 5).join(", ");
-    const projectText = projects.length
-        ? `${projects.length} project/work evidence item${projects.length === 1 ? "" : "s"}`
-        : "no clear project evidence";
-    const strongestEvidence = compactSummaryFragment(
-        sections.strengths[0] || projects[0]?.description || ""
+    const totalYears = firstFinite(
+        finiteOrUndefined(reportExperience?.total_years),
+        toNumber(candidate.total_experience_years),
+        toNumber(candidate.experience)
     );
-    const gapText = compactSummaryFragment(missingSkills.slice(0, 3).join(", ") || sections.gaps[0] || "");
+    const relevantYears = firstFinite(
+        finiteOrUndefined(reportExperience?.relevant_years),
+        toNumber(candidate.relevant_experience_years),
+        toNumber(candidate.jd_relevant_experience_years)
+    );
 
     const parts = [
-        `${candidate.name || "Candidate"} is mapped as ${role} with ${scoreText}.`,
+        `${candidate.name || "Candidate"} is a ${Number.isFinite(score) && score >= 70 ? "strong" : Number.isFinite(score) && score < 50 ? "low" : "potential"} match for the ${role} role, with a ${scoreText}.`,
     ];
 
-    if (baseSummary) parts.push(baseSummary);
-    if (tools) parts.push(`Relevant tools/signals: ${tools}.`);
-    parts.push(`Resume evidence includes ${projectText}${strongestEvidence ? `, especially ${strongestEvidence}` : ""}.`);
-    if (gapText) parts.push(`Verify gaps around ${gapText}.`);
+    const experienceParts = [];
+    if (Number.isFinite(totalYears)) experienceParts.push(`${formatCompactYears(totalYears)} total experience`);
+    if (Number.isFinite(relevantYears)) experienceParts.push(`around ${formatCompactYears(relevantYears)} of JD-relevant experience`);
+    if (experienceParts.length) parts.push(`It shows ${experienceParts.join(" and ")}.`);
+    if (designation && designation !== role) parts.push(`Current role signal: ${designation}.`);
+    if (baseSummary && !looksLikeJson(baseSummary)) parts.push(baseSummary);
 
     return parts.join(" ");
 }
@@ -497,6 +742,43 @@ function normalizeProjects(projects) {
         .slice(0, 6);
 }
 
+function sortProjectEvidenceByRelevance(projects, evidenceText = "", jobTitle = "") {
+    const roleText = `${jobTitle || ""} ${evidenceText || ""}`.toLowerCase();
+    return (projects || [])
+        .map(project => {
+            const scored = scoreProjectRelevance(project, roleText);
+            return { ...project, relevanceScore: scored.score, relevanceLabel: scored.label };
+        })
+        .sort((a, b) => b.relevanceScore - a.relevanceScore)
+        .slice(0, 6);
+}
+
+function scoreProjectRelevance(project, roleText) {
+    const text = `${project?.name || ""} ${project?.description || ""} ${(project?.technologies || []).join(" ")}`.toLowerCase();
+    const appliedMlRole = /\b(data scientist|applied ml|machine learning|computer vision|ocr|llm|vlm|document ai)\b/i.test(roleText);
+    const directAppliedMl = /\b(yolo|r\s*-?\s*cnn|object detection|computer vision|ocr|pytorch|tensorflow|scikit|model evaluation|medical imaging|llm|langchain|rag|mlops|model deployment|deep learning|machine learning)\b/gi;
+    const transferableAppliedMl = /\b(python|sql|aws|azure|docker|api|backend|pipeline|data pipeline|fastapi)\b/gi;
+    const weakAppliedMl = /\b(android|xamarin|c#|xaml|ios|mobile app)\b/gi;
+
+    let score = 30;
+    if (appliedMlRole) {
+        const directHits = (text.match(directAppliedMl) || []).length;
+        const transferableHits = (text.match(transferableAppliedMl) || []).length;
+        const weakHits = (text.match(weakAppliedMl) || []).length;
+        score = directHits * 35 + transferableHits * 10 - weakHits * 18;
+        if (directHits >= 2) return { score: score + 80, label: "Direct JD Evidence" };
+        if (directHits === 1) return { score: score + 55, label: "Supporting Evidence" };
+        if (transferableHits >= 2) return { score: score + 35, label: "Transferable Evidence" };
+        return { score: Math.max(0, score), label: "Weak / Non-JD Evidence" };
+    }
+
+    const directGeneral = /\b(designed|built|developed|implemented|architected|owned|optimized|deployed|integrated)\b/i.test(text);
+    const supporting = /\b(api|dashboard|automation|system|platform|database|cloud|security|performance)\b/i.test(text);
+    if (directGeneral && supporting) return { score: 80, label: "Direct JD Evidence" };
+    if (directGeneral || supporting) return { score: 55, label: "Supporting Evidence" };
+    return { score: 20, label: "Weak / Non-JD Evidence" };
+}
+
 function renderProjects(projects) {
     if (!projects.length) {
         return `<p class="empty-state">No project evidence was extracted from the stored resume. Ask the candidate for project examples during screening.</p>`;
@@ -506,6 +788,7 @@ function renderProjects(projects) {
         <div class="project-list">
             ${projects.map((project, index) => `
                 <article class="project-item">
+                    <span class="evidence-label ${evidenceLabelClass(project.relevanceLabel)}">${escapeHtml(project.relevanceLabel || "Supporting Evidence")}</span>
                     <h3>${escapeHtml(project.name)}</h3>
                     <p>${escapeHtml(compactProjectDescription(project.description, index))}</p>
                     ${renderToolRow(project.technologies)}
@@ -513,6 +796,14 @@ function renderProjects(projects) {
             `).join("")}
         </div>
     `;
+}
+
+function evidenceLabelClass(label) {
+    const value = String(label || "").toLowerCase();
+    if (value.includes("direct")) return "is-direct";
+    if (value.includes("transferable")) return "is-transferable";
+    if (value.includes("weak")) return "is-weak";
+    return "is-supporting";
 }
 
 function renderExperienceEvidence(candidate, experienceValue, roleSignal, strengths, projects, evidenceText) {
@@ -794,16 +1085,49 @@ function renderToolRow(tools) {
     `;
 }
 
-function renderSkillCloud(title, skills, emptyMessage) {
+function renderSkillCloud(title, skills, emptyMessage, hiddenCount = 0) {
     return `
         <div class="skill-block">
             <h3>${escapeHtml(title)}</h3>
             ${skills.length
-                ? `<div class="skill-cloud">${skills.slice(0, 18).map(skill => `<span>${escapeHtml(skill)}</span>`).join("")}</div>`
+                ? `<div class="skill-cloud">${skills.slice(0, 18).map(skill => `<span>${escapeHtml(skill)}</span>`).join("")}</div>${hiddenCount > 0 ? `<p class="more-skills">+${hiddenCount} more matched skills</p>` : ""}`
                 : `<p class="empty-state">${escapeHtml(emptyMessage)}</p>`
             }
         </div>
     `;
+}
+
+function prioritizeMatchedSkills(skills, candidate, evidenceText = "") {
+    const all = uniqueItems(skills || []);
+    const jdText = `${candidate?.job_title || ""} ${evidenceText || ""}`.toLowerCase();
+    const appliedMlPriority = [
+        "Machine Learning", "Deep Learning", "Python", "PyTorch", "TensorFlow",
+        "Scikit-learn", "Scikit Learn", "Model Evaluation", "Computer Vision",
+        "Object Detection", "YOLO", "R-CNN", "OCR", "Document AI", "LLM",
+        "LangChain", "Generative AI", "AWS", "SQL",
+    ];
+    const genericPriority = splitSkillText(candidate?.must_have_skills || candidate?.required_skills);
+    const priority = /\b(data scientist|applied ml|machine learning|computer vision|ocr|llm|document ai)\b/i.test(jdText)
+        ? appliedMlPriority
+        : genericPriority;
+    const scored = all.map((skill, index) => {
+        const key = normalizeSkillKey(skill);
+        const priorityIndex = priority.findIndex(item => normalizeSkillKey(item) === key);
+        const evidenceBoost = new RegExp(`\\b${escapeRegExp(skill)}\\b`, "i").test(evidenceText) ? 3 : 0;
+        return {
+            skill,
+            score: (priorityIndex >= 0 ? 100 - priorityIndex : 30) + evidenceBoost - index * 0.01,
+        };
+    });
+    const visible = scored
+        .sort((a, b) => b.score - a.score)
+        .map(item => item.skill)
+        .slice(0, 18);
+    return { visible, hiddenCount: Math.max(0, all.length - visible.length), all };
+}
+
+function escapeRegExp(value) {
+    return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function splitSkillText(value) {
@@ -822,6 +1146,20 @@ function formatExperience(value) {
     const years = toNumber(value);
     if (!Number.isFinite(years)) return "Not listed";
     return `${years} ${years === 1 ? "year" : "years"}`;
+}
+
+function formatCompactYears(value) {
+    const years = toNumber(value);
+    if (!Number.isFinite(years)) return "";
+    const rounded = Math.round(years * 100) / 100;
+    return `${rounded} ${rounded === 1 ? "year" : "years"}`;
+}
+
+function shortRankingReason(value) {
+    const text = cleanReportText(value);
+    if (!text) return "";
+    const first = text.split(/(?<=\.)\s+/)[0] || text;
+    return first.length > 260 ? `${first.slice(0, 260).trim()}...` : first;
 }
 
 function formatGeneratedTime(value) {
