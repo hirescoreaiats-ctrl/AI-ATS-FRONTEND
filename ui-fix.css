@@ -12544,15 +12544,16 @@ overflow:visible !important;
 body.ats-support-mode #pagesContainer{
 width:100vw !important;
 max-width:none !important;
+position:static !important;
 }
 
 body.ats-support-mode .ats-support-page{
 width:min(1180px, calc(100vw - 18rem - 64px)) !important;
 max-width:min(1180px, calc(100vw - 18rem - 64px)) !important;
-margin-top:24px !important;
-margin-right:auto !important;
-margin-bottom:48px !important;
-margin-left:calc(18rem + max(24px, ((100vw - 18rem - 1180px) / 2))) !important;
+position:absolute !important;
+top:24px !important;
+left:calc(18rem + max(24px, ((100vw - 18rem - 1180px) / 2))) !important;
+margin:0 0 48px 0 !important;
 padding:0 0 48px !important;
 }
 }
@@ -12561,6 +12562,9 @@ padding:0 0 48px !important;
 body.ats-support-mode .ats-support-page{
 width:auto !important;
 max-width:none !important;
+position:relative !important;
+top:auto !important;
+left:auto !important;
 margin:0 !important;
 padding:0 0 28px !important;
 }

@@ -802,10 +802,33 @@ btn.classList.toggle("active", Boolean(isActive))
 }
 
 function resetPageScroll(){
+if("scrollRestoration" in window.history){
+    window.history.scrollRestoration = "manual"
+}
+let scrollTargets = [
+    window,
+    document.scrollingElement,
+    document.documentElement,
+    document.body,
+    document.querySelector("body > .w-full"),
+    document.querySelector("body > .w-full > .flex-1"),
+    document.getElementById("pagesContainer")
+]
+scrollTargets.forEach(target => {
+    if(!target) return
+    if(target === window){
+        window.scrollTo({top:0,left:0,behavior:"auto"})
+    }else{
+        target.scrollTop = 0
+        target.scrollLeft = 0
+    }
+})
 requestAnimationFrame(()=>{
 window.scrollTo({top:0,left:0,behavior:"auto"})
 let main = document.querySelector("body > .w-full > .flex-1")
 if(main) main.scrollTop = 0
+let pages = document.getElementById("pagesContainer")
+if(pages) pages.scrollTop = 0
 document.documentElement.scrollTop = 0
 document.body.scrollTop = 0
 })
@@ -813,7 +836,20 @@ setTimeout(()=>{
 window.scrollTo(0,0)
 document.documentElement.scrollTop = 0
 document.body.scrollTop = 0
+let main = document.querySelector("body > .w-full > .flex-1")
+if(main) main.scrollTop = 0
+let pages = document.getElementById("pagesContainer")
+if(pages) pages.scrollTop = 0
 }, 60)
+setTimeout(()=>{
+window.scrollTo(0,0)
+document.documentElement.scrollTop = 0
+document.body.scrollTop = 0
+let main = document.querySelector("body > .w-full > .flex-1")
+if(main) main.scrollTop = 0
+let pages = document.getElementById("pagesContainer")
+if(pages) pages.scrollTop = 0
+}, 240)
 }
 
 function pageForCurrentPath(){
