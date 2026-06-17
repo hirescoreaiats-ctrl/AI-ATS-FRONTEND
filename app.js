@@ -1149,6 +1149,11 @@ localStorage.setItem(OUTREACH_SENDER_CONFIG_KEY, JSON.stringify(config))
 if(config?.reply_to){
     localStorage.setItem("outreachSenderEmail", config.reply_to)
 }
+if(config?.mode === "hirescore"){
+    localStorage.removeItem("outreachSenderMode")
+    localStorage.removeItem("outreachSenderVerified")
+    localStorage.removeItem("outreachSenderVerificationPending")
+}
 updateGmailConnectStatus()
 }
 
@@ -1213,13 +1218,21 @@ let verified = params.get("sender_verified")
 let email = params.get("email")
 if(!verified || !email) return
 localStorage.setItem("outreachSenderEmail", email)
-localStorage.setItem("outreachSenderMode", "smtp")
-localStorage.setItem("outreachSenderVerified", email)
+writeOutreachSenderConfig({
+    mode: "own_domain",
+    active: true,
+    from_email: email,
+    from_name: email.split("@")[0],
+    reply_to: email,
+    sender_name: email.split("@")[0],
+    domain: domainFromEmail(email),
+    verification_status: "verified"
+})
 localStorage.removeItem("outreachSenderVerificationPending")
 window.history.replaceState({}, document.title, window.location.pathname)
 setTimeout(() => {
     updateGmailConnectStatus()
-    alert("Business sender verified: " + email)
+    alert("Own domain sender verified: " + email)
 }, 200)
 }
 
@@ -6565,7 +6578,7 @@ function connectGmailForOutreach(){
     if(!isPlainGmail){
         let proceed = confirm(
             email + " must be a Google Workspace mailbox to connect with this button.\n\n" +
-            "If this mailbox is Zoho, Microsoft 365, cPanel, or another SMTP provider, click 'Use SMTP/Resend Sender' instead.\n\n" +
+            "If this mailbox is Zoho, Microsoft 365, cPanel, or another provider, use Connect Own Domain for sending and keep reply sync separate.\n\n" +
             "Continue to Google account selection?"
         )
         if(!proceed) return
