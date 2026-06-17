@@ -1287,7 +1287,7 @@ let preview = document.getElementById("hireScoreReplyPreview")
 if(preview) preview.innerText = value
 }
 
-function saveHireScoreSender(makeActive){
+async function saveHireScoreSender(makeActive){
 let replyTo = safeText(document.getElementById("hireScoreReplyToInput")?.value).trim()
 let senderName = safeText(document.getElementById("hireScoreDisplayNameInput")?.value).trim()
 if(!replyTo || !replyTo.includes("@")){
@@ -1295,15 +1295,38 @@ if(!replyTo || !replyTo.includes("@")){
     document.getElementById("hireScoreReplyToInput")?.focus()
     return
 }
-writeOutreachSenderConfig({
-    mode: "hirescore",
-    active: makeActive || readOutreachSenderConfig().mode === "hirescore",
-    from_email: HIRE_SCORE_DEFAULT_FROM_EMAIL,
-    from_name: HIRE_SCORE_DEFAULT_FROM_NAME,
-    reply_to: replyTo,
-    sender_name: senderName
-})
-if(makeActive) removeSenderSetupModal()
+let button = typeof event !== "undefined" ? event.currentTarget : null
+setButtonLoading(button, true, "Saving...")
+try{
+    let res = await fetch(API + "/outreach-sender/default", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+            reply_to: replyTo,
+            sender_name: senderName,
+            active: makeActive
+        })
+    })
+    let data = await res.json().catch(()=>({}))
+    if(!res.ok || data.error){
+        alert("Sender setup failed: " + (data.detail || data.error || "Backend did not save sender"))
+        return
+    }
+    writeOutreachSenderConfig({
+        mode: "hirescore",
+        active: makeActive || readOutreachSenderConfig().mode === "hirescore",
+        from_email: data.from_email || HIRE_SCORE_DEFAULT_FROM_EMAIL,
+        from_name: data.from_name || HIRE_SCORE_DEFAULT_FROM_NAME,
+        reply_to: data.reply_to || replyTo,
+        sender_name: senderName
+    })
+    alert(makeActive ? "HireScore AI sender is active." : "HireScore AI sender saved.")
+    if(makeActive) removeSenderSetupModal()
+}catch(error){
+    alert("Sender setup failed. Please check backend connection.")
+}finally{
+    setButtonLoading(button, false)
+}
 }
 
 function openOwnDomainSenderModal(){
