@@ -1110,21 +1110,95 @@ try{
 }
 }
 
+const HIRE_SCORE_DEFAULT_FROM_EMAIL = "Info@hirescoreai.com"
+const HIRE_SCORE_DEFAULT_FROM_NAME = "HireScore AI"
+const OUTREACH_SENDER_CONFIG_KEY = "outreachSenderConfig:v2"
+let ownDomainDraft = null
+
+function normalizeSenderDomain(value){
+let domain = safeText(value).trim().toLowerCase()
+domain = domain.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0].split(":")[0]
+if(domain.includes("@")) domain = domain.split("@").pop()
+return domain
+}
+
+function domainFromEmail(email){
+let parts = safeText(email).trim().toLowerCase().split("@")
+return parts.length === 2 ? normalizeSenderDomain(parts[1]) : ""
+}
+
+function readOutreachSenderConfig(){
+try{
+    let parsed = JSON.parse(localStorage.getItem(OUTREACH_SENDER_CONFIG_KEY) || "null")
+    if(parsed && typeof parsed === "object") return parsed
+}catch(e){}
+let legacyReplyTo = safeText(localStorage.getItem("outreachSenderEmail")).trim()
+let recruiterEmail = getRecruiterEmailFromSession()
+return {
+    mode: "hirescore",
+    active: true,
+    from_email: HIRE_SCORE_DEFAULT_FROM_EMAIL,
+    from_name: HIRE_SCORE_DEFAULT_FROM_NAME,
+    reply_to: legacyReplyTo || recruiterEmail,
+    sender_name: ""
+}
+}
+
+function writeOutreachSenderConfig(config){
+localStorage.setItem(OUTREACH_SENDER_CONFIG_KEY, JSON.stringify(config))
+if(config?.reply_to){
+    localStorage.setItem("outreachSenderEmail", config.reply_to)
+}
+updateGmailConnectStatus()
+}
+
 function getOutreachSenderEmail(){
-let input = document.getElementById("outreachSenderEmail")
-let typed = safeText(input?.value).trim()
-let saved = safeText(localStorage.getItem("outreachSenderEmail")).trim()
-let fallback = getRecruiterEmailFromSession()
-return typed || saved || fallback || ""
+let config = readOutreachSenderConfig()
+if(config.mode === "own_domain" && config.verification_status === "verified"){
+    return safeText(config.from_email).trim()
+}
+return safeText(config.reply_to).trim() || getRecruiterEmailFromSession() || ""
+}
+
+function getReplySyncEmail(){
+return safeText(localStorage.getItem("gmailConnectedEmail")).trim()
+    || safeText(readOutreachSenderConfig().reply_to).trim()
+    || safeText(localStorage.getItem("outreachSenderEmail")).trim()
+    || getRecruiterEmailFromSession()
+}
+
+function getActiveSenderPayload(){
+let config = readOutreachSenderConfig()
+if(config.mode === "own_domain"){
+    return {
+        sender_mode: "own_domain",
+        from_email: safeText(config.from_email).trim(),
+        from_name: safeText(config.sender_name || config.from_name).trim(),
+        reply_to: safeText(config.from_email).trim(),
+        domain: normalizeSenderDomain(config.domain),
+        verification_status: config.verification_status || "pending"
+    }
+}
+return {
+    sender_mode: "hirescore",
+    from_email: HIRE_SCORE_DEFAULT_FROM_EMAIL,
+    from_name: HIRE_SCORE_DEFAULT_FROM_NAME,
+    reply_to: safeText(config.reply_to).trim() || getRecruiterEmailFromSession(),
+    sender_display_name: safeText(config.sender_name).trim()
+}
 }
 
 function saveOutreachSenderEmail(){
 let input = document.getElementById("outreachSenderEmail")
-let email = safeText(input?.value).trim()
+let email = safeText(input?.value || readOutreachSenderConfig().reply_to).trim()
 if(email){
     localStorage.setItem("outreachSenderEmail", email)
 }else{
     localStorage.removeItem("outreachSenderEmail")
+}
+let config = readOutreachSenderConfig()
+if(config.mode === "hirescore"){
+    localStorage.setItem(OUTREACH_SENDER_CONFIG_KEY, JSON.stringify({ ...config, reply_to: email }))
 }
 let connectedEmail = safeText(localStorage.getItem("gmailConnectedEmail")).trim().toLowerCase()
 if(connectedEmail && email.toLowerCase() !== connectedEmail){
@@ -1152,8 +1226,268 @@ setTimeout(() => {
 function offerGoogleReconnect(message){
 let prompt = (message || "Google/Gmail permission is required.") + "\n\nConnect Gmail/Google now?"
 if(confirm(prompt)){
-    connectGmailForOutreach()
+    openReplySyncModal()
 }
+}
+
+function removeSenderSetupModal(){
+document.getElementById("senderSetupModal")?.remove()
+}
+
+function senderModalShell(title, description, bodyHtml){
+removeSenderSetupModal()
+let modal = document.createElement("div")
+modal.id = "senderSetupModal"
+modal.className = "ats-sender-modal"
+modal.innerHTML = `
+<div class="ats-sender-modal-card">
+<div class="ats-sender-modal-head">
+<div>
+<h3>${safeHtml(title)}</h3>
+<p>${safeHtml(description)}</p>
+</div>
+<button type="button" class="ats-sender-modal-close" onclick="removeSenderSetupModal()">Close</button>
+</div>
+${bodyHtml}
+</div>`
+document.body.appendChild(modal)
+}
+
+function openHireScoreSenderModal(){
+let config = readOutreachSenderConfig()
+let replyTo = safeText(config.reply_to).trim() || getRecruiterEmailFromSession()
+let displayName = safeText(config.sender_name).trim()
+senderModalShell(
+    "Use HireScore AI Sender",
+    "No DNS setup needed. Candidate emails will be sent from HireScore AI, and replies will go to your email.",
+    `
+<div class="ats-sender-recommended">Recommended default sender</div>
+<div class="ats-sender-preview-box">
+<div><span>From</span><strong>HireScore AI &lt;${HIRE_SCORE_DEFAULT_FROM_EMAIL}&gt;</strong></div>
+<div><span>Reply-To</span><strong id="hireScoreReplyPreview">${safeHtml(replyTo || "recruiter@email.com")}</strong></div>
+</div>
+<label class="ats-sender-field">
+<span>Reply-to email</span>
+<input id="hireScoreReplyToInput" type="email" value="${safeHtml(replyTo)}" placeholder="recruiter@email.com" oninput="updateHireScoreReplyPreview()">
+</label>
+<label class="ats-sender-field">
+<span>Sender display name optional</span>
+<input id="hireScoreDisplayNameInput" type="text" value="${safeHtml(displayName)}" placeholder="Recruiting Team">
+</label>
+<div class="ats-sender-actions">
+<button type="button" class="ats-gmail-connect-btn is-secondary" onclick="saveHireScoreSender(false)">Save</button>
+<button type="button" class="ats-gmail-connect-btn" onclick="saveHireScoreSender(true)">Set as Active Sender</button>
+</div>`
+)
+}
+
+function updateHireScoreReplyPreview(){
+let value = safeText(document.getElementById("hireScoreReplyToInput")?.value).trim() || "recruiter@email.com"
+let preview = document.getElementById("hireScoreReplyPreview")
+if(preview) preview.innerText = value
+}
+
+function saveHireScoreSender(makeActive){
+let replyTo = safeText(document.getElementById("hireScoreReplyToInput")?.value).trim()
+let senderName = safeText(document.getElementById("hireScoreDisplayNameInput")?.value).trim()
+if(!replyTo || !replyTo.includes("@")){
+    alert("Please enter a valid reply-to email.")
+    document.getElementById("hireScoreReplyToInput")?.focus()
+    return
+}
+writeOutreachSenderConfig({
+    mode: "hirescore",
+    active: makeActive || readOutreachSenderConfig().mode === "hirescore",
+    from_email: HIRE_SCORE_DEFAULT_FROM_EMAIL,
+    from_name: HIRE_SCORE_DEFAULT_FROM_NAME,
+    reply_to: replyTo,
+    sender_name: senderName
+})
+if(makeActive) removeSenderSetupModal()
+}
+
+function openOwnDomainSenderModal(){
+let config = readOutreachSenderConfig()
+let domain = config.mode === "own_domain" ? safeText(config.domain).trim() : ""
+let fromEmail = config.mode === "own_domain" ? safeText(config.from_email).trim() : ""
+let senderName = config.mode === "own_domain" ? safeText(config.sender_name || config.from_name).trim() : ""
+let records = Array.isArray(config.records) ? config.records : []
+let status = config.mode === "own_domain" ? (config.verification_status || "pending") : "pending"
+senderModalShell(
+    "Connect Your Own Sending Domain",
+    "Send emails from your company domain. Add the DNS records below in your domain provider to verify ownership and improve deliverability.",
+    `
+<div class="ats-sender-form-grid">
+<label class="ats-sender-field"><span>Domain</span><input id="ownDomainInput" type="text" value="${safeHtml(domain)}" placeholder="abcagency.com"></label>
+<label class="ats-sender-field"><span>From email</span><input id="ownDomainFromInput" type="email" value="${safeHtml(fromEmail)}" placeholder="hr@abcagency.com"></label>
+<label class="ats-sender-field"><span>Sender name</span><input id="ownDomainNameInput" type="text" value="${safeHtml(senderName)}" placeholder="ABC Recruitment"></label>
+</div>
+<div class="ats-sender-preview-box" id="ownDomainPreview">
+<div><span>From</span><strong>${safeHtml(senderName || "ABC Recruitment")} &lt;${safeHtml(fromEmail || "hr@abcagency.com")}&gt;</strong></div>
+<div><span>Reply-To</span><strong>${safeHtml(fromEmail || "hr@abcagency.com")}</strong></div>
+</div>
+<div class="ats-sender-actions">
+<button type="button" class="ats-gmail-connect-btn" onclick="generateOwnDomainDnsRecords()">Generate DNS Records</button>
+</div>
+<div id="ownDomainDnsPanel">${records.length ? ownDomainDnsTableHtml(records, status) : ""}</div>`
+)
+}
+
+function collectOwnDomainForm(){
+let domain = normalizeSenderDomain(document.getElementById("ownDomainInput")?.value)
+let fromEmail = safeText(document.getElementById("ownDomainFromInput")?.value).trim().toLowerCase()
+let senderName = safeText(document.getElementById("ownDomainNameInput")?.value).trim()
+if(!domain){
+    alert("Please enter your sending domain, for example abcagency.com.")
+    document.getElementById("ownDomainInput")?.focus()
+    return null
+}
+if(!fromEmail || !fromEmail.includes("@")){
+    alert("Please enter a valid from email, for example hr@abcagency.com.")
+    document.getElementById("ownDomainFromInput")?.focus()
+    return null
+}
+if(domainFromEmail(fromEmail) !== domain){
+    alert("From email domain must match the entered domain. Example: domain abcagency.com and from email hr@abcagency.com.")
+    document.getElementById("ownDomainFromInput")?.focus()
+    return null
+}
+return { domain, from_email: fromEmail, sender_name: senderName || fromEmail.split("@")[0] }
+}
+
+function fallbackDnsRecords(domain){
+let clean = normalizeSenderDomain(domain)
+return [
+    { type: "TXT", host: "@", value: "brevo-code:pending-" + clean, ttl: "3600", status: "pending", label: "Brevo code TXT" },
+    { type: "CNAME", host: "brevo1._domainkey", value: "brevo1.domainkey.brevo.com", ttl: "3600", status: "pending", label: "DKIM CNAME" },
+    { type: "CNAME", host: "brevo2._domainkey", value: "brevo2.domainkey.brevo.com", ttl: "3600", status: "pending", label: "DKIM CNAME" },
+    { type: "TXT", host: "_dmarc", value: "v=DMARC1; p=none", ttl: "3600", status: "pending", label: "DMARC TXT" }
+]
+}
+
+async function generateOwnDomainDnsRecords(){
+let form = collectOwnDomainForm()
+if(!form) return
+let button = typeof event !== "undefined" ? event.target : null
+setButtonLoading(button, true, "Generating...")
+try{
+    let res = await fetch(API + "/sender-domains/dns-records", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(form)
+    })
+    let data = res.ok ? await res.json() : {}
+    let records = Array.isArray(data.records) && data.records.length ? data.records : fallbackDnsRecords(form.domain)
+    let status = data.verification_status || "pending"
+    ownDomainDraft = { mode: "own_domain", active: false, ...form, from_name: form.sender_name, records, verification_status: status }
+    document.getElementById("ownDomainDnsPanel").innerHTML = ownDomainDnsTableHtml(records, status)
+}catch(e){
+    let records = fallbackDnsRecords(form.domain)
+    ownDomainDraft = { mode: "own_domain", active: false, ...form, from_name: form.sender_name, records, verification_status: "pending" }
+    document.getElementById("ownDomainDnsPanel").innerHTML = ownDomainDnsTableHtml(records, "pending")
+}finally{
+    setButtonLoading(button, false)
+}
+}
+
+function dnsStatusBadge(status){
+let clean = safeText(status || "pending").toLowerCase()
+let label = clean === "verified" ? "Verified" : clean === "failed" ? "Failed" : "Pending"
+return `<span class="ats-dns-status is-${safeHtml(clean)}">${label}</span>`
+}
+
+function ownDomainDnsTableHtml(records, verificationStatus){
+let rows = records.map((record, index) => {
+    let host = record.host || record.name || record.hostname || ""
+    let value = record.value || record.content || record.record_value || ""
+    let status = record.status || verificationStatus || "pending"
+    return `<tr>
+<td>${safeHtml(record.type || "")}</td>
+<td><strong>${safeHtml(host)}</strong><small>${safeHtml(record.label || "")}</small></td>
+<td>${safeHtml(value)}</td>
+<td>${safeHtml(record.ttl || "3600")}</td>
+<td>${dnsStatusBadge(status)}</td>
+<td><button type="button" onclick="copyDnsPart(${index}, 'host')">Copy Host</button><button type="button" onclick="copyDnsPart(${index}, 'value')">Copy Value</button></td>
+</tr>`
+}).join("")
+return `
+<div class="ats-sender-warning">Add these records in your own domain DNS provider, not in HireScore AI DNS.</div>
+<div class="ats-sender-warning is-danger">Do not change MX records. MX records control email receiving and changing them can break your mailbox.</div>
+<p class="ats-sender-helper">If your domain uses Cloudflare, add these records in Cloudflare DNS. If your domain uses GoDaddy, Namecheap, Hostinger, or another provider, add them there.</p>
+<div class="ats-dns-table-wrap">
+<table class="ats-dns-table">
+<thead><tr><th>Type</th><th>Name / Host</th><th>Value / Content</th><th>TTL</th><th>Status</th><th>Action</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</div>
+${verificationStatus === "verified" ? `<div class="ats-sender-success">Domain verified. You can now send emails from this domain.</div>` : ""}
+<div class="ats-sender-actions">
+<button type="button" class="ats-gmail-connect-btn is-secondary" onclick="checkOwnDomainVerification()">Check Verification Status</button>
+<button type="button" class="ats-gmail-connect-btn" ${verificationStatus === "verified" ? "" : "disabled"} onclick="activateOwnDomainSender()">Set as Active Sender</button>
+</div>`
+}
+
+function copyDnsPart(index, field){
+let record = (ownDomainDraft?.records || readOutreachSenderConfig().records || [])[index]
+if(!record) return
+let value = field === "host" ? (record.host || record.name || record.hostname || "") : (record.value || record.content || record.record_value || "")
+if(navigator.clipboard?.writeText){
+    navigator.clipboard.writeText(value)
+}else{
+    prompt("Copy value", value)
+}
+}
+
+async function checkOwnDomainVerification(){
+let form = collectOwnDomainForm()
+if(!form) return
+let button = typeof event !== "undefined" ? event.target : null
+setButtonLoading(button, true, "Checking...")
+let draft = ownDomainDraft || readOutreachSenderConfig()
+try{
+    let res = await fetch(API + "/sender-domains/verification-status", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ domain: form.domain, from_email: form.from_email })
+    })
+    let data = res.ok ? await res.json() : {}
+    let status = data.verification_status || data.status || "pending"
+    let records = Array.isArray(data.records) && data.records.length ? data.records : (draft.records || fallbackDnsRecords(form.domain))
+    ownDomainDraft = { mode: "own_domain", active: false, ...form, from_name: form.sender_name, records, verification_status: status }
+    document.getElementById("ownDomainDnsPanel").innerHTML = ownDomainDnsTableHtml(records, status)
+}catch(e){
+    alert("Verification is still pending. Please confirm the DNS records are saved with your DNS provider.")
+}finally{
+    setButtonLoading(button, false)
+}
+}
+
+function activateOwnDomainSender(){
+let config = ownDomainDraft || readOutreachSenderConfig()
+if(config.verification_status !== "verified"){
+    alert("Your sending domain is not verified yet. Please add the DNS records or use HireScore AI sender.")
+    return
+}
+writeOutreachSenderConfig({ ...config, active: true, reply_to: config.from_email })
+removeSenderSetupModal()
+}
+
+function openReplySyncModal(){
+let email = getReplySyncEmail()
+senderModalShell(
+    "Connect Inbox for Reply Sync",
+    "Connect Gmail/Workspace or Outlook to sync candidate replies. This does not change your sending domain.",
+    `
+<div class="ats-reply-sync-options">
+<button type="button" class="ats-gmail-connect-btn" onclick="connectGmailForOutreach()">Google / Workspace OAuth</button>
+<button type="button" class="ats-gmail-connect-btn is-secondary" disabled>Outlook/Microsoft OAuth if available</button>
+</div>
+<p class="ats-sender-helper">Sending uses HireScore AI sender or a verified own-domain sender. Reply sync connects your inbox so candidate replies can be tracked.</p>
+<label class="ats-sender-field">
+<span>Inbox email for reply sync</span>
+<input id="outreachSenderEmail" type="email" value="${safeHtml(email)}" placeholder="recruiter@email.com" oninput="saveOutreachSenderEmail()" onchange="saveOutreachSenderEmail()">
+</label>`
+)
 }
 
 function connectGoogleForAssessmentAccess(){
@@ -6197,9 +6531,9 @@ function connectGmailForOutreach(){
     }
 
     let loginEmail = getRecruiterEmailFromSession()
-    let email = getOutreachSenderEmail()
+    let email = getReplySyncEmail()
     if(!email || !email.includes("@")){
-        alert("Please enter a valid sender email first.")
+        alert("Please enter a valid inbox email first.")
         document.getElementById("outreachSenderEmail")?.focus()
         return
     }
@@ -6223,143 +6557,31 @@ function connectGmailForOutreach(){
 }
 
 async function useBusinessSenderForOutreach(){
-    let email = getOutreachSenderEmail()
-    if(!email || !email.includes("@")){
-        alert("Please enter a valid company sender email first.")
-        document.getElementById("outreachSenderEmail")?.focus()
-        return
-    }
-    let modal = document.getElementById("smtpSenderModal")
-    if(!modal) return
-    let senderInput = document.getElementById("smtpSenderEmail")
-    let usernameInput = document.getElementById("smtpUsername")
-    let passwordInput = document.getElementById("smtpPassword")
-    if(senderInput) senderInput.value = email
-    if(usernameInput) usernameInput.value = email
-    if(passwordInput) passwordInput.value = ""
-    let providerInput = document.getElementById("smtpProvider")
-    if(providerInput) providerInput.value = guessSmtpProvider(email)
-    applySmtpPreset()
-    modal.classList.remove("hidden")
-    modal.setAttribute("aria-hidden", "false")
-    document.getElementById("smtpProvider")?.focus()
-}
-
-function closeSmtpSenderModal(){
-    let modal = document.getElementById("smtpSenderModal")
-    if(!modal) return
-    modal.classList.add("hidden")
-    modal.setAttribute("aria-hidden", "true")
-}
-
-function guessSmtpProvider(email){
-    let domain = safeText(email).split("@")[1]?.toLowerCase() || ""
-    if(domain.includes("gmail") || domain.includes("googlemail")) return "google"
-    if(domain.includes("outlook") || domain.includes("hotmail") || domain.includes("live") || domain.includes("office365")) return "office365"
-    if(domain.includes("zoho")) return "zoho"
-    if(domain.includes("secureserver") || domain.includes("godaddy")) return "godaddy"
-    return "google"
-}
-
-function applySmtpPreset(){
-    let provider = document.getElementById("smtpProvider")?.value || "google"
-    let hostInput = document.getElementById("smtpHost")
-    let portInput = document.getElementById("smtpPort")
-    let tlsInput = document.getElementById("smtpUseTls")
-    let presets = {
-        google:{host:"smtp.gmail.com", port:587, tls:true},
-        office365:{host:"smtp.office365.com", port:587, tls:true},
-        zoho:{host:"smtp.zoho.com", port:587, tls:true},
-        godaddy:{host:"smtpout.secureserver.net", port:587, tls:true}
-    }
-    let preset = presets[provider]
-    if(preset){
-        if(hostInput) hostInput.value = preset.host
-        if(portInput) portInput.value = preset.port
-        if(tlsInput) tlsInput.checked = preset.tls
-    }else if(hostInput && !safeText(hostInput.value).trim()){
-        hostInput.placeholder = "mail.yourdomain.com or provider SMTP host"
-    }
-}
-
-async function configureBusinessSmtpSender(){
-    let email = safeText(document.getElementById("smtpSenderEmail")?.value).trim()
-    let smtpHost = safeText(document.getElementById("smtpHost")?.value).trim()
-    let smtpPort = Number(document.getElementById("smtpPort")?.value || 587)
-    let smtpUsername = safeText(document.getElementById("smtpUsername")?.value).trim() || email
-    let smtpPassword = safeText(document.getElementById("smtpPassword")?.value).trim()
-    let useTls = document.getElementById("smtpUseTls")?.checked !== false
-    if(!email || !email.includes("@")){
-        alert("Please enter a valid sender email.")
-        document.getElementById("smtpSenderEmail")?.focus()
-        return
-    }
-    if(!smtpHost){
-        alert("Please enter SMTP host.")
-        document.getElementById("smtpHost")?.focus()
-        return
-    }
-    if(!smtpPassword){
-        alert("Please enter SMTP password or app password.")
-        document.getElementById("smtpPassword")?.focus()
-        return
-    }
-    let button = typeof event !== "undefined" ? event.currentTarget : null
-    setButtonLoading(button, true, "Sending...")
-    try{
-        let res = await fetch(API + "/outreach-sender/configure-smtp", {
-            method:"POST",
-            headers:authHeaders(),
-            body:JSON.stringify({
-                email,
-                smtp_host:smtpHost,
-                smtp_port:smtpPort || 587,
-                smtp_username:smtpUsername,
-                smtp_password:smtpPassword,
-                use_tls:useTls
-            })
-        })
-        let data = await res.json().catch(()=>({}))
-        if(!res.ok || data.error){
-            alert("Authorization mail failed: " + (data.detail || data.error || "SMTP details are incorrect"))
-            return
-        }
-        localStorage.setItem("outreachSenderEmail", email)
-        localStorage.setItem("outreachSenderMode", "smtp")
-        localStorage.setItem("outreachSenderVerificationPending", email)
-        localStorage.removeItem("outreachSenderVerified")
-        localStorage.removeItem("gmailConnected")
-        let mainInput = document.getElementById("outreachSenderEmail")
-        if(mainInput) mainInput.value = email
-        closeSmtpSenderModal()
-        updateGmailConnectStatus()
-        alert("Authorization mail sent to " + email + ". Open that inbox and approve the link.")
-    }catch(err){
-        alert("Authorization mail could not be sent. Please check SMTP host, port, username and app password.")
-    }finally{
-        setButtonLoading(button, false)
-    }
+    openOwnDomainSenderModal()
 }
 
 function updateGmailConnectStatus(){
     let status = document.getElementById("gmailConnectStatus")
-    if(!status) return
+    let preview = document.getElementById("activeSenderPreview")
+    if(!status && !preview) return
     let input = document.getElementById("outreachSenderEmail")
-    let saved = localStorage.getItem("outreachSenderEmail") || localStorage.getItem("userEmail") || ""
+    let config = readOutreachSenderConfig()
+    let saved = getReplySyncEmail()
     if(input && saved && !safeText(input.value).trim()) input.value = saved
-    let email = getOutreachSenderEmail() || "your company email"
-    let mode = localStorage.getItem("outreachSenderMode") || ""
-    let verifiedEmail = safeText(localStorage.getItem("outreachSenderVerified")).trim().toLowerCase()
+    let email = getReplySyncEmail() || "your inbox"
     let connectedEmail = safeText(localStorage.getItem("gmailConnectedEmail")).trim().toLowerCase()
     let isConnected = localStorage.getItem("gmailConnected") === "true" && (!connectedEmail || connectedEmail === email.toLowerCase())
-    if(isConnected){
-        status.innerText = "Google Workspace/Gmail connected for outreach from " + email + "."
-    }else if(mode === "smtp" && verifiedEmail === email.toLowerCase()){
-        status.innerText = "Business sender verified: " + email + ". Candidate mail can use configured SMTP/Resend."
-    }else if(mode === "smtp"){
-        status.innerText = "Verification link sent to " + email + ". Open that inbox and approve the link before sending candidate mail."
+    if(config.mode === "own_domain" && config.verification_status === "verified"){
+        if(status) status.innerText = "Own domain sender is verified and active. Reply sync remains separate."
+        if(preview) preview.innerHTML = `<span>Active sender</span><strong>${safeHtml(config.sender_name || config.from_name || "Recruiting Team")} &lt;${safeHtml(config.from_email)}&gt;</strong><small>Reply-To: ${safeHtml(config.from_email)}</small>`
+    }else if(config.mode === "own_domain"){
+        if(status) status.innerText = "Your own domain is pending DNS verification. Use HireScore AI sender until it is verified."
+        if(preview) preview.innerHTML = `<span>Pending sender</span><strong>${safeHtml(config.sender_name || config.from_name || "Recruiting Team")} &lt;${safeHtml(config.from_email || "sender@company.com")}&gt;</strong><small>Verification status: ${safeHtml(config.verification_status || "pending")}</small>`
     }else{
-        status.innerText = "Use Google connect for Workspace/Gmail, or verify a business mailbox for SMTP/Resend sending."
+        if(status) status.innerText = isConnected
+            ? "HireScore AI sender is active. Google/Workspace reply sync is connected for " + email + "."
+            : "HireScore AI sender is active. Connect reply sync separately when you want candidate replies tracked."
+        if(preview) preview.innerHTML = `<span>Active sender</span><strong>${HIRE_SCORE_DEFAULT_FROM_NAME} &lt;${HIRE_SCORE_DEFAULT_FROM_EMAIL}&gt;</strong><small>Reply-To: ${safeHtml(config.reply_to || email || "recruiter@email.com")}</small>`
     }
 }
 
@@ -6367,17 +6589,12 @@ async function syncGmailReplies(options = {}){
     let silent = options.silent === true
     let reload = options.reload !== false
 
-    if(localStorage.getItem("outreachSenderMode") === "smtp"){
-        if(!silent) alert("Reply sync is available only for connected Gmail/Google Workspace inboxes. SMTP/Resend can send mail, but cannot sync inbox replies from Google.")
-        return
-    }
-
     if(!window.currentJobId){
         if(!silent) alert("Open a communication job first.")
         return
     }
 
-    let recruiterEmail = getOutreachSenderEmail()
+    let recruiterEmail = getReplySyncEmail()
     if(!recruiterEmail){
         let token = localStorage.getItem("token")
         let payload = typeof parseJwt === "function" ? parseJwt(token) : null
@@ -8557,24 +8774,33 @@ currentMailComposer = null
 
 async function sendMail(email, name, jobTitle, jobId, candidateId = ""){
     let button = typeof event !== "undefined" ? event.target : null
-    let senderEmail = getOutreachSenderEmail()
-    if(!senderEmail || !senderEmail.includes("@")){
-        alert("Please enter the company sender email before sending.")
-        document.getElementById("outreachSenderEmail")?.focus()
+    let senderPayload = getActiveSenderPayload()
+    if(senderPayload.sender_mode === "own_domain" && senderPayload.verification_status !== "verified"){
+        alert("Your sending domain is not verified yet. Please add the DNS records or use HireScore AI sender.")
         return
     }
-    localStorage.setItem("outreachSenderEmail", senderEmail)
+    if(!senderPayload.reply_to || !senderPayload.reply_to.includes("@")){
+        alert("Please set a valid reply-to email for the active sender.")
+        openHireScoreSenderModal()
+        return
+    }
+    localStorage.setItem("outreachSenderEmail", senderPayload.reply_to)
 
     try{
         let jobRes = await fetch(API + "/public-job/" + encodeURIComponent(jobId))
         let job = jobRes.ok ? await jobRes.json() : {}
+        let senderLabel = senderPayload.sender_mode === "own_domain"
+            ? `${senderPayload.from_name || "Recruiting Team"} <${senderPayload.from_email}>`
+            : `${HIRE_SCORE_DEFAULT_FROM_NAME} <${HIRE_SCORE_DEFAULT_FROM_EMAIL}>`
         currentMailComposer = {
             email,
             name,
             candidateId,
             jobId,
             jobTitle,
-            senderEmail,
+            senderEmail: senderPayload.reply_to,
+            senderPayload,
+            senderLabel,
             button,
             companyName: job.company_name,
             hiringManager: job.hiring_manager
@@ -8584,7 +8810,7 @@ async function sendMail(email, name, jobTitle, jobId, candidateId = ""){
         let meta = document.getElementById("mailComposerMeta")
         let subject = document.getElementById("mailComposerSubject")
         let body = document.getElementById("mailComposerBody")
-        if(meta) meta.innerText = `${name || "Candidate"} | ${email} | From ${senderEmail}`
+        if(meta) meta.innerText = `${name || "Candidate"} | ${email} | From ${senderLabel}`
         if(subject) subject.value = `${jobTitle || "Role"} - Next Step`
         if(body) body.value = defaultCandidateMailBody(name, jobTitle, job.company_name, job.hiring_manager)
         if(modal){
@@ -8647,7 +8873,7 @@ async function sendMailComposerMessage(){
     setButtonLoading(button, true, "Sending...")
 
     try{
-        let {email, name, candidateId, jobTitle, jobId, senderEmail, companyName, hiringManager} = currentMailComposer
+        let {email, name, candidateId, jobTitle, jobId, senderEmail, senderPayload, companyName, hiringManager} = currentMailComposer
 
         let res = await fetch(API + "/send-mail", {
             method: "POST",
@@ -8663,6 +8889,12 @@ async function sendMailComposerMessage(){
                 job_title: jobTitle,
                 recruiter_email: senderEmail,
                 recruiter_name: localStorage.getItem("username"),
+                sender_mode: senderPayload?.sender_mode || "hirescore",
+                from_email: senderPayload?.from_email,
+                from_name: senderPayload?.from_name,
+                reply_to: senderPayload?.reply_to || senderEmail,
+                sender_domain: senderPayload?.domain,
+                verification_status: senderPayload?.verification_status,
                 hiring_manager: hiringManager,
                 company_name: companyName,
                 subject,
@@ -8697,7 +8929,7 @@ async function sendAssessmentTest(candidateId, jobId){
         return
     }
 
-    let recruiterEmail = getOutreachSenderEmail()
+    let recruiterEmail = getReplySyncEmail()
     if(!recruiterEmail){
         alert("Recruiter email not found. Please login again.")
         return
@@ -8720,14 +8952,13 @@ async function sendAssessmentTest(candidateId, jobId){
         let data = await res.json()
         if(!res.ok || data.error){
             let message = data.detail || data.error || "Google Forms/Gmail is not configured"
-            let usesSmtpSender = localStorage.getItem("outreachSenderMode") === "smtp"
             let isFormsIssue = /forms|google forms/i.test(message)
             let isGoogleSenderIssue = /gmail|google/i.test(message) && !/smtp|business/i.test(message)
             if(isFormsIssue){
                 offerGoogleAssessmentReconnect("Test setup failed: " + message)
                 return
             }
-            if(!usesSmtpSender && (res.status === 401 || isGoogleSenderIssue)){
+            if(res.status === 401 || isGoogleSenderIssue){
                 offerGoogleReconnect("Test send failed: " + message)
                 return
             }
@@ -8755,7 +8986,7 @@ async function syncAssessmentResults(jobId, options = {}){
         return
     }
 
-    let recruiterEmail = getOutreachSenderEmail()
+    let recruiterEmail = getReplySyncEmail()
     if(!recruiterEmail){
         if(!silent) alert("Recruiter email not found. Please login again.")
         return

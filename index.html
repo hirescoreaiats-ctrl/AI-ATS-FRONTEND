@@ -2369,7 +2369,7 @@ Back Back to Recruitment Dashboard
             <h2>Outreach Command Center</h2>
             <p>Open role-specific communication queues, send recruiter emails, sync replies, and move responsive candidates into the next stage.</p>
         </div>
-        <button onclick="syncGmailReplies()" class="ats-outreach-sync-btn">Sync Replies</button>
+        <button onclick="openReplySyncModal()" class="ats-outreach-sync-btn">Sync Replies</button>
     </section>
 
     <section class="ats-outreach-metrics">
@@ -2451,79 +2451,22 @@ Back Back to Recruitment Dashboard
 <span class="ats-comm-panel-icon">MAIL</span>
 <div class="ats-sender-card-copy">
 <h3>Outreach Sender</h3>
-<p id="gmailConnectStatus">Add a verified company sender for candidate outreach.</p>
-<div class="ats-sender-email-row">
-<input id="outreachSenderEmail" type="email" placeholder="sender@company.com" oninput="saveOutreachSenderEmail()" onchange="saveOutreachSenderEmail()">
-</div>
-<small class="ats-sender-card-help">Google Workspace can sync replies. Business SMTP sends from your company mailbox after authorization.</small>
+<p id="gmailConnectStatus">Use the recommended HireScore AI sender, or verify your own domain with DNS records before sending from it.</p>
+<div id="activeSenderPreview" class="ats-active-sender-preview"></div>
 </div>
 </div>
 <div class="ats-sender-card-actions">
-<button onclick="connectGmailForOutreach()" class="ats-gmail-connect-btn">
-Google / Workspace
+<button onclick="openHireScoreSenderModal()" class="ats-gmail-connect-btn">
+Use HireScore AI Sender
 </button>
-<button onclick="useBusinessSenderForOutreach()" class="ats-gmail-connect-btn is-secondary">
-Business SMTP
+<button onclick="openOwnDomainSenderModal()" class="ats-gmail-connect-btn is-secondary">
+Connect Own Domain
 </button>
-<button onclick="syncGmailReplies()" class="ats-gmail-connect-btn is-secondary">
+<button onclick="openReplySyncModal()" class="ats-gmail-connect-btn is-secondary">
 Sync Replies
 </button>
 </div>
 </section>
-
-<div id="smtpSenderModal" class="ats-mail-composer hidden" aria-hidden="true">
-<div class="ats-mail-composer-card ats-smtp-card">
-<div class="ats-mail-composer-head">
-<div>
-<span>Business sender</span>
-<h3>Connect business mail</h3>
-<p>Select the mail provider, add the app password/SMTP password, and approve the authorization link sent to this inbox.</p>
-</div>
-<button type="button" onclick="closeSmtpSenderModal()">Close</button>
-</div>
-<div class="ats-smtp-grid">
-<label>
-Sender email
-<input id="smtpSenderEmail" type="email" placeholder="sachin.yadav@infometry.net" autocomplete="off" name="business_sender_email">
-</label>
-<label>
-Mail provider
-<select id="smtpProvider" onchange="applySmtpPreset()" autocomplete="off" name="business_smtp_provider">
-<option value="google">Google Workspace / Gmail</option>
-<option value="office365">Microsoft 365 / Outlook</option>
-<option value="zoho">Zoho Mail</option>
-<option value="godaddy">GoDaddy / Secureserver</option>
-<option value="custom">Custom SMTP</option>
-</select>
-</label>
-<label>
-Port
-<input id="smtpPort" type="number" value="587" autocomplete="off" name="business_smtp_port">
-</label>
-<label>
-SMTP username
-<input id="smtpUsername" type="text" placeholder="usually same as sender email" autocomplete="off" name="business_smtp_login">
-</label>
-<label class="ats-smtp-host-row">
-SMTP host
-<input id="smtpHost" type="text" placeholder="smtp.gmail.com" autocomplete="off" name="business_smtp_host">
-</label>
-</div>
-<label>
-SMTP password / app password
-<input id="smtpPassword" type="password" placeholder="Use app password where required; usually not your login password" autocomplete="new-password" name="business_smtp_secret">
-<small class="ats-smtp-help">Google Workspace/Gmail, Microsoft 365, and Zoho usually need an app password or SMTP-enabled password, not the normal login password.</small>
-</label>
-<label class="ats-smtp-check">
-<input id="smtpUseTls" type="checkbox" checked>
-Use TLS
-</label>
-<div class="ats-mail-composer-actions">
-<button type="button" onclick="closeSmtpSenderModal()" class="is-secondary">Cancel</button>
-<button type="button" onclick="configureBusinessSmtpSender()">Send Authorization Mail</button>
-</div>
-</div>
-</div>
 
 <div id="mailComposerModal" class="ats-mail-composer hidden" aria-hidden="true">
 <div class="ats-mail-composer-card">
