@@ -9902,9 +9902,14 @@ function selectCommunicationCandidate(key){
     let name = candidate.name || candidate.full_name || "Candidate"
     let email = candidate.email || "Email not available"
     let score = candidate.final_score ?? candidate.score ?? candidate.ai_fit_score ?? 0
+    let experience = formatExperience(candidate.total_experience_years ?? candidate.experience) || "Not listed"
+    let location = candidate.location || candidate.current_location || "Not listed"
+    let rawSkills = candidate.key_skills || candidate.matched_skills || candidate.skills || ""
+    let skills = Array.isArray(rawSkills) ? rawSkills.join(", ") : safeText(rawSkills)
+    skills = skills ? shortText(skills, 54) : "Review profile"
     if(panel){
         panel.className = "ats-ai-candidate"
-        panel.innerHTML = `<span class="ats-avatar">${safeHtml(candidateInitials(name))}</span><div><strong>${safeHtml(name)}</strong><p title="${safeHtml(email)}">${safeHtml(email)}</p></div><span class="ats-score-pill">${safeHtml(formatScore(score))}</span>`
+        panel.innerHTML = `<div class="ats-ai-candidate-head"><span class="ats-avatar">${safeHtml(candidateInitials(name))}</span><div><strong>${safeHtml(name)}</strong><p title="${safeHtml(email)}">${safeHtml(email)}</p></div><span class="ats-score-pill">${safeHtml(formatScore(score))}</span></div><div class="ats-ai-detail-grid"><div><small>Fit score</small><strong>${safeHtml(formatScore(score))}</strong></div><div><small>Experience</small><strong>${safeHtml(experience)}</strong></div><div><small>Location</small><strong title="${safeHtml(location)}">${safeHtml(shortText(location,22))}</strong></div><div class="is-wide"><small>Top skills</small><strong title="${safeHtml(skills)}">${safeHtml(skills)}</strong></div></div>`
     }
     if(badge) badge.innerText = "Ready"
     if(suggestion) suggestion.innerText = candidate.next_step || "Review this candidate and send personalized outreach based on their profile."
@@ -9938,6 +9943,17 @@ async function markSelectedCommunicationNotInterested(){
     let candidateId = candidate?.id || candidate?.candidate_id
     if(!candidateId){ alert("Select a candidate with a valid record first."); return }
     await updateCommunicationResponse(candidateId, "Not Interested")
+}
+
+async function refreshCommunicationActivity(){
+    let button = typeof event !== "undefined" ? event.currentTarget : null
+    if(!window.currentJobId) return
+    setButtonLoading(button, true, "Refreshing...")
+    try{
+        await loadCommunicationSplit(window.currentJobId)
+    }finally{
+        setButtonLoading(button, false)
+    }
 }
 
 async function loadCommunicationSplit(jobId){
@@ -10132,6 +10148,15 @@ async function loadCommunicationSplit(jobId){
     setCommCount("commReplyRate", contactedCount ? `${Math.round((responseCount / contactedCount) * 100)}%` : "—")
     setCommCount("commTestsSent", testsSent)
     setCommCount("commFollowupsInsight", pendingRows.length)
+    let totalCandidates = notContactedRows.length + pendingRows.length + interested.length + notInterested.length
+    let setInsightProgress = (id, value) => {
+        let chart = document.getElementById(id)
+        if(chart) chart.style.setProperty("--metric-progress", `${Math.max(0, Math.min(100, Math.round(value || 0)))}%`)
+    }
+    setInsightProgress("commEmailsChart", totalCandidates ? (contactedCount / totalCandidates) * 100 : 0)
+    setInsightProgress("commReplyChart", contactedCount ? (responseCount / contactedCount) * 100 : 0)
+    setInsightProgress("commTestsChart", interested.length ? (testsSent / interested.length) * 100 : 0)
+    setInsightProgress("commFollowupsChart", contactedCount ? (pendingRows.length / contactedCount) * 100 : 0)
 
     let activity = document.getElementById("commRecentActivity")
     if(activity){

@@ -20,7 +20,7 @@
 <link rel="stylesheet" href="sidebar.css">
 <link rel="stylesheet" href="createjob.css">
 <link rel="stylesheet" href="Dashbord.css">
-<link rel="stylesheet" href="ui-fix.css?v=outreach-command-center-20260618-6">
+<link rel="stylesheet" href="ui-fix.css?v=outreach-command-center-20260618-7">
 
 </head>
 
@@ -2652,17 +2652,17 @@ Message
 <section class="ats-outreach-insights">
 <div class="ats-card-title-row"><h3><span class="ats-card-heading-icon">↗</span> Outreach Insights</h3></div>
 <div class="ats-insight-grid">
-<article><span>Emails Sent</span><strong id="commEmailsSent">0</strong><small>Current pipeline</small><i class="is-bars"></i></article>
-<article><span>Reply Rate</span><strong id="commReplyRate">—</strong><small>Candidate responses</small><i class="is-line"></i></article>
-<article><span>Tests Sent</span><strong id="commTestsSent">0</strong><small>Interested candidates</small><i></i></article>
-<article><span>Follow-ups Pending</span><strong id="commFollowupsInsight">0</strong><small>Needs attention</small><i></i></article>
+<article><span>Emails Sent</span><strong id="commEmailsSent">0</strong><small>Current pipeline</small><div id="commEmailsChart" class="ats-metric-progress"><i></i></div></article>
+<article><span>Reply Rate</span><strong id="commReplyRate">—</strong><small>Candidate responses</small><div id="commReplyChart" class="ats-metric-progress is-green"><i></i></div></article>
+<article><span>Tests Sent</span><strong id="commTestsSent">0</strong><small>Interested candidates</small><div id="commTestsChart" class="ats-metric-progress"><i></i></div></article>
+<article><span>Follow-ups Pending</span><strong id="commFollowupsInsight">0</strong><small>Needs attention</small><div id="commFollowupsChart" class="ats-metric-progress is-orange"><i></i></div></article>
 </div>
 <p>Insights based on the current outreach pipeline <span>ⓘ</span></p>
 </section>
 <section class="ats-recent-activity">
 <div class="ats-card-title-row"><h3><span class="ats-card-heading-icon">ϟ</span> Recent Activity</h3></div>
 <div id="commRecentActivity" class="ats-activity-list"><div class="ats-activity-empty">Recent outreach activity will appear here.</div></div>
-<button type="button" class="ats-activity-refresh" onclick="syncGmailReplies()">Refresh activity <span>→</span></button>
+<button type="button" class="ats-activity-refresh" onclick="refreshCommunicationActivity()">Refresh activity <span>→</span></button>
 </section>
 </div>
 </main>
@@ -2898,7 +2898,7 @@ Message / Issue Description
 <script src="runtime-config.js"></script>
 <script src="config.js"></script>
 <script src="auth.js"></script>
-<script src="app.js?v=outreach-command-center-20260618-6"></script>
+<script src="app.js?v=outreach-command-center-20260618-7"></script>
 
 
 </div>

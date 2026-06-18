@@ -4208,8 +4208,8 @@ box-shadow:0 16px 42px rgba(76,65,135,.07);
 #communicationResultsPage .ats-comm-detail-metrics strong{margin:2px 0;font-size:23px;color:#11182c}
 #communicationResultsPage .ats-comm-detail-metrics small{font-size:10.5px;color:#94a3b8}
 
-.ats-comm-main-grid{display:grid;grid-template-columns:minmax(270px,300px) minmax(0,1fr);gap:22px;align-items:start}
-.ats-comm-side-column{display:grid;gap:18px;position:sticky;top:18px}
+.ats-comm-main-grid{display:grid;grid-template-columns:minmax(270px,300px) minmax(0,1fr);gap:22px;align-items:stretch}
+.ats-comm-side-column{display:grid;grid-template-rows:auto minmax(0,1fr);gap:18px;position:relative;top:auto;align-self:stretch}
 #communicationResultsPage .ats-comm-side-column .ats-sender-card{display:block;padding:20px;border-color:#ece9ff;border-radius:22px;background:#fff;box-shadow:0 16px 40px rgba(76,65,135,.07)}
 #communicationResultsPage .ats-comm-side-column .ats-sender-card-main{display:block!important}
 #communicationResultsPage .ats-comm-side-column .ats-comm-panel-icon{width:40px;height:40px;margin-bottom:14px;border:0;background:linear-gradient(135deg,#eef2ff,#f5f3ff);color:#6657eb;font-size:18px}
@@ -4224,14 +4224,21 @@ box-shadow:0 16px 42px rgba(76,65,135,.07);
 #communicationResultsPage .ats-sender-card-actions .ats-gmail-connect-btn{min-height:40px;border-radius:11px;background:linear-gradient(100deg,#3568f4,#7347ed);font-size:12px;box-shadow:0 10px 22px rgba(91,76,232,.2)}
 
 .ats-ai-outreach-card,.ats-outreach-insights,.ats-recent-activity{padding:20px;border:1px solid #ece9ff;border-radius:22px;background:linear-gradient(145deg,#fff 45%,#faf8ff);box-shadow:0 16px 40px rgba(76,65,135,.07)}
+.ats-ai-outreach-card{display:flex;flex-direction:column;height:100%}
 .ats-ai-outreach-card .ats-card-title-row h3 span{color:#6d5ce8}
 .ats-ai-candidate-empty{margin-top:16px;padding:18px;border:1px dashed #ded9ff;border-radius:16px;background:#faf9ff;text-align:center}
 .ats-ai-candidate-empty strong,.ats-ai-candidate strong{display:block;color:#151c30;font-size:13px}
 .ats-ai-candidate-empty p{margin:6px 0 0;color:#8490a5;font-size:11px;line-height:1.45}
-.ats-ai-candidate{display:grid;grid-template-columns:42px 1fr auto;gap:10px;align-items:center;margin-top:16px;padding:13px;border:1px solid #ebe8ff;border-radius:16px;background:#faf9ff}
+.ats-ai-candidate{display:block;margin-top:16px;padding:13px;border:1px solid #ebe8ff;border-radius:16px;background:#faf9ff}
+.ats-ai-candidate-head{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:10px;align-items:center}
 .ats-ai-candidate .ats-avatar{display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:13px;background:linear-gradient(135deg,#e9eefe,#f2eaff);color:#5b50dd;font-weight:950}
 .ats-ai-candidate p{margin:3px 0 0;font-size:10.5px;color:#8a95a8;overflow:hidden;text-overflow:ellipsis}
 .ats-ai-candidate .ats-score-pill{font-size:11px}
+.ats-ai-detail-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:12px;padding-top:12px;border-top:1px solid #e7e3f8}
+.ats-ai-detail-grid>div{min-width:0;padding:9px 8px;border-radius:11px;background:#fff}
+.ats-ai-detail-grid>div.is-wide{grid-column:1/-1}
+.ats-ai-detail-grid small{display:block;margin-bottom:4px;font-size:7.5px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;color:#8d96a9}
+.ats-ai-detail-grid strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9.5px!important;color:#30394d!important}
 .ats-ai-suggestion{margin:12px 0;padding:13px;border-radius:14px;background:linear-gradient(120deg,#f4f5ff,#faf7ff)}
 .ats-ai-suggestion small{font-size:9px;font-weight:950;text-transform:uppercase;letter-spacing:.06em;color:#7768eb}
 .ats-ai-suggestion p{margin:5px 0 0;font-size:11.5px;line-height:1.5;font-weight:750;color:#556176}
@@ -4239,6 +4246,8 @@ box-shadow:0 16px 42px rgba(76,65,135,.07);
 .ats-ai-actions button{min-height:38px;border:0;border-radius:10px;background:linear-gradient(100deg,#3568f4,#7347ed);color:#fff;font-size:11px;font-weight:950}
 .ats-ai-actions button.is-secondary{border:1px solid #ded9ff;background:#fff;color:#6254e5}
 .ats-ai-reject{display:block;margin:12px auto 0;border:0;background:transparent;color:#ef4444;font-size:10.5px;font-weight:900}
+.ats-ai-outreach-card .ats-ai-suggestion{min-height:82px}
+.ats-ai-outreach-card .ats-ai-actions{margin-top:auto}
 
 .ats-comm-work-column{display:grid;gap:18px;min-width:0}
 .ats-candidate-workspace{min-width:0;border:1px solid #ece9ff;border-radius:22px;background:#fff;box-shadow:0 18px 44px rgba(76,65,135,.08);overflow:hidden}
@@ -4309,9 +4318,13 @@ box-shadow:0 16px 42px rgba(76,65,135,.07);
 .ats-insight-grid span{display:block;font-size:8.5px;font-weight:850;color:#7f899d}
 .ats-insight-grid strong{display:block;margin:4px 0 2px;font-size:19px;color:#192136}
 .ats-insight-grid small{display:block;font-size:7.5px;font-weight:750;color:#22aa68}
-.ats-insight-grid i{position:absolute;left:11px;right:11px;bottom:10px;display:block;height:4px;border-radius:9px;background:linear-gradient(90deg,#5848e8 0 62%,#e9e7f8 62%)}
-.ats-insight-grid i.is-bars{height:18px;border-radius:0;background:repeating-linear-gradient(90deg,#6a58ee 0 3px,transparent 3px 7px);clip-path:polygon(0 62%,8% 42%,16% 70%,24% 30%,32% 56%,40% 18%,48% 48%,56% 8%,64% 57%,72% 31%,80% 67%,88% 24%,96% 44%,100% 12%,100% 100%,0 100%)}
-.ats-insight-grid i.is-line{height:18px;border-radius:0;background:none;border-bottom:2px solid #6a58ee;transform:skewY(-7deg);transform-origin:left bottom}
+.ats-metric-progress{--metric-progress:0%;position:absolute;left:11px;right:11px;bottom:11px;height:7px;border:1px solid #e7e5f4;border-radius:999px;background:#f0eef8;overflow:visible}
+.ats-metric-progress i{position:relative;left:auto;right:auto;bottom:auto;display:block;width:var(--metric-progress);height:100%;min-width:3px;border-radius:999px;background:linear-gradient(90deg,#6551ec,#8066f3);box-shadow:0 2px 8px rgba(99,81,236,.25);transition:width .35s ease}
+.ats-metric-progress i::after{content:"";position:absolute;right:-2px;top:50%;width:7px;height:7px;border:2px solid #fff;border-radius:50%;background:#6a54ec;box-shadow:0 1px 5px rgba(74,55,190,.35);transform:translateY(-50%)}
+.ats-metric-progress.is-green i{background:linear-gradient(90deg,#19aa66,#43d48b);box-shadow:0 2px 8px rgba(31,181,110,.22)}
+.ats-metric-progress.is-green i::after{background:#23b96f}
+.ats-metric-progress.is-orange i{background:linear-gradient(90deg,#f39a18,#ffbd4b);box-shadow:0 2px 8px rgba(244,158,32,.22)}
+.ats-metric-progress.is-orange i::after{background:#f5a020}
 .ats-outreach-insights>p{margin:12px 0 0;font-size:8.5px;color:#98a2b3}
 .ats-activity-list{display:grid;gap:12px;margin-top:14px}
 .ats-activity-item{display:grid;grid-template-columns:31px minmax(0,1fr);gap:9px;align-items:center}
@@ -4336,7 +4349,8 @@ box-shadow:0 16px 42px rgba(76,65,135,.07);
 #communicationResultsPage.ats-outreach-detail-page{padding:18px!important}
 .ats-comm-main-grid{grid-template-columns:1fr}
 .ats-comm-bottom-grid{grid-template-columns:1fr}
-.ats-comm-side-column{position:static;grid-template-columns:1fr 1fr}
+.ats-comm-side-column{position:static;grid-template-columns:1fr 1fr;grid-template-rows:auto;align-self:auto}
+.ats-ai-outreach-card{height:auto}
 #communicationResultsPage .ats-comm-detail-metrics{grid-template-columns:repeat(2,1fr);gap:8px}
 #communicationResultsPage .ats-comm-detail-metrics::before{display:none}
 #communicationResultsPage .ats-comm-detail-metrics article{border:1px solid #f0eef8!important;border-radius:14px}
