@@ -4268,6 +4268,26 @@ box-shadow:0 16px 42px rgba(76,65,135,.07);
 #communicationResultsPage .ats-comm-tab-panel .dashboard-table tr[data-candidate-id]{cursor:pointer;transition:background .15s ease}
 #communicationResultsPage .ats-comm-tab-panel .dashboard-table tr[data-candidate-id]:hover,#communicationResultsPage .ats-comm-tab-panel .dashboard-table tr.is-selected{background:#f7f5ff}
 #communicationResultsPage .ats-comm-tab-panel .ats-comm-name-link{max-width:150px;font-size:11px}
+#communicationResultsPage .ats-comm-tab-panel .ats-select-column{width:42px;min-width:42px;padding-left:14px!important;padding-right:5px!important;text-align:center}
+.ats-checkbox-ghost{display:block;width:13px;height:13px;border:1px solid #d9ddec;border-radius:4px;background:#fff}
+.ats-row-checkbox{display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.ats-row-checkbox input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.ats-row-checkbox span{display:flex;align-items:center;justify-content:center;width:14px;height:14px;border:1px solid #d8dcec;border-radius:4px;background:#fff;box-shadow:inset 0 0 0 2px #fff;transition:.15s ease}
+.ats-row-checkbox input:checked+span{border-color:#5745e7;background:#5745e7;box-shadow:inset 0 0 0 2px #5745e7}
+.ats-row-checkbox input:checked+span::after{content:"";width:6px;height:3px;border-left:1.7px solid #fff;border-bottom:1.7px solid #fff;transform:rotate(-45deg) translateY(-1px)}
+.ats-workspace-candidate{display:grid;grid-template-columns:38px minmax(0,1fr);gap:10px;align-items:center;min-width:180px}
+.ats-workspace-avatar{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border:0;border-radius:50%;background:linear-gradient(135deg,#ebeaff,#f5f1ff);color:#5848df;font-size:11px;font-weight:950;letter-spacing:.02em}
+.ats-workspace-candidate>div{min-width:0}
+#communicationResultsPage .ats-workspace-candidate .ats-comm-name-link{display:block;max-width:170px;margin:0;text-align:left;font-size:11.5px;font-weight:950;color:#182036}
+.ats-workspace-email{display:block;max-width:180px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;color:#8a94a8;font-size:9.5px;font-weight:700}
+.ats-fit-score{display:flex;align-items:center;gap:8px;min-width:90px}
+.ats-fit-track{display:block;width:38px;height:5px;border-radius:99px;background:#e9edf4;overflow:hidden}
+.ats-fit-track i{display:block;height:100%;border-radius:inherit;background:#22b96b}
+.ats-fit-score strong{min-width:32px;color:#22a861;font-size:11px;font-weight:850}
+.ats-fit-score.is-medium .ats-fit-track i{background:#ff930d}
+.ats-fit-score.is-medium strong{color:#f08108}
+.ats-fit-score.is-low .ats-fit-track i{background:#ef5350}
+.ats-fit-score.is-low strong{color:#dc4947}
 #communicationResultsPage .ats-comm-tab-panel .ats-empty-state{height:150px;color:#8995aa;background:linear-gradient(180deg,#fff,#fcfbff)}
 #communicationResultsPage .ats-comm-tab-panel .ats-send-btn{border:0;border-radius:9px!important;background:linear-gradient(100deg,#3568f4,#7347ed)!important;font-size:10px!important;font-weight:900!important}
 

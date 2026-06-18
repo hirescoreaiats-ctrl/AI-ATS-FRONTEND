@@ -9840,7 +9840,12 @@ function selectCommunicationCandidate(key){
     let candidate = window.currentCommunicationCandidates?.[String(key)]
     if(!candidate) return
     selectedCommunicationCandidateKey = String(key)
-    document.querySelectorAll("tr[data-candidate-id]").forEach(row => row.classList.toggle("is-selected", row.dataset.candidateId === selectedCommunicationCandidateKey))
+    document.querySelectorAll("tr[data-candidate-id]").forEach(row => {
+        let selected = row.dataset.candidateId === selectedCommunicationCandidateKey
+        row.classList.toggle("is-selected", selected)
+        let checkbox = row.querySelector(".ats-candidate-checkbox")
+        if(checkbox) checkbox.checked = selected
+    })
     let panel = document.getElementById("commAiCandidate")
     let badge = document.getElementById("commAiReadyBadge")
     let suggestion = document.getElementById("commAiSuggestion")
@@ -9853,6 +9858,15 @@ function selectCommunicationCandidate(key){
     }
     if(badge) badge.innerText = "Ready"
     if(suggestion) suggestion.innerText = candidate.next_step || "Review this candidate and send personalized outreach based on their profile."
+}
+
+function toggleCommunicationCandidateSelection(event, key){
+    event.stopPropagation()
+    if(event.currentTarget.checked) selectCommunicationCandidate(key)
+    else if(selectedCommunicationCandidateKey === String(key)){
+        selectedCommunicationCandidateKey = ""
+        event.currentTarget.closest("tr")?.classList.remove("is-selected")
+    }
 }
 
 function selectedCommunicationCandidate(){
@@ -9958,14 +9972,22 @@ async function loadCommunicationSplit(jobId){
             designation: candidate.job_title || window.currentJobTitle
         })
         let label = candidate.name || candidate.full_name || "Candidate"
-        return `<button type="button" class="ats-candidate-name-link ats-comm-name-link ats-ellipsis" data-profile-candidate-id="${safeHtml(profileId)}" title="${safeHtml(label)}">${safeHtml(label)}</button>`
+        let email = candidate.email || "Email not available"
+        return `<div class="ats-workspace-candidate"><button type="button" class="ats-workspace-avatar ats-profile-open-avatar" data-profile-candidate-id="${safeHtml(profileId)}" title="Open ${safeHtml(label)} profile">${safeHtml(candidateInitials(label))}</button><div><button type="button" class="ats-candidate-name-link ats-comm-name-link ats-ellipsis" data-profile-candidate-id="${safeHtml(profileId)}" title="${safeHtml(label)}">${safeHtml(label)}</button><small class="ats-workspace-email" title="${safeHtml(email)}">${safeHtml(email)}</small></div></div>`
+    }
+    let communicationSelectionCell = candidate => `<label class="ats-row-checkbox" onclick="event.stopPropagation()"><input class="ats-candidate-checkbox" type="checkbox" aria-label="Select ${safeHtml(candidate.name || candidate.full_name || "candidate")}" onchange="toggleCommunicationCandidateSelection(event,'${safeJs(candidate._communicationKey)}')"><span></span></label>`
+    let communicationScoreCell = candidate => {
+        let rawScore = Number(candidate.final_score ?? candidate.score ?? candidate.ai_fit_score ?? 0)
+        let score = Number.isFinite(rawScore) ? Math.max(0, Math.min(100, rawScore)) : 0
+        let tone = score >= 75 ? "is-strong" : score >= 60 ? "is-medium" : "is-low"
+        return `<div class="ats-fit-score ${tone}"><span class="ats-fit-track"><i style="width:${score}%"></i></span><strong>${safeHtml(formatScore(rawScore || 0))}</strong></div>`
     }
 
     topTable.innerHTML = notContactedRows.length ? notContactedRows.map(c => `
         <tr ${rowAttributes(c)}>
+            <td class="ats-select-column">${communicationSelectionCell(c)}</td>
             <td>${communicationCandidateNameCell(c)}</td>
-            <td><span class="ats-ellipsis" title="${safeHtml(c.email)}">${safeHtml(c.email)}</span></td>
-            <td><span class="ats-score-pill">${safeHtml(c.final_score ?? 0)}</span></td>
+            <td>${communicationScoreCell(c)}</td>
             <td><span class="ats-next-step">${safeHtml(c.next_step || "Send outreach")}</span></td>
             <td><span class="ats-status-pill ats-status-warn">${safeHtml(c.status)}</span></td>
             <td>
@@ -9979,9 +10001,9 @@ async function loadCommunicationSplit(jobId){
 
     pendingTable.innerHTML = pendingRows.length ? pendingRows.map(c => `
         <tr ${rowAttributes(c)}>
+            <td class="ats-select-column">${communicationSelectionCell(c)}</td>
             <td>${communicationCandidateNameCell(c)}</td>
-            <td><span class="ats-ellipsis" title="${safeHtml(c.email)}">${safeHtml(c.email)}</span></td>
-            <td><span class="ats-score-pill">${safeHtml(c.final_score ?? 0)}</span></td>
+            <td>${communicationScoreCell(c)}</td>
             <td><span class="ats-next-step">${safeHtml(c.next_step || "Await response")}</span></td>
             <td><span class="ats-status-pill ats-status-info">${safeHtml(c.status)}</span></td>
             <td>
@@ -9999,9 +10021,9 @@ async function loadCommunicationSplit(jobId){
 
     interestedTable.innerHTML = interested.length ? interested.map(c => `
         <tr ${rowAttributes(c)}>
+            <td class="ats-select-column">${communicationSelectionCell(c)}</td>
             <td>${communicationCandidateNameCell(c)}</td>
-            <td><span class="ats-ellipsis" title="${safeHtml(c.email)}">${safeHtml(c.email)}</span></td>
-            <td><span class="ats-score-pill">${safeHtml(c.final_score ?? 0)}</span></td>
+            <td>${communicationScoreCell(c)}</td>
             <td>
                 ${c.test_status ? `
                     <span class="ats-next-step">${safeHtml(c.test_status)}</span>
@@ -10041,9 +10063,9 @@ async function loadCommunicationSplit(jobId){
 
     notInterestedTable.innerHTML = notInterested.length ? notInterested.map(c => `
         <tr ${rowAttributes(c)}>
+            <td class="ats-select-column">${communicationSelectionCell(c)}</td>
             <td>${communicationCandidateNameCell(c)}</td>
-            <td><span class="ats-ellipsis" title="${safeHtml(c.email)}">${safeHtml(c.email)}</span></td>
-            <td><span class="ats-score-pill">${safeHtml(c.final_score ?? 0)}</span></td>
+            <td>${communicationScoreCell(c)}</td>
             <td>
                 <button onclick="dropCommunicationCandidate('${safeJs(c.id)}','${safeJs(jobId)}')" class="ats-response-btn is-not-interested">
                     Drop Candidate
