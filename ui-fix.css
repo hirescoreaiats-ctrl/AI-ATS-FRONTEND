@@ -4280,7 +4280,9 @@ box-shadow:0 16px 42px rgba(76,65,135,.07);
 .ats-workspace-candidate>div{min-width:0}
 #communicationResultsPage .ats-workspace-candidate .ats-comm-name-link{display:block;max-width:170px;margin:0;text-align:left;font-size:11.5px;font-weight:950;color:#182036}
 .ats-workspace-email{display:block;max-width:180px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;color:#8a94a8;font-size:9.5px;font-weight:700}
-.ats-fit-score{display:flex;align-items:center;gap:8px;min-width:90px}
+.ats-score-column{width:120px;min-width:120px;text-align:center!important}
+#communicationResultsPage .ats-comm-tab-panel th.ats-score-column,#communicationResultsPage .ats-comm-tab-panel td.ats-score-column{padding-left:12px!important;padding-right:12px!important}
+.ats-fit-score{display:flex;align-items:center;justify-content:center;gap:8px;width:96px;min-width:96px;margin:0 auto}
 .ats-fit-track{display:block;width:38px;height:5px;border-radius:99px;background:#e9edf4;overflow:hidden}
 .ats-fit-track i{display:block;height:100%;border-radius:inherit;background:#22b96b}
 .ats-fit-score strong{min-width:32px;color:#22a861;font-size:11px;font-weight:850}
@@ -4299,31 +4301,41 @@ box-shadow:0 16px 42px rgba(76,65,135,.07);
 #communicationResultsPage .ats-comm-tab-panel .ats-empty-state{height:150px;color:#8995aa;background:linear-gradient(180deg,#fff,#fcfbff)}
 #communicationResultsPage .ats-comm-tab-panel .ats-send-btn{border:0;border-radius:9px!important;background:linear-gradient(100deg,#3568f4,#7347ed)!important;font-size:10px!important;font-weight:900!important}
 
-.ats-comm-bottom-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:18px}
-.ats-outreach-insights,.ats-recent-activity{padding:18px;background:#fff}
-.ats-outreach-insights .ats-card-title-row small{font-size:9px;color:#8d97aa}
-.ats-insight-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
-.ats-insight-grid article{padding:11px;border-radius:13px;background:#f9f8ff}
-.ats-insight-grid span{display:block;font-size:8.5px;font-weight:900;color:#8590a5}
-.ats-insight-grid strong{display:block;margin:5px 0;font-size:18px;color:#192136}
-.ats-insight-grid i{display:block;width:65%;height:3px;border-radius:9px;background:linear-gradient(90deg,#4d6df1,#8a5de8)}
-.ats-outreach-insights>p{margin:12px 0 0;font-size:9.5px;color:#98a2b3}
-.ats-recent-activity .ats-card-title-row button{border:0;background:transparent;color:#6556e8;font-size:9.5px;font-weight:900}
-.ats-activity-list{display:grid;gap:10px;margin-top:14px}
-.ats-activity-list p{position:relative;margin:0;padding-left:20px;font-size:10.5px;line-height:1.4;color:#667287}
-.ats-activity-list p::before{content:"";position:absolute;left:2px;top:4px;width:8px;height:8px;border:3px solid #e2defe;border-radius:50%;background:#6b5ce8}
+.ats-comm-bottom-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:stretch}
+.ats-outreach-insights,.ats-recent-activity{display:flex;flex-direction:column;min-height:265px;padding:18px;background:#fff}
+.ats-card-heading-icon{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;margin-right:5px;border-radius:8px;background:#f0edff;color:#5e4ce5;font-size:13px}
+.ats-insight-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:14px}
+.ats-insight-grid article{position:relative;min-height:93px;padding:11px;border:1px solid #eceafa;border-radius:13px;background:linear-gradient(145deg,#fff,#faf9ff);overflow:hidden}
+.ats-insight-grid span{display:block;font-size:8.5px;font-weight:850;color:#7f899d}
+.ats-insight-grid strong{display:block;margin:4px 0 2px;font-size:19px;color:#192136}
+.ats-insight-grid small{display:block;font-size:7.5px;font-weight:750;color:#22aa68}
+.ats-insight-grid i{position:absolute;left:11px;right:11px;bottom:10px;display:block;height:4px;border-radius:9px;background:linear-gradient(90deg,#5848e8 0 62%,#e9e7f8 62%)}
+.ats-insight-grid i.is-bars{height:18px;border-radius:0;background:repeating-linear-gradient(90deg,#6a58ee 0 3px,transparent 3px 7px);clip-path:polygon(0 62%,8% 42%,16% 70%,24% 30%,32% 56%,40% 18%,48% 48%,56% 8%,64% 57%,72% 31%,80% 67%,88% 24%,96% 44%,100% 12%,100% 100%,0 100%)}
+.ats-insight-grid i.is-line{height:18px;border-radius:0;background:none;border-bottom:2px solid #6a58ee;transform:skewY(-7deg);transform-origin:left bottom}
+.ats-outreach-insights>p{margin:12px 0 0;font-size:8.5px;color:#98a2b3}
+.ats-activity-list{display:grid;gap:12px;margin-top:14px}
+.ats-activity-item{display:grid;grid-template-columns:31px minmax(0,1fr);gap:9px;align-items:center}
+.ats-activity-icon{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#e9e4ff;color:#6352e6;font-size:9px;font-weight:950}
+.ats-activity-icon.is-success{background:#dcf8e8;color:#20a866;font-size:14px}
+.ats-activity-icon.is-pending{background:#fff3d9;color:#e28a08;font-size:14px}
+.ats-activity-icon.is-info{background:#e9ecff;color:#5c55e6;font-size:13px}
+.ats-activity-icon.is-mail{background:#f0edff;color:#6251e5;font-size:13px}
+.ats-activity-item strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9.5px;color:#2a3246}
+.ats-activity-item small{display:block;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:8px;color:#929bad}
+.ats-activity-empty{padding:28px 10px;text-align:center;font-size:10px;color:#929bad}
+.ats-activity-refresh{display:flex;align-items:center;justify-content:center;gap:8px;margin:auto auto 0;padding-top:12px;border:0;background:transparent;color:#604ee5;font-size:9.5px;font-weight:900}
 
 @media(max-width:1180px){
 .ats-comm-main-grid{grid-template-columns:250px minmax(0,1fr)}
 .ats-comm-hero-art{display:none}
 #communicationResultsPage .ats-comm-detail-metrics article{padding:8px 10px;grid-template-columns:40px 1fr;column-gap:8px}
 #communicationResultsPage .ats-comm-detail-metrics article i{width:38px;height:38px}
-.ats-comm-bottom-grid{grid-template-columns:1fr}
 }
 
 @media(max-width:900px){
 #communicationResultsPage.ats-outreach-detail-page{padding:18px!important}
 .ats-comm-main-grid{grid-template-columns:1fr}
+.ats-comm-bottom-grid{grid-template-columns:1fr}
 .ats-comm-side-column{position:static;grid-template-columns:1fr 1fr}
 #communicationResultsPage .ats-comm-detail-metrics{grid-template-columns:repeat(2,1fr);gap:8px}
 #communicationResultsPage .ats-comm-detail-metrics::before{display:none}

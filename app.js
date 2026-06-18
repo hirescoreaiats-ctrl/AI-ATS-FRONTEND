@@ -10037,7 +10037,7 @@ async function loadCommunicationSplit(jobId){
         <tr ${rowAttributes(c)}>
             <td class="ats-select-column">${communicationSelectionCell(c)}</td>
             <td>${communicationCandidateNameCell(c)}</td>
-            <td>${communicationScoreCell(c)}</td>
+            <td class="ats-score-column">${communicationScoreCell(c)}</td>
             <td><span class="ats-next-step">${safeHtml(c.next_step || "Send outreach")}</span></td>
             <td><span class="ats-status-pill ats-status-warn">${safeHtml(c.status)}</span></td>
             <td>
@@ -10053,7 +10053,7 @@ async function loadCommunicationSplit(jobId){
         <tr ${rowAttributes(c)}>
             <td class="ats-select-column">${communicationSelectionCell(c)}</td>
             <td>${communicationCandidateNameCell(c)}</td>
-            <td>${communicationScoreCell(c)}</td>
+            <td class="ats-score-column">${communicationScoreCell(c)}</td>
             <td><span class="ats-next-step">${safeHtml(c.next_step || "Await response")}</span></td>
             <td><span class="ats-status-pill ats-status-info">${safeHtml(c.status)}</span></td>
             <td>
@@ -10073,7 +10073,7 @@ async function loadCommunicationSplit(jobId){
         <tr ${rowAttributes(c)}>
             <td class="ats-select-column">${communicationSelectionCell(c)}</td>
             <td>${communicationCandidateNameCell(c)}</td>
-            <td>${communicationScoreCell(c)}</td>
+            <td class="ats-score-column">${communicationScoreCell(c)}</td>
             <td>
                 ${c.test_status ? `
                     <span class="ats-next-step">${safeHtml(c.test_status)}</span>
@@ -10115,7 +10115,7 @@ async function loadCommunicationSplit(jobId){
         <tr ${rowAttributes(c)}>
             <td class="ats-select-column">${communicationSelectionCell(c)}</td>
             <td>${communicationCandidateNameCell(c)}</td>
-            <td>${communicationScoreCell(c)}</td>
+            <td class="ats-score-column">${communicationScoreCell(c)}</td>
             <td>
                 <button onclick="dropCommunicationCandidate('${safeJs(c.id)}','${safeJs(jobId)}')" class="ats-response-btn is-not-interested">
                     Drop Candidate
@@ -10129,18 +10129,22 @@ async function loadCommunicationSplit(jobId){
     let responseCount = interested.length + notInterested.length
     let testsSent = interested.filter(candidate => candidate.test_status || candidate.test_percentage != null).length
     setCommCount("commEmailsSent", contactedCount)
-    setCommCount("commReplyRate", contactedCount ? `${Math.round((responseCount / contactedCount) * 100)}%` : 0)
+    setCommCount("commReplyRate", contactedCount ? `${Math.round((responseCount / contactedCount) * 100)}%` : "—")
     setCommCount("commTestsSent", testsSent)
     setCommCount("commFollowupsInsight", pendingRows.length)
 
     let activity = document.getElementById("commRecentActivity")
     if(activity){
         let items = []
-        if(notContactedRows.length) items.push(`${notContactedRows.length} candidate${notContactedRows.length === 1 ? " is" : "s are"} ready for first outreach`)
-        if(interested.length) items.push(`${interested.length} interested candidate${interested.length === 1 ? " is" : "s are"} ready for the next step`)
-        if(pendingRows.length) items.push(`${pendingRows.length} follow-up${pendingRows.length === 1 ? "" : "s"} awaiting a response`)
-        if(!items.length) items.push("Sync replies to refresh the outreach pipeline")
-        activity.innerHTML = items.map(item => `<p>${safeHtml(item)}</p>`).join("")
+        if(notContactedRows.length){
+            let candidateName = notContactedRows[0].name || notContactedRows[0].full_name || "Candidate"
+            items.push({icon:candidateInitials(candidateName), title:`${candidateName} ready for first outreach`, detail:"AI outreach draft is ready", tone:"is-candidate"})
+        }
+        if(interested.length) items.push({icon:"✓", title:`${interested.length} interested candidate${interested.length === 1 ? "" : "s"} ready for test`, detail:"Move to the assessment stage to proceed", tone:"is-success"})
+        if(pendingRows.length) items.push({icon:"◷", title:`${pendingRows.length} follow-up${pendingRows.length === 1 ? "" : "s"} pending`, detail:"Candidate response needs attention", tone:"is-pending"})
+        else items.push({icon:"✓", title:"No pending follow-ups", detail:"Great! The follow-up queue is clear", tone:"is-info"})
+        items.push({icon:"✉", title:"Sync replies to refresh pipeline", detail:"Pull the latest candidate responses", tone:"is-mail"})
+        activity.innerHTML = items.slice(0,4).map(item => `<div class="ats-activity-item"><span class="ats-activity-icon ${safeHtml(item.tone)}">${safeHtml(item.icon)}</span><div><strong>${safeHtml(item.title)}</strong><small>${safeHtml(item.detail)}</small></div></div>`).join("")
     }
 
     let selectedStillExists = selectedCommunicationCandidateKey && window.currentCommunicationCandidates[selectedCommunicationCandidateKey]
