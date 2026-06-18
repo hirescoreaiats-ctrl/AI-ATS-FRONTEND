@@ -9799,6 +9799,8 @@ async function loadShortlistedCandidates(){
 let currentCommunicationTab = "waiting"
 let communicationScoreFilter = 0
 let selectedCommunicationCandidateKey = ""
+const communicationPageSize = 5
+let communicationPages = { waiting: 1, interested: 1, pending: 1, closed: 1 }
 
 function communicationCandidateKey(candidate, index = 0){
     return String(candidate?.id || candidate?.candidate_id || candidate?.email || `candidate-${index}`)
@@ -9814,7 +9816,7 @@ function switchCommunicationTab(tab){
     document.querySelectorAll("[data-comm-panel]").forEach(panel => {
         panel.classList.toggle("hidden", panel.dataset.commPanel !== currentCommunicationTab)
     })
-    filterCommunicationRows()
+    filterCommunicationRows(false)
 }
 
 function cycleCommunicationScoreFilter(){
@@ -9826,7 +9828,7 @@ function cycleCommunicationScoreFilter(){
     filterCommunicationRows()
 }
 
-function filterCommunicationRows(){
+function filterCommunicationRows(resetPage = true){
     let query = safeText(document.getElementById("commCandidateSearch")?.value).trim().toLowerCase()
     let panel = document.querySelector(`[data-comm-panel="${currentCommunicationTab}"]`)
     panel?.querySelectorAll("tr[data-candidate-id]").forEach(row => {
@@ -9834,6 +9836,54 @@ function filterCommunicationRows(){
         let matchesScore = !communicationScoreFilter || Number(row.dataset.score || 0) >= communicationScoreFilter
         row.classList.toggle("ats-row-filtered", !(matchesText && matchesScore))
     })
+    if(resetPage) communicationPages[currentCommunicationTab] = 1
+    paginateCommunicationRows(currentCommunicationTab)
+}
+
+function communicationPaginationElement(tab){
+    let ids = {
+        waiting: "commWaitingPagination",
+        interested: "commInterestedPagination",
+        pending: "commPendingPagination",
+        closed: "commClosedPagination"
+    }
+    return document.getElementById(ids[tab])
+}
+
+function paginateCommunicationRows(tab){
+    let panel = document.querySelector(`[data-comm-panel="${tab}"]`)
+    let footer = communicationPaginationElement(tab)
+    if(!panel || !footer) return
+    let allRows = Array.from(panel.querySelectorAll("tr[data-candidate-id]"))
+    let rows = allRows.filter(row => !row.classList.contains("ats-row-filtered"))
+    let total = rows.length
+    let totalPages = Math.max(1, Math.ceil(total / communicationPageSize))
+    let page = Math.min(Math.max(communicationPages[tab] || 1, 1), totalPages)
+    communicationPages[tab] = page
+    let start = (page - 1) * communicationPageSize
+    let end = Math.min(start + communicationPageSize, total)
+
+    allRows.forEach(row => row.classList.add("ats-row-paginated"))
+    rows.slice(start, end).forEach(row => row.classList.remove("ats-row-paginated"))
+
+    if(!total){ footer.innerHTML = ""; footer.classList.add("hidden"); return }
+    footer.classList.remove("hidden")
+    let pageButtons = Array.from({length: totalPages}, (_, index) => index + 1).map(number => `
+        <button type="button" class="${number === page ? "is-active" : ""}" onclick="changeCommunicationPage('${tab}',${number})" aria-label="Page ${number}">${number}</button>
+    `).join("")
+    footer.innerHTML = `
+        <span>Showing ${start + 1}&ndash;${end} of ${total} candidate${total === 1 ? "" : "s"}</span>
+        <nav aria-label="Candidate pages">
+            <button type="button" onclick="changeCommunicationPage('${tab}',${page - 1})" ${page === 1 ? "disabled" : ""} aria-label="Previous page">&lsaquo;</button>
+            ${pageButtons}
+            <button type="button" onclick="changeCommunicationPage('${tab}',${page + 1})" ${page === totalPages ? "disabled" : ""} aria-label="Next page">&rsaquo;</button>
+        </nav>
+    `
+}
+
+function changeCommunicationPage(tab, page){
+    communicationPages[tab] = page
+    paginateCommunicationRows(tab)
 }
 
 function selectCommunicationCandidate(key){

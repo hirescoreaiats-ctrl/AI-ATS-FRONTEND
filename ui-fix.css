@@ -4261,7 +4261,7 @@ box-shadow:0 16px 42px rgba(76,65,135,.07);
 #communicationResultsPage .ats-comm-tab-panel .ats-comm-section-head span{font-size:9px}
 #communicationResultsPage .ats-comm-tab-panel .ats-comm-section-head h3{font-size:15px}
 #communicationResultsPage .ats-comm-tab-panel .ats-comm-section-head>strong{min-height:28px;padding:0 10px;font-size:9px}
-#communicationResultsPage .ats-comm-tab-panel .ats-communication-scroll{max-height:430px;overflow:auto}
+#communicationResultsPage .ats-candidate-workspace .ats-comm-tab-panel .ats-communication-scroll{height:auto!important;max-height:none!important;overflow:visible!important}
 #communicationResultsPage .ats-comm-tab-panel .dashboard-table{min-width:640px!important;table-layout:auto}
 #communicationResultsPage .ats-comm-tab-panel .dashboard-table th{height:42px;padding:9px 13px;background:#fbfbfe!important;font-size:9px;white-space:nowrap}
 #communicationResultsPage .ats-comm-tab-panel .dashboard-table td{height:61px;padding:10px 13px;font-size:11px;white-space:nowrap}
@@ -4288,6 +4288,14 @@ box-shadow:0 16px 42px rgba(76,65,135,.07);
 .ats-fit-score.is-medium strong{color:#f08108}
 .ats-fit-score.is-low .ats-fit-track i{background:#ef5350}
 .ats-fit-score.is-low strong{color:#dc4947}
+.ats-row-filtered,.ats-row-paginated{display:none!important}
+.ats-table-pagination{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 20px 16px;border-top:1px solid #efedf7;background:#fff}
+.ats-table-pagination.hidden{display:none}
+.ats-table-pagination>span{font-size:10.5px;font-weight:750;color:#5f6a7e}
+.ats-table-pagination nav{display:flex;align-items:center;gap:7px}
+.ats-table-pagination button{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:1px solid #e2e4ef;border-radius:10px;background:#fff;color:#536076;font-size:11px;font-weight:900;box-shadow:0 3px 10px rgba(36,45,70,.04)}
+.ats-table-pagination button.is-active{border-color:#5d49e8;background:linear-gradient(135deg,#6549eb,#4c39df);color:#fff;box-shadow:0 7px 16px rgba(88,69,226,.26)}
+.ats-table-pagination button:disabled{cursor:not-allowed;opacity:.38}
 #communicationResultsPage .ats-comm-tab-panel .ats-empty-state{height:150px;color:#8995aa;background:linear-gradient(180deg,#fff,#fcfbff)}
 #communicationResultsPage .ats-comm-tab-panel .ats-send-btn{border:0;border-radius:9px!important;background:linear-gradient(100deg,#3568f4,#7347ed)!important;font-size:10px!important;font-weight:900!important}
 
@@ -4333,6 +4341,8 @@ box-shadow:0 16px 42px rgba(76,65,135,.07);
 .ats-insight-grid{grid-template-columns:repeat(2,1fr)}
 .ats-workspace-toolbar{align-items:stretch;flex-direction:column}
 .ats-candidate-search{width:100%}
+#communicationResultsPage .ats-candidate-workspace .ats-comm-tab-panel .ats-communication-scroll{overflow-x:auto!important}
+.ats-table-pagination{align-items:flex-start;flex-direction:column}
 }
 
 .ats-comm-detail-hero{
