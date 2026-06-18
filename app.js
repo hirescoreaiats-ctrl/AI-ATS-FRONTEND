@@ -9886,6 +9886,29 @@ function changeCommunicationPage(tab, page){
     paginateCommunicationRows(tab)
 }
 
+function communicationSuggestedNextStep(candidate){
+    let status = safeText(candidate.status || candidate.response_status || candidate.mail_status).toLowerCase()
+    let rawSkills = candidate.matched_skills || candidate.key_skills || candidate.skills || ""
+    let skillList = (Array.isArray(rawSkills) ? rawSkills : safeText(rawSkills).split(","))
+        .map(skill => safeText(skill).trim())
+        .filter(Boolean)
+        .slice(0, 3)
+    let experienceValue = Number(candidate.total_experience_years ?? candidate.experience)
+    let experienceText = Number.isFinite(experienceValue) && experienceValue > 0 ? formatExperience(experienceValue) : ""
+    let roleText = candidate.designation || window.currentJobTitle || "this role"
+    let evidence = skillList.length
+        ? `${skillList.join(", ")} skills${experienceText ? ` and ${experienceText} of experience` : ""}`
+        : experienceText
+            ? `${experienceText} of experience relevant to ${roleText}`
+            : `their profile fit for ${roleText}`
+
+    if(status.includes("not interested")) return "Keep this profile closed unless the candidate asks to re-enter the hiring process."
+    if(status.includes("interested")) return `Send the assessment test and tailor the next conversation around ${evidence}.`
+    if(status.includes("not contacted")) return `Send personalized outreach highlighting ${evidence}, then invite the candidate to confirm interest in the next stage.`
+    if(status.includes("await") || status.includes("pending") || status.includes("contacted")) return `Send a personalized follow-up referencing ${evidence} and confirm availability for the next stage.`
+    return `Send personalized outreach highlighting ${evidence}, then invite the candidate to confirm interest in the next stage.`
+}
+
 function selectCommunicationCandidate(key){
     let candidate = window.currentCommunicationCandidates?.[String(key)]
     if(!candidate) return
@@ -9902,17 +9925,18 @@ function selectCommunicationCandidate(key){
     let name = candidate.name || candidate.full_name || "Candidate"
     let email = candidate.email || "Email not available"
     let score = candidate.final_score ?? candidate.score ?? candidate.ai_fit_score ?? 0
-    let experience = formatExperience(candidate.total_experience_years ?? candidate.experience) || "Not listed"
-    let location = candidate.location || candidate.current_location || "Not listed"
+    let experienceValue = Number(candidate.total_experience_years ?? candidate.experience)
+    let experience = Number.isFinite(experienceValue) && experienceValue > 0 ? formatExperience(experienceValue) : "Not available"
+    let location = candidate.location || candidate.current_location || "Not available"
     let rawSkills = candidate.key_skills || candidate.matched_skills || candidate.skills || ""
     let skills = Array.isArray(rawSkills) ? rawSkills.join(", ") : safeText(rawSkills)
-    skills = skills ? shortText(skills, 54) : "Review profile"
+    skills = skills ? shortText(skills, 54) : "Not available"
     if(panel){
         panel.className = "ats-ai-candidate"
         panel.innerHTML = `<div class="ats-ai-candidate-head"><span class="ats-avatar">${safeHtml(candidateInitials(name))}</span><div><strong>${safeHtml(name)}</strong><p title="${safeHtml(email)}">${safeHtml(email)}</p></div><span class="ats-score-pill">${safeHtml(formatScore(score))}</span></div><div class="ats-ai-detail-grid"><div><small>Fit score</small><strong>${safeHtml(formatScore(score))}</strong></div><div><small>Experience</small><strong>${safeHtml(experience)}</strong></div><div><small>Location</small><strong title="${safeHtml(location)}">${safeHtml(shortText(location,22))}</strong></div><div class="is-wide"><small>Top skills</small><strong title="${safeHtml(skills)}">${safeHtml(skills)}</strong></div></div>`
     }
     if(badge) badge.innerText = "Ready"
-    if(suggestion) suggestion.innerText = candidate.next_step || "Review this candidate and send personalized outreach based on their profile."
+    if(suggestion) suggestion.innerText = communicationSuggestedNextStep(candidate)
 }
 
 function toggleCommunicationCandidateSelection(event, key){
