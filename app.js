@@ -8777,7 +8777,7 @@ function openCommunicationPage(jobId, jobTitle){
     let title = document.getElementById("communicationResultsTitle")
 
     if(title){
-        title.innerText = jobTitle + " - Communication"
+        title.innerText = jobTitle + " \u2013 Communication"
     }
 
     // * OLD REMOVE
@@ -9796,6 +9796,86 @@ async function loadShortlistedCandidates(){
     }
 }
 
+let currentCommunicationTab = "waiting"
+let communicationScoreFilter = 0
+let selectedCommunicationCandidateKey = ""
+
+function communicationCandidateKey(candidate, index = 0){
+    return String(candidate?.id || candidate?.candidate_id || candidate?.email || `candidate-${index}`)
+}
+
+function switchCommunicationTab(tab){
+    currentCommunicationTab = ["waiting", "interested", "pending", "closed"].includes(tab) ? tab : "waiting"
+    document.querySelectorAll("[data-comm-tab]").forEach(button => {
+        let active = button.dataset.commTab === currentCommunicationTab
+        button.classList.toggle("is-active", active)
+        button.setAttribute("aria-selected", active ? "true" : "false")
+    })
+    document.querySelectorAll("[data-comm-panel]").forEach(panel => {
+        panel.classList.toggle("hidden", panel.dataset.commPanel !== currentCommunicationTab)
+    })
+    filterCommunicationRows()
+}
+
+function cycleCommunicationScoreFilter(){
+    let filters = [0, 60, 75]
+    let index = filters.indexOf(communicationScoreFilter)
+    communicationScoreFilter = filters[(index + 1) % filters.length]
+    let label = document.getElementById("commScoreFilterLabel")
+    if(label) label.innerText = communicationScoreFilter ? `${communicationScoreFilter}+` : "All"
+    filterCommunicationRows()
+}
+
+function filterCommunicationRows(){
+    let query = safeText(document.getElementById("commCandidateSearch")?.value).trim().toLowerCase()
+    let panel = document.querySelector(`[data-comm-panel="${currentCommunicationTab}"]`)
+    panel?.querySelectorAll("tr[data-candidate-id]").forEach(row => {
+        let matchesText = !query || safeText(row.dataset.search).includes(query)
+        let matchesScore = !communicationScoreFilter || Number(row.dataset.score || 0) >= communicationScoreFilter
+        row.classList.toggle("ats-row-filtered", !(matchesText && matchesScore))
+    })
+}
+
+function selectCommunicationCandidate(key){
+    let candidate = window.currentCommunicationCandidates?.[String(key)]
+    if(!candidate) return
+    selectedCommunicationCandidateKey = String(key)
+    document.querySelectorAll("tr[data-candidate-id]").forEach(row => row.classList.toggle("is-selected", row.dataset.candidateId === selectedCommunicationCandidateKey))
+    let panel = document.getElementById("commAiCandidate")
+    let badge = document.getElementById("commAiReadyBadge")
+    let suggestion = document.getElementById("commAiSuggestion")
+    let name = candidate.name || candidate.full_name || "Candidate"
+    let email = candidate.email || "Email not available"
+    let score = candidate.final_score ?? candidate.score ?? candidate.ai_fit_score ?? 0
+    if(panel){
+        panel.className = "ats-ai-candidate"
+        panel.innerHTML = `<span class="ats-avatar">${safeHtml(candidateInitials(name))}</span><div><strong>${safeHtml(name)}</strong><p title="${safeHtml(email)}">${safeHtml(email)}</p></div><span class="ats-score-pill">${safeHtml(formatScore(score))}</span>`
+    }
+    if(badge) badge.innerText = "Ready"
+    if(suggestion) suggestion.innerText = candidate.next_step || "Review this candidate and send personalized outreach based on their profile."
+}
+
+function selectedCommunicationCandidate(){
+    return window.currentCommunicationCandidates?.[selectedCommunicationCandidateKey] || null
+}
+
+function previewSelectedCommunicationEmail(){
+    sendSelectedCommunicationMail()
+}
+
+function sendSelectedCommunicationMail(){
+    let candidate = selectedCommunicationCandidate()
+    if(!candidate){ alert("Select a candidate first."); return }
+    sendMail(candidate.email || "", candidate.name || candidate.full_name || "Candidate", window.currentJobTitle, window.currentJobId, candidate.id || candidate.candidate_id || "")
+}
+
+async function markSelectedCommunicationNotInterested(){
+    let candidate = selectedCommunicationCandidate()
+    let candidateId = candidate?.id || candidate?.candidate_id
+    if(!candidateId){ alert("Select a candidate with a valid record first."); return }
+    await updateCommunicationResponse(candidateId, "Not Interested")
+}
+
 async function loadCommunicationSplit(jobId){
     window.currentJobId = jobId
 
@@ -9826,7 +9906,9 @@ async function loadCommunicationSplit(jobId){
         await syncAssessmentResults(jobId, { silent: true, reload: false })
     }
 
+    try{
     let res = await fetch(API + "/communication-filter?job_id=" + encodeURIComponent(jobId))
+    if(!res.ok) throw new Error(await res.text() || "Communication API failed")
     let data = await res.json()
 
     let pending = Array.isArray(data.pending) ? data.pending : []
@@ -9848,6 +9930,24 @@ async function loadCommunicationSplit(jobId){
     setCommCount("commInterestedBadge", interested.length, interested.length === 1 ? "candidate" : "candidates")
     setCommCount("commPendingBadge", pendingRows.length, pendingRows.length === 1 ? "candidate" : "candidates")
     setCommCount("commNotInterestedBadge", notInterested.length, notInterested.length === 1 ? "candidate" : "candidates")
+    setCommCount("commWaitingTabCount", notContactedRows.length)
+    setCommCount("commInterestedTabCount", interested.length)
+    setCommCount("commPendingTabCount", pendingRows.length)
+    setCommCount("commClosedTabCount", notInterested.length)
+
+    window.currentCommunicationCandidates = {}
+    ;[...notContactedRows, ...interested, ...pendingRows, ...notInterested].forEach((candidate, index) => {
+        let key = communicationCandidateKey(candidate, index)
+        candidate._communicationKey = key
+        window.currentCommunicationCandidates[key] = candidate
+    })
+
+    let rowAttributes = candidate => {
+        let key = candidate._communicationKey
+        let search = `${candidate.name || candidate.full_name || ""} ${candidate.email || ""}`.toLowerCase()
+        let score = candidate.final_score ?? candidate.score ?? candidate.ai_fit_score ?? 0
+        return `data-candidate-id="${safeHtml(key)}" data-search="${safeHtml(search)}" data-score="${safeHtml(score)}" onclick="selectCommunicationCandidate('${safeJs(key)}')"`
+    }
     let communicationCandidateNameCell = candidate => {
         let profileId = registerCandidateProfile({
             ...candidate,
@@ -9862,7 +9962,7 @@ async function loadCommunicationSplit(jobId){
     }
 
     topTable.innerHTML = notContactedRows.length ? notContactedRows.map(c => `
-        <tr>
+        <tr ${rowAttributes(c)}>
             <td>${communicationCandidateNameCell(c)}</td>
             <td><span class="ats-ellipsis" title="${safeHtml(c.email)}">${safeHtml(c.email)}</span></td>
             <td><span class="ats-score-pill">${safeHtml(c.final_score ?? 0)}</span></td>
@@ -9875,10 +9975,10 @@ async function loadCommunicationSplit(jobId){
                 </button>
             </td>
         </tr>
-    `).join("") : `<tr><td colspan="6" class="ats-empty-state">No candidates waiting for first contact</td></tr>`
+    `).join("") : `<tr><td colspan="6" class="ats-empty-state">No candidates waiting for outreach yet.<br><small>Newly queued candidates will appear here.</small></td></tr>`
 
     pendingTable.innerHTML = pendingRows.length ? pendingRows.map(c => `
-        <tr>
+        <tr ${rowAttributes(c)}>
             <td>${communicationCandidateNameCell(c)}</td>
             <td><span class="ats-ellipsis" title="${safeHtml(c.email)}">${safeHtml(c.email)}</span></td>
             <td><span class="ats-score-pill">${safeHtml(c.final_score ?? 0)}</span></td>
@@ -9895,10 +9995,10 @@ async function loadCommunicationSplit(jobId){
                 </div>
             </td>
         </tr>
-    `).join("") : `<tr><td colspan="6" class="ats-empty-state">No pending responses</td></tr>`
+    `).join("") : `<tr><td colspan="6" class="ats-empty-state">No pending follow-ups yet.<br><small>Candidate replies will appear here after sync.</small></td></tr>`
 
     interestedTable.innerHTML = interested.length ? interested.map(c => `
-        <tr>
+        <tr ${rowAttributes(c)}>
             <td>${communicationCandidateNameCell(c)}</td>
             <td><span class="ats-ellipsis" title="${safeHtml(c.email)}">${safeHtml(c.email)}</span></td>
             <td><span class="ats-score-pill">${safeHtml(c.final_score ?? 0)}</span></td>
@@ -9937,10 +10037,10 @@ async function loadCommunicationSplit(jobId){
             </td>
             <td><span class="ats-status-pill ats-status-success">${safeHtml(c.status)}</span></td>
         </tr>
-    `).join("") : `<tr><td colspan="7" class="ats-empty-state">No interested candidates yet</td></tr>`
+    `).join("") : `<tr><td colspan="7" class="ats-empty-state">No interested candidates yet.<br><small>Positive replies will appear here after reply sync.</small></td></tr>`
 
     notInterestedTable.innerHTML = notInterested.length ? notInterested.map(c => `
-        <tr>
+        <tr ${rowAttributes(c)}>
             <td>${communicationCandidateNameCell(c)}</td>
             <td><span class="ats-ellipsis" title="${safeHtml(c.email)}">${safeHtml(c.email)}</span></td>
             <td><span class="ats-score-pill">${safeHtml(c.final_score ?? 0)}</span></td>
@@ -9951,7 +10051,43 @@ async function loadCommunicationSplit(jobId){
             </td>
             <td><span class="ats-status-pill ats-status-danger">${safeHtml(c.status)}</span></td>
         </tr>
-    `).join("") : `<tr><td colspan="5" class="ats-empty-state">No not-interested responses</td></tr>`
+    `).join("") : `<tr><td colspan="5" class="ats-empty-state">No not-interested responses yet.<br><small>Closed responses will appear here.</small></td></tr>`
+
+    let contactedCount = pendingRows.length + interested.length + notInterested.length
+    let responseCount = interested.length + notInterested.length
+    let testsSent = interested.filter(candidate => candidate.test_status || candidate.test_percentage != null).length
+    setCommCount("commEmailsSent", contactedCount)
+    setCommCount("commReplyRate", contactedCount ? `${Math.round((responseCount / contactedCount) * 100)}%` : 0)
+    setCommCount("commTestsSent", testsSent)
+    setCommCount("commFollowupsInsight", pendingRows.length)
+
+    let activity = document.getElementById("commRecentActivity")
+    if(activity){
+        let items = []
+        if(notContactedRows.length) items.push(`${notContactedRows.length} candidate${notContactedRows.length === 1 ? " is" : "s are"} ready for first outreach`)
+        if(interested.length) items.push(`${interested.length} interested candidate${interested.length === 1 ? " is" : "s are"} ready for the next step`)
+        if(pendingRows.length) items.push(`${pendingRows.length} follow-up${pendingRows.length === 1 ? "" : "s"} awaiting a response`)
+        if(!items.length) items.push("Sync replies to refresh the outreach pipeline")
+        activity.innerHTML = items.map(item => `<p>${safeHtml(item)}</p>`).join("")
+    }
+
+    let selectedStillExists = selectedCommunicationCandidateKey && window.currentCommunicationCandidates[selectedCommunicationCandidateKey]
+    let focused = selectedStillExists ? selectedCommunicationCandidateKey : (notContactedRows[0]?._communicationKey || interested[0]?._communicationKey || pendingRows[0]?._communicationKey || notInterested[0]?._communicationKey || "")
+    if(focused) selectCommunicationCandidate(focused)
+    else{
+        selectedCommunicationCandidateKey = ""
+        let panel = document.getElementById("commAiCandidate")
+        if(panel){ panel.className = "ats-ai-candidate-empty"; panel.innerHTML = "<strong>No candidate selected</strong><p>Select a candidate to preview AI outreach actions.</p>" }
+        let badge = document.getElementById("commAiReadyBadge")
+        if(badge) badge.innerText = "Waiting"
+    }
+    switchCommunicationTab(currentCommunicationTab)
+    }catch(error){
+        topTable.innerHTML = `<tr><td colspan="6" class="ats-empty-state">Could not load communication candidates.<br><small>${safeHtml(error.message || "Please refresh and try again.")}</small></td></tr>`
+        pendingTable.innerHTML = ""
+        interestedTable.innerHTML = ""
+        notInterestedTable.innerHTML = ""
+    }
 }
 
 async function moveAllToCommunication(){

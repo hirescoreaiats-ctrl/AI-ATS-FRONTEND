@@ -2418,39 +2418,46 @@ Back Back to Recruitment Dashboard
 <div>
 <span class="ats-page-kicker">Outreach pipeline</span>
 <h2 id="communicationResultsTitle">Communication Candidates</h2>
-<p>Track first contact, candidate replies, assessment follow-up, and interview handoff for this role.</p>
+<p>Track first contact, candidate replies, assessment follow-up, and interview handoff for this role with AI-powered engagement.</p>
 </div>
-<button onclick="showPage('communication')" class="ats-comm-back-btn">Back to Outreach</button>
+<div class="ats-comm-hero-art" aria-hidden="true"><span>✉</span><span>➤</span></div>
+<button onclick="showPage('communication')" class="ats-comm-back-btn">← Back to Outreach</button>
 </section>
 
 <section class="ats-comm-detail-metrics">
-<article>
-<span>First contact</span>
+<article class="is-active">
+<i>✉</i>
+<span>Waiting Outreach</span>
 <strong id="commFirstContactCount">0</strong>
-<small>Waiting for outreach</small>
+<small>Ready for first contact</small>
 </article>
 <article>
+<i>✓</i>
 <span>Interested</span>
 <strong id="commInterestedCount">0</strong>
 <small>Ready for test or interview</small>
 </article>
 <article>
-<span>Pending replies</span>
+<i>◷</i>
+<span>Pending Follow-up</span>
 <strong id="commPendingCount">0</strong>
 <small>Follow-up queue</small>
 </article>
 <article>
+<i>×</i>
 <span>Not interested</span>
 <strong id="commNotInterestedCount">0</strong>
 <small>Closed responses</small>
 </article>
 </section>
 
+<div class="ats-comm-main-grid">
+<aside class="ats-comm-side-column">
 <section class="ats-gmail-connect-card ats-comm-sender-panel ats-sender-card">
 <div class="ats-sender-card-main">
-<span class="ats-comm-panel-icon">MAIL</span>
+<span class="ats-comm-panel-icon">✉</span>
 <div class="ats-sender-card-copy">
-<h3>Outreach Sender</h3>
+<div class="ats-card-title-row"><h3>Sender Setup</h3><span class="ats-active-badge">Active</span></div>
 <p id="gmailConnectStatus">Use the recommended HireScore AI sender, or verify your own domain with DNS records before sending from it.</p>
 <div id="activeSenderPreview" class="ats-active-sender-preview"></div>
 </div>
@@ -2468,6 +2475,23 @@ Sync Replies
 </div>
 </section>
 
+<section class="ats-ai-outreach-card">
+<div class="ats-card-title-row"><h3><span>✦</span> AI Outreach Assistant</h3><span id="commAiReadyBadge" class="ats-active-badge">Waiting</span></div>
+<div id="commAiCandidate" class="ats-ai-candidate-empty">
+<strong>No candidate selected</strong>
+<p>Select a candidate to preview AI outreach actions.</p>
+</div>
+<div class="ats-ai-suggestion">
+<small>Suggested next step</small>
+<p id="commAiSuggestion">Review a candidate and prepare personalized outreach based on their profile.</p>
+</div>
+<div class="ats-ai-actions">
+<button type="button" class="is-secondary" onclick="previewSelectedCommunicationEmail()">Preview Email</button>
+<button type="button" onclick="sendSelectedCommunicationMail()">Send Mail</button>
+</div>
+<button type="button" class="ats-ai-reject" onclick="markSelectedCommunicationNotInterested()">Mark as Not Interested</button>
+</section>
+</aside>
 <div id="mailComposerModal" class="ats-mail-composer hidden" aria-hidden="true">
 <div class="ats-mail-composer-card">
 <div class="ats-mail-composer-head">
@@ -2493,7 +2517,24 @@ Message
 </div>
 </div>
 
-<section class="ats-comm-section">
+<main class="ats-comm-work-column">
+<section class="ats-candidate-workspace">
+<div class="ats-workspace-heading">
+<div><span>Candidate pipeline</span><h3>Candidate Outreach Workspace</h3></div>
+<button type="button" class="ats-workspace-refresh" onclick="loadCommunicationSplit(window.currentJobId)" title="Refresh candidates">↻</button>
+</div>
+<div class="ats-workspace-tabs" role="tablist" aria-label="Outreach stages">
+<button type="button" class="is-active" data-comm-tab="waiting" onclick="switchCommunicationTab('waiting')">Waiting <span id="commWaitingTabCount">0</span></button>
+<button type="button" data-comm-tab="interested" onclick="switchCommunicationTab('interested')">Interested <span id="commInterestedTabCount">0</span></button>
+<button type="button" data-comm-tab="pending" onclick="switchCommunicationTab('pending')">Pending Follow-up <span id="commPendingTabCount">0</span></button>
+<button type="button" data-comm-tab="closed" onclick="switchCommunicationTab('closed')">Not Interested <span id="commClosedTabCount">0</span></button>
+</div>
+<div class="ats-workspace-toolbar">
+<label class="ats-candidate-search"><span>⌕</span><input id="commCandidateSearch" type="search" placeholder="Search candidates" oninput="filterCommunicationRows()"></label>
+<button type="button" class="ats-score-filter" onclick="cycleCommunicationScoreFilter()">Score: <span id="commScoreFilterLabel">All</span></button>
+</div>
+
+<section class="ats-comm-section ats-comm-tab-panel" data-comm-panel="waiting">
 <div class="ats-comm-section-head">
 <div>
 <span>First contact</span>
@@ -2520,7 +2561,7 @@ Message
 </section>
 
 
-<section class="ats-comm-section is-positive">
+<section class="ats-comm-section is-positive ats-comm-tab-panel hidden" data-comm-panel="interested">
 <div class="ats-comm-section-head">
 <div>
 <span>Positive replies</span>
@@ -2548,7 +2589,7 @@ Message
 </section>
 
 
-<section class="ats-comm-section is-closed">
+<section class="ats-comm-section is-closed ats-comm-tab-panel hidden" data-comm-panel="closed">
 <div class="ats-comm-section-head">
 <div>
 <span>Closed</span>
@@ -2575,7 +2616,7 @@ Message
 
 
 
-<section class="ats-comm-section is-waiting">
+<section class="ats-comm-section is-waiting ats-comm-tab-panel hidden" data-comm-panel="pending">
 <div class="ats-comm-section-head">
 <div>
 <span>Follow-up</span>
@@ -2600,6 +2641,27 @@ Message
 </table>
 </div>
 </section>
+
+</section>
+
+<div class="ats-comm-bottom-grid">
+<section class="ats-outreach-insights">
+<div class="ats-card-title-row"><h3>Outreach Insights</h3><small>Current pipeline</small></div>
+<div class="ats-insight-grid">
+<article><span>Emails Sent</span><strong id="commEmailsSent">0</strong><i></i></article>
+<article><span>Reply Rate</span><strong id="commReplyRate">—</strong><i></i></article>
+<article><span>Tests Sent</span><strong id="commTestsSent">0</strong><i></i></article>
+<article><span>Follow-ups</span><strong id="commFollowupsInsight">0</strong><i></i></article>
+</div>
+<p>Based on the current outreach pipeline</p>
+</section>
+<section class="ats-recent-activity">
+<div class="ats-card-title-row"><h3>Recent Activity</h3><button type="button" onclick="syncGmailReplies()">Refresh</button></div>
+<div id="commRecentActivity" class="ats-activity-list"><p>Recent outreach activity will appear here.</p></div>
+</section>
+</div>
+</main>
+</div>
 
 </div>
 
