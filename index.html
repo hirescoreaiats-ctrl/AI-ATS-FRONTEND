@@ -2786,8 +2786,23 @@ Message
 </section>
 
 <section class="ats-interview-ai-card">
-<div><span class="ats-ai-spark">AI</span><strong>AI Smart Match</strong><p id="interviewAiRecommendation">Recommendations will appear when interview-ready candidates are available.</p></div>
-<button id="interviewAiAction" onclick="applyInterviewRecommendation()">Apply Recommendation</button>
+<div class="ats-ai-recommendation-main">
+<span class="ats-ai-spark">AI</span>
+<div class="ats-ai-recommendation-content">
+<div class="ats-ai-recommendation-heading"><strong>AI Recommended Next Step</strong><span>Top Match</span></div>
+<p id="interviewAiRecommendation"><strong id="interviewAiCandidateName">Candidate</strong> is the strongest match for <span id="interviewAiJobTitle">the selected role</span>.</p>
+<p id="interviewAiEmpty" class="hidden">Recommendations will appear when interview-ready candidates are available.</p>
+<div class="ats-ai-recommendation-meta">
+<span id="interviewAiFitScore">Fit score pending</span>
+<span id="interviewAiRound">Interview round suggested</span>
+<span id="interviewAiAvailability">Availability pending</span>
+</div>
+</div>
+</div>
+<div class="ats-ai-recommendation-action">
+<button id="interviewAiAction" onclick="applyInterviewRecommendation()">Move to Interview Pipeline</button>
+<small>This will move the candidate to the next interview stage.</small>
+</div>
 </section>
 </div>
 </section>
@@ -2910,7 +2925,7 @@ Message / Issue Description
 <script src="runtime-config.js"></script>
 <script src="config.js"></script>
 <script src="auth.js"></script>
-<script src="app.js?v=interview-local-date-20260619-7"></script>
+<script src="app.js?v=ai-recommendation-card-20260619-8"></script>
 
 
 </div>

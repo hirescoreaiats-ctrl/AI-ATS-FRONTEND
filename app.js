@@ -9477,11 +9477,22 @@ function renderInterviewDashboard(){
         .filter(c => c.status !== "Completed")
         .sort((a, b) => Number(b.final_score || 0) - Number(a.final_score || 0))[0]
     let recommendationText = document.getElementById("interviewAiRecommendation")
+    let recommendationEmpty = document.getElementById("interviewAiEmpty")
+    let recommendationName = document.getElementById("interviewAiCandidateName")
+    let recommendationJob = document.getElementById("interviewAiJobTitle")
+    let recommendationScore = document.getElementById("interviewAiFitScore")
+    let recommendationRound = document.getElementById("interviewAiRound")
+    let recommendationAvailability = document.getElementById("interviewAiAvailability")
     let recommendationAction = document.getElementById("interviewAiAction")
     if(recommendationText){
-        recommendationText.innerText = recommendation
-            ? `${recommendation.name || "Candidate"} is the strongest current match for ${recommendation.job_title || "this role"} at ${Number(recommendation.final_score || 0).toFixed(1)} fit score. Schedule the next ${String(recommendation.round || "interview").toLowerCase()} when availability is confirmed.`
-            : "Recommendations will appear when interview-ready candidates are available."
+        recommendationText.classList.toggle("hidden", !recommendation)
+        if(recommendationEmpty) recommendationEmpty.classList.toggle("hidden", Boolean(recommendation))
+        if(recommendationName) recommendationName.innerText = recommendation?.name || "Candidate"
+        if(recommendationJob) recommendationJob.innerText = recommendation?.job_title || "the selected role"
+        if(recommendationScore) recommendationScore.innerText = recommendation ? `${Number(recommendation.final_score || 0).toFixed(1)} Fit Score` : "Fit score pending"
+        let recommendedRound = /technical/i.test(recommendation?.round || "") ? "Technical Round" : (recommendation?.round || "Interview Round")
+        if(recommendationRound) recommendationRound.innerText = recommendation ? `${recommendedRound} Suggested` : "Interview round suggested"
+        if(recommendationAvailability) recommendationAvailability.innerText = recommendation?.scheduled_at ? "Schedule Confirmed" : "Availability Pending"
     }
     if(recommendationAction) recommendationAction.disabled = !recommendation
 
