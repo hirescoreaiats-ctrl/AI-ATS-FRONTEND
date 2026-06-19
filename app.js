@@ -9089,7 +9089,7 @@ async function moveCandidateToInterviewScheduling(candidateId, jobId){
 
         let data = await res.json()
         if(!res.ok || data.error){
-            alert("Could not move candidate: " + (data.detail || data.error || "Test is not passed yet"))
+            alert("Could not move candidate: " + (data.detail || data.error || "Please try again"))
             return
         }
 
@@ -10226,15 +10226,9 @@ async function loadCommunicationSplit(jobId){
                 `}
             </td>
             <td>
-                ${c.test_percentage != null ? `
-                    <button onclick="moveCandidateToInterviewScheduling('${safeJs(c.id)}','${safeJs(jobId)}')" class="ats-pipeline-btn is-ready">
-                        ${c.test_result_status === "Passed" ? "Interview Scheduling" : "Review & Schedule"}
-                    </button>
-                ` : `
-                    <button class="ats-pipeline-btn is-locked" disabled>
-                        Interview Pipeline
-                    </button>
-                `}
+                <button onclick="moveCandidateToInterviewScheduling('${safeJs(c.id)}','${safeJs(jobId)}')" class="ats-pipeline-btn is-ready">
+                    Interview Pipeline
+                </button>
             </td>
             <td><span class="ats-status-pill ats-status-success">${safeHtml(c.status)}</span></td>
         </tr>
