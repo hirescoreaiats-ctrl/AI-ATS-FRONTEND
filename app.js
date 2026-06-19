@@ -8949,7 +8949,13 @@ async function sendMailComposerMessage(){
             })
         })
 
-        let data = await res.json()
+        let responseText = await res.text()
+        let data = {}
+        try{
+            data = responseText ? JSON.parse(responseText) : {}
+        }catch(parseError){
+            data = {detail: responseText || `Server returned HTTP ${res.status}`}
+        }
 
         if(!res.ok || data.error){
             alert("Mail failed: " + (data.detail || data.error || "Email provider not configured"))
@@ -8964,7 +8970,7 @@ async function sendMailComposerMessage(){
             await loadCommunicationJobs()
         }
     }catch(err){
-        alert("Mail failed. Please check backend email configuration.")
+        alert("Mail failed: " + (err?.message || "Please check backend email configuration."))
     }finally{
         setButtonLoading(button, false)
     }
