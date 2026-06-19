@@ -12,6 +12,9 @@ let jobChart = null
 let currentResults = []  
 let currentSkills = []
 let interviewDashboardCandidates = []
+let interviewCurrentPage = 1
+const interviewPageSize = 5
+let currentFilteredInterviewRows = []
 let candidateProfileStore = {}
 let currentShortlistResults = []
 let shortlistAnalyticsCharts = {}
@@ -9137,12 +9140,14 @@ function getInterviewRowModel(candidate){
         : "Awaiting slot"
     return {
         ...candidate,
-        round: "Technical Screen",
-        interviewer: candidate.company_name ? candidate.company_name + " hiring team" : "Hiring team",
+        round: candidate.interview_type || candidate.interview_round || "Technical Screen",
+        interviewer: candidate.interviewer_name || (candidate.company_name ? candidate.company_name + " hiring team" : "Hiring team"),
         dateTime,
         dateValue,
         status,
-        meetingType: candidate.meeting_url ? "Video" : "TBD"
+        meetingType: candidate.meeting_url
+            ? (/zoom/i.test(candidate.meeting_url) ? "Zoom" : /teams/i.test(candidate.meeting_url) ? "Teams" : "Google Meet")
+            : "TBD"
     }
 }
 
@@ -9263,7 +9268,7 @@ function populateInterviewFilters(candidates){
 
     let currentValue = roleFilter.value
     let roles = [...new Set(candidates.map(c => c.job_title).filter(Boolean))].sort()
-    roleFilter.innerHTML = `<option value="">All roles</option>` + roles.map(role => `
+    roleFilter.innerHTML = `<option value="">Job: All Jobs</option>` + roles.map(role => `
         <option value="${safeHtml(role)}">${safeHtml(role)}</option>
     `).join("")
     roleFilter.value = roles.includes(currentValue) ? currentValue : ""
@@ -9274,7 +9279,45 @@ function setInterviewStatusFilter(status, button){
     if(input) input.value = status
     document.querySelectorAll(".ats-filter-chip").forEach(chip => chip.classList.remove("is-active"))
     if(button) button.classList.add("is-active")
+    interviewCurrentPage = 1
     renderInterviewDashboard()
+}
+
+function clearInterviewFilters(){
+    ;["interviewSearchFilter", "interviewJobFilter", "interviewRoundFilter", "interviewDateFilter", "interviewStatusFilter"].forEach(id => {
+        let field = document.getElementById(id)
+        if(field) field.value = ""
+    })
+    document.querySelectorAll(".ats-filter-chip").forEach(chip => chip.classList.toggle("is-active", chip.dataset.status === ""))
+    interviewCurrentPage = 1
+    renderInterviewDashboard()
+}
+
+function startNewInterviewSchedule(){
+    let rows = interviewDashboardCandidates.map(getInterviewRowModel)
+    let candidate = rows.find(row => row.status === "Pending") || rows.find(row => row.status !== "Completed")
+    if(!candidate){
+        alert("No interview-ready candidate is available to schedule yet.")
+        return
+    }
+    scheduleInterviewSlot(candidate.id, candidate.job_id, candidate.meeting_url || "", candidate.scheduled_at || "")
+}
+
+function changeInterviewPage(page){
+    let pageCount = Math.max(1, Math.ceil(currentFilteredInterviewRows.length / interviewPageSize))
+    interviewCurrentPage = Math.max(1, Math.min(page, pageCount))
+    renderInterviewDashboard()
+}
+
+function applyInterviewRecommendation(){
+    let candidate = [...currentFilteredInterviewRows]
+        .filter(row => row.status !== "Completed")
+        .sort((a, b) => Number(b.final_score || 0) - Number(a.final_score || 0))[0]
+    if(!candidate){
+        alert("No candidate is currently available for an AI scheduling recommendation.")
+        return
+    }
+    scheduleInterviewSlot(candidate.id, candidate.job_id, candidate.meeting_url || "", candidate.scheduled_at || "")
 }
 
 function interviewEmptyState(title, body, actionText="Refresh"){
@@ -9286,6 +9329,13 @@ function interviewEmptyState(title, body, actionText="Refresh"){
             <button onclick="loadInterviewDashboard()" class="ats-interview-secondary-btn">${safeHtml(actionText)}</button>
         </div>
     `
+}
+
+function interviewStatusClass(status){
+    if(status === "Pending") return "is-pending"
+    if(status === "Completed") return "is-complete"
+    if(status === "Scheduled") return "is-scheduled"
+    return "is-rescheduled"
 }
 
 function interviewCard(candidate){
@@ -9311,7 +9361,7 @@ function interviewCard(candidate){
                 <span>${safeHtml(candidate.dateTime)}</span>
             </div>
             <div class="ats-workflow-card-footer">
-                <span class="ats-interview-status ${candidate.status === "Pending" ? "is-pending" : candidate.status === "Completed" ? "is-complete" : "is-rescheduled"}">${safeHtml(candidate.status)}</span>
+                <span class="ats-interview-status ${interviewStatusClass(candidate.status)}">${safeHtml(candidate.status)}</span>
                 <div class="ats-card-actions">
                     ${candidate.meeting_url ? `
                         <button onclick="openInterviewJoinLink('${safeJs(candidate.meeting_url)}')" title="Join">Join</button>
@@ -9349,6 +9399,8 @@ function renderInterviewDashboard(){
     let roundFilter = document.getElementById("interviewRoundFilter")?.value || ""
     let dateFilter = document.getElementById("interviewDateFilter")?.value || ""
     let searchFilter = (document.getElementById("interviewSearchFilter")?.value || "").trim().toLowerCase()
+    let viewingJob = document.getElementById("interviewViewingJob")
+    if(viewingJob) viewingJob.innerText = jobFilter || "All Jobs"
 
     let filtered = rows.filter(c => {
         let searchable = `${c.name || ""} ${c.email || ""} ${c.job_title || ""}`.toLowerCase()
@@ -9359,6 +9411,7 @@ function renderInterviewDashboard(){
         if(searchFilter && !searchable.includes(searchFilter)) return false
         return true
     })
+    currentFilteredInterviewRows = filtered
 
     let todayRows = filtered.filter(c => c.dateValue === new Date().toISOString().slice(0,10))
     let scheduledRows = filtered.filter(c => c.status === "Scheduled")
@@ -9381,7 +9434,24 @@ function renderInterviewDashboard(){
         if(list) list.innerHTML = items.length ? items.map(interviewCard).join("") : interviewEmptyState(title, body)
     })
 
-    table.innerHTML = filtered.length ? filtered.map(c => {
+    let pageCount = Math.max(1, Math.ceil(filtered.length / interviewPageSize))
+    if(interviewCurrentPage > pageCount) interviewCurrentPage = pageCount
+    let pageStart = (interviewCurrentPage - 1) * interviewPageSize
+    let pageRows = filtered.slice(pageStart, pageStart + interviewPageSize)
+
+    let recommendation = [...filtered]
+        .filter(c => c.status !== "Completed")
+        .sort((a, b) => Number(b.final_score || 0) - Number(a.final_score || 0))[0]
+    let recommendationText = document.getElementById("interviewAiRecommendation")
+    let recommendationAction = document.getElementById("interviewAiAction")
+    if(recommendationText){
+        recommendationText.innerText = recommendation
+            ? `${recommendation.name || "Candidate"} is the strongest current match for ${recommendation.job_title || "this role"} at ${Number(recommendation.final_score || 0).toFixed(1)} fit score. Schedule the next ${String(recommendation.round || "interview").toLowerCase()} when availability is confirmed.`
+            : "Recommendations will appear when interview-ready candidates are available."
+    }
+    if(recommendationAction) recommendationAction.disabled = !recommendation
+
+    table.innerHTML = pageRows.length ? pageRows.map(c => {
         let profileId = registerCandidateProfile({
             ...c,
             full_name: c.name || c.full_name,
@@ -9402,7 +9472,7 @@ function renderInterviewDashboard(){
             <td><span class="ats-round-pill">${safeHtml(c.round)}</span></td>
             <td><span class="ats-ellipsis" title="${safeHtml(c.interviewer)}">${safeHtml(c.interviewer)}</span></td>
             <td><span class="ats-date-pill">${safeHtml(c.dateTime)}</span></td>
-            <td><span class="ats-interview-status ${c.status === "Pending" ? "is-pending" : c.status === "Completed" ? "is-complete" : "is-rescheduled"}">${safeHtml(c.status)}</span></td>
+            <td><span class="ats-interview-status ${interviewStatusClass(c.status)}">${safeHtml(c.status)}</span></td>
             <td><span class="ats-meeting-pill">${safeHtml(c.meetingType)}</span></td>
             <td>
                 <div class="ats-interview-actions">
@@ -9419,6 +9489,25 @@ function renderInterviewDashboard(){
         </tr>
     `
     }).join("") : `<tr><td colspan="8" class="ats-empty-state">No interviews match the selected filters</td></tr>`
+
+    let paginationText = document.getElementById("interviewPaginationText")
+    if(paginationText){
+        let first = filtered.length ? pageStart + 1 : 0
+        let last = Math.min(pageStart + interviewPageSize, filtered.length)
+        paginationText.innerText = `Showing ${first}–${last} of ${filtered.length} scheduled interviews`
+    }
+    let paginationButtons = document.getElementById("interviewPaginationButtons")
+    if(paginationButtons){
+        let buttons = []
+        buttons.push(`<button onclick="changeInterviewPage(${interviewCurrentPage - 1})" ${interviewCurrentPage === 1 ? "disabled" : ""}>‹</button>`)
+        for(let page = 1; page <= pageCount; page++){
+            if(pageCount <= 5 || page === 1 || page === pageCount || Math.abs(page - interviewCurrentPage) <= 1){
+                buttons.push(`<button onclick="changeInterviewPage(${page})" class="${page === interviewCurrentPage ? "is-active" : ""}">${page}</button>`)
+            }
+        }
+        buttons.push(`<button onclick="changeInterviewPage(${interviewCurrentPage + 1})" ${interviewCurrentPage === pageCount ? "disabled" : ""}>›</button>`)
+        paginationButtons.innerHTML = buttons.join("")
+    }
 }
 
 async function loadCommunicationSplitLegacy(jobId){

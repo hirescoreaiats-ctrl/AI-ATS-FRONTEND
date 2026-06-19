@@ -20,7 +20,7 @@
 <link rel="stylesheet" href="sidebar.css">
 <link rel="stylesheet" href="createjob.css">
 <link rel="stylesheet" href="Dashbord.css">
-<link rel="stylesheet" href="ui-fix.css?v=outreach-command-center-20260618-8">
+<link rel="stylesheet" href="ui-fix.css?v=interview-operations-20260619-1">
 
 </head>
 
@@ -2675,11 +2675,12 @@ Message
 <div>
 <span class="ats-page-kicker">Interview Operations</span>
 <h2>Interview Schedule</h2>
-<p>Track assessment-qualified candidates, coordinate rounds, and keep scheduling decisions moving.</p>
+<p>Coordinate candidate interviews, manage rounds, and keep hiring decisions moving with AI-assisted scheduling.</p>
+<a class="ats-interview-viewing" href="#interviewFilters">Viewing interviews for: <strong id="interviewViewingJob">All Jobs</strong></a>
 </div>
 <div class="ats-interview-toolbar">
 <button onclick="loadInterviewDashboard()" class="ats-interview-icon-btn" title="Refresh interview dashboard">Refresh</button>
-<button onclick="alert('Calendar scheduling integration is ready for this workflow.')" class="ats-interview-primary-btn">New Schedule</button>
+<button onclick="startNewInterviewSchedule()" class="ats-interview-primary-btn">+ New Schedule</button>
 </div>
 </div>
 
@@ -2695,7 +2696,7 @@ Message
 <strong>Due today</strong>
 </div>
 <div>
-<small>Pending</small>
+<small>Pending Action</small>
 <span id="interviewPendingCount">0</span>
 <strong>Awaiting schedule</strong>
 </div>
@@ -2711,23 +2712,23 @@ Message
 </div>
 </div>
 
-<section class="ats-interview-commandbar">
-<div class="ats-interview-search">
-<span>Search</span>
-<input id="interviewSearchFilter" type="search" placeholder="Find candidate, role, interviewer..." oninput="renderInterviewDashboard()">
-</div>
+<section id="interviewFilters" class="ats-interview-commandbar">
+<select id="interviewJobFilter" onchange="renderInterviewDashboard()">
+<option value="">Job: All Jobs</option>
+</select>
+<span class="ats-filter-label">Filters:</span>
 <div class="ats-filter-chips">
 <button class="ats-filter-chip is-active" data-status="" onclick="setInterviewStatusFilter('', this)">All</button>
 <button class="ats-filter-chip" data-status="Pending" onclick="setInterviewStatusFilter('Pending', this)">Pending</button>
+<button class="ats-filter-chip" data-status="Scheduled" onclick="setInterviewStatusFilter('Scheduled', this)">Scheduled</button>
 <button class="ats-filter-chip" data-status="Completed" onclick="setInterviewStatusFilter('Completed', this)">Completed</button>
-<button class="ats-filter-chip" data-status="Rescheduled" onclick="setInterviewStatusFilter('Rescheduled', this)">Rescheduled</button>
+</div>
+<div class="ats-interview-search">
+<input id="interviewSearchFilter" type="search" placeholder="Find candidate, role, interviewer..." oninput="renderInterviewDashboard()">
 </div>
 <div class="ats-compact-filters">
-<select id="interviewJobFilter" onchange="renderInterviewDashboard()">
-<option value="">All roles</option>
-</select>
 <select id="interviewRoundFilter" onchange="renderInterviewDashboard()">
-<option value="">All rounds</option>
+<option value="">Interview Round</option>
 <option value="Technical Screen">Technical Screen</option>
 <option value="Recruiter Screen">Recruiter Screen</option>
 <option value="Hiring Manager">Hiring Manager</option>
@@ -2735,36 +2736,30 @@ Message
 <input id="interviewDateFilter" type="date" onchange="renderInterviewDashboard()">
 <input id="interviewStatusFilter" type="hidden" value="">
 </div>
+<button class="ats-interview-clear" onclick="clearInterviewFilters()">Clear all filters</button>
 </section>
 
-<section class="ats-interview-workflow">
+<section class="ats-interview-operations-grid">
+<div class="ats-interview-board">
+<div class="ats-interview-section-title"><h3>Board View</h3><button onclick="clearInterviewFilters()">View all</button></div>
 <div class="ats-workflow-column" data-stage="Today">
 <div class="ats-workflow-heading"><span>Today</span><strong id="workflowTodayCount">0</strong></div>
 <div id="workflowTodayList" class="ats-workflow-list"></div>
 </div>
-<div class="ats-workflow-column" data-stage="Scheduled">
-<div class="ats-workflow-heading"><span>Scheduled</span><strong id="workflowScheduledCount">0</strong></div>
-<div id="workflowScheduledList" class="ats-workflow-list"></div>
-</div>
 <div class="ats-workflow-column" data-stage="Pending">
-<div class="ats-workflow-heading"><span>Pending</span><strong id="workflowPendingCount">0</strong></div>
+<div class="ats-workflow-heading"><span>Pending Action</span><strong id="workflowPendingCount">0</strong></div>
 <div id="workflowPendingList" class="ats-workflow-list"></div>
+<button class="ats-batch-schedule" onclick="startNewInterviewSchedule()">Batch Schedule</button>
 </div>
-<div class="ats-workflow-column" data-stage="Completed">
-<div class="ats-workflow-heading"><span>Completed</span><strong id="workflowCompletedCount">0</strong></div>
-<div id="workflowCompletedList" class="ats-workflow-list"></div>
 </div>
-<div class="ats-workflow-column" data-stage="Rescheduled">
-<div class="ats-workflow-heading"><span>Rescheduled</span><strong id="workflowRescheduledCount">0</strong></div>
-<div id="workflowRescheduledList" class="ats-workflow-list"></div>
-</div>
-</section>
 
+<div class="ats-interview-pipeline">
+<div class="ats-interview-section-title"><h3>Central Pipeline</h3><span>Real-time interview operations</span></div>
 <section class="ats-interview-panel ats-interview-table-panel">
 <div class="ats-panel-heading">
 <div>
-<h3>Central Interview Pipeline</h3>
-<p>All interview-ready candidates across every active job.</p>
+<h3>Interview-ready candidates</h3>
+<p>Schedule, reschedule, join, or complete each real candidate round.</p>
 </div>
 </div>
 <div class="table-scroll ats-interview-table-scroll">
@@ -2784,7 +2779,24 @@ Message
 <tbody id="interviewDashboardTable"></tbody>
 </table>
 </div>
+<div class="ats-interview-pagination">
+<span id="interviewPaginationText">Showing 0 interviews</span>
+<div id="interviewPaginationButtons"></div>
+</div>
 </section>
+
+<section class="ats-interview-ai-card">
+<div><span class="ats-ai-spark">AI</span><strong>AI Smart Match</strong><p id="interviewAiRecommendation">Recommendations will appear when interview-ready candidates are available.</p></div>
+<button id="interviewAiAction" onclick="applyInterviewRecommendation()">Apply Recommendation</button>
+</section>
+</div>
+</section>
+
+<div class="hidden" aria-hidden="true">
+<strong id="workflowScheduledCount">0</strong><div id="workflowScheduledList"></div>
+<strong id="workflowCompletedCount">0</strong><div id="workflowCompletedList"></div>
+<strong id="workflowRescheduledCount">0</strong><div id="workflowRescheduledList"></div>
+</div>
 </div>
 
 <div id="supportPage" class="hidden ats-support-page">
@@ -2898,7 +2910,7 @@ Message / Issue Description
 <script src="runtime-config.js"></script>
 <script src="config.js"></script>
 <script src="auth.js"></script>
-<script src="app.js?v=outreach-command-center-20260618-8"></script>
+<script src="app.js?v=interview-operations-20260619-1"></script>
 
 
 </div>
