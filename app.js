@@ -9068,10 +9068,15 @@ async function syncAssessmentResults(jobId, options = {}){
     }
 }
 
-async function moveCandidateToInterviewScheduling(candidateId, jobId){
+async function moveCandidateToInterviewScheduling(candidateId, jobId, hasTestResult = false){
     if(!candidateId || !jobId){
         alert("Candidate or job is missing.")
         return
+    }
+
+    if(!hasTestResult){
+        let shouldContinue = confirm("This candidate's test result is not available yet. Do you still want to move them to the Interview Pipeline?")
+        if(!shouldContinue) return
     }
 
     let button = typeof event !== "undefined" ? event.currentTarget : null
@@ -9083,7 +9088,8 @@ async function moveCandidateToInterviewScheduling(candidateId, jobId){
             headers: authHeaders(),
             body: JSON.stringify({
                 candidate_id: candidateId,
-                job_id: jobId
+                job_id: jobId,
+                force_without_test: !hasTestResult
             })
         })
 
@@ -10226,7 +10232,7 @@ async function loadCommunicationSplit(jobId){
                 `}
             </td>
             <td>
-                <button onclick="moveCandidateToInterviewScheduling('${safeJs(c.id)}','${safeJs(jobId)}')" class="ats-pipeline-btn is-ready">
+                <button onclick="moveCandidateToInterviewScheduling('${safeJs(c.id)}','${safeJs(jobId)}',${c.test_percentage != null})" class="ats-pipeline-btn is-ready">
                     Interview Pipeline
                 </button>
             </td>
