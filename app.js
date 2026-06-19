@@ -9152,13 +9152,20 @@ async function loadInterviewDashboard(){
     }
 }
 
+function localDateKey(value = new Date()){
+    let date = value instanceof Date ? value : new Date(value)
+    if(Number.isNaN(date.getTime())) return ""
+    let pad = number => String(number).padStart(2, "0")
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
 function getInterviewRowModel(candidate){
     let status = candidate.interview_status || "Pending"
     if(status === "Interview Scheduling") status = "Pending"
     let scheduledAt = candidate.scheduled_at ? new Date(candidate.scheduled_at) : null
     let hasValidDate = scheduledAt && !Number.isNaN(scheduledAt.getTime())
     let isMissingTime = hasValidDate && scheduledAt.getHours() === 0 && scheduledAt.getMinutes() === 0 && scheduledAt.getSeconds() === 0
-    let dateValue = hasValidDate ? scheduledAt.toISOString().slice(0,10) : ""
+    let dateValue = hasValidDate ? localDateKey(scheduledAt) : ""
     let dateTime = hasValidDate
         ? (isMissingTime
             ? scheduledAt.toLocaleDateString([], {dateStyle:"medium"}) + ", time not set"
@@ -9415,7 +9422,8 @@ function renderInterviewDashboard(){
     let rescheduledBox = document.getElementById("interviewRescheduledCount")
 
     if(totalBox) totalBox.innerText = rows.length
-    if(todayBox) todayBox.innerText = rows.filter(c => c.dateValue === new Date().toISOString().slice(0,10)).length
+    let todayDateValue = localDateKey()
+    if(todayBox) todayBox.innerText = rows.filter(c => c.dateValue === todayDateValue).length
     if(pendingBox) pendingBox.innerText = rows.filter(c => c.status === "Pending").length
     if(completedBox) completedBox.innerText = rows.filter(c => c.status === "Completed").length
     if(rescheduledBox) rescheduledBox.innerText = rows.filter(c => c.status === "Rescheduled").length
@@ -9439,7 +9447,7 @@ function renderInterviewDashboard(){
     })
     currentFilteredInterviewRows = filtered
 
-    let todayRows = filtered.filter(c => c.dateValue === new Date().toISOString().slice(0,10))
+    let todayRows = filtered.filter(c => c.dateValue === todayDateValue)
     let scheduledRows = filtered.filter(c => c.status === "Scheduled")
     let pendingRows = filtered.filter(c => c.status === "Pending")
     let completedRows = filtered.filter(c => c.status === "Completed")
