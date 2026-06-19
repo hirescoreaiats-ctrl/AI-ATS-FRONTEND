@@ -9093,7 +9093,13 @@ async function moveCandidateToInterviewScheduling(candidateId, jobId, hasTestRes
             })
         })
 
-        let data = await res.json()
+        let responseText = await res.text()
+        let data = {}
+        try{
+            data = responseText ? JSON.parse(responseText) : {}
+        }catch(parseError){
+            data = {detail: responseText || `Server returned HTTP ${res.status}`}
+        }
         if(!res.ok || data.error){
             alert("Could not move candidate: " + (data.detail || data.error || "Please try again"))
             return
