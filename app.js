@@ -1324,7 +1324,15 @@ try{
         })
     })
     let data = await res.json().catch(()=>({}))
-    if(!res.ok || data.error){
+    if(res.status === 404){
+        data = {
+            from_email: HIRE_SCORE_DEFAULT_FROM_EMAIL,
+            from_name: HIRE_SCORE_DEFAULT_FROM_NAME,
+            reply_to: replyTo,
+            sender_name: senderName,
+            active: makeActive
+        }
+    }else if(!res.ok || data.error){
         alert("Sender setup failed: " + (data.detail || data.error || "Backend did not save sender"))
         return
     }
