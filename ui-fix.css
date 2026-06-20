@@ -13557,6 +13557,8 @@ padding:0 0 28px !important;
 .ats-pilot-create-card button:disabled { cursor: wait; opacity: .66; }
 .ats-pilot-result { margin-top: 18px; padding: 15px; border: 1px solid #ccebdc; border-radius: 12px; background: #f5fcf8; }
 .ats-pilot-result strong { display: block; color: #166534; font-size: 12px; }
+.ats-pilot-result.is-error { border-color: #fed7aa; background: #fffaf2; }
+.ats-pilot-result.is-error strong { color: #b45309; }
 .ats-pilot-result label { margin-top: 11px; }
 .ats-pilot-result .is-secondary { border-color: #b9c5d8; background: #fff; color: #334155; }
 .ats-pilot-result small { display: block; margin-top: 9px; color: #718096; font-size: 10px; line-height: 1.45; }

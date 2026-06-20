@@ -1106,9 +1106,16 @@ async function createPilotUser(event){
         let urlInput = document.getElementById("pilotInviteUrl")
         let copyButton = document.getElementById("pilotCopyButton")
         let message = document.getElementById("pilotInviteMessage")
+        let help = document.getElementById("pilotInviteHelp")
         let hasInvite = Boolean(data.signup_url)
         if(result) result.classList.remove("hidden")
+        if(result) result.classList.toggle("is-error", data.email_sent === false)
         if(message) message.innerText = data.message || "Pilot access created"
+        if(help) help.innerText = !hasInvite
+            ? "The existing account now has active pilot access."
+            : data.email_sent === false
+                ? "Email was not delivered. Copy this private link and share it manually, then check the backend email provider configuration."
+                : "Invitation email delivered. You can also copy this private link as a backup."
         if(urlInput){
             urlInput.value = data.signup_url || ""
             urlInput.parentElement?.classList.toggle("hidden", !hasInvite)
