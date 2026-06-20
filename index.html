@@ -20,7 +20,7 @@
 <link rel="stylesheet" href="sidebar.css">
 <link rel="stylesheet" href="createjob.css">
 <link rel="stylesheet" href="Dashbord.css">
-<link rel="stylesheet" href="ui-fix.css?v=shortlist-table-saas-20260619-10">
+<link rel="stylesheet" href="ui-fix.css?v=pilot-access-admin-20260620-11">
 
 </head>
 
@@ -81,6 +81,12 @@ HireScore AI
 <span class="ats-nav-icon" aria-hidden="true">ID</span>
 <span class="nav-text">Interview Dashboard</span>
 <small>Scheduling pipeline</small>
+</button>
+
+<button id="pilotUsersNav" class="nav-btn hidden" onclick="showPage('pilotUsers')">
+<span class="ats-nav-icon" aria-hidden="true">PU</span>
+<span class="nav-text">Pilot Access</span>
+<small>Admin-created pilot users</small>
 </button>
 
 <button class="nav-btn" onclick="navigateToPage('support')">
@@ -2822,6 +2828,47 @@ Message
 </div>
 </div>
 
+<div id="pilotUsersPage" class="hidden ats-pilot-page">
+<section class="ats-pilot-hero">
+<div>
+<span class="ats-page-kicker">Admin Access Control</span>
+<h2>Pilot Users</h2>
+<p>Create controlled pilot invitations without opening unpaid public signup. Only admin accounts can access this workspace.</p>
+</div>
+<span class="ats-pilot-lock">Admin only</span>
+</section>
+
+<section class="ats-pilot-grid">
+<form class="ats-pilot-create-card" onsubmit="createPilotUser(event)">
+<div class="ats-pilot-card-head">
+<div><span>01</span><h3>Create Pilot Invite</h3></div>
+<p>The invited recruiter creates their own password. The invite bypasses payment and expires after 7 days.</p>
+</div>
+<label><span>Pilot user email</span><input id="pilotUserEmail" type="email" required placeholder="recruiter@company.com"></label>
+<button id="pilotCreateButton" type="submit">Create Pilot Access</button>
+<div id="pilotInviteResult" class="ats-pilot-result hidden">
+<strong id="pilotInviteMessage">Pilot invitation created</strong>
+<label><span>Signup link</span><input id="pilotInviteUrl" readonly></label>
+<button id="pilotCopyButton" type="button" class="is-secondary" onclick="copyPilotInvite()">Copy Signup Link</button>
+<small>Share this private link only with the intended pilot user.</small>
+</div>
+</form>
+
+<section class="ats-pilot-list-card">
+<div class="ats-pilot-list-head">
+<div><h3>Pilot Access Registry</h3><p>Active users and pending invitations.</p></div>
+<button onclick="loadPilotUsers()">Refresh</button>
+</div>
+<div class="ats-pilot-table-scroll">
+<table class="ats-pilot-table">
+<thead><tr><th>User</th><th>Access</th><th>Status</th><th>Action</th></tr></thead>
+<tbody id="pilotUsersTable"><tr><td colspan="4">Loading pilot access...</td></tr></tbody>
+</table>
+</div>
+</section>
+</section>
+</div>
+
 <div id="supportPage" class="hidden ats-support-page">
 <section class="ats-support-hero">
 <div>
@@ -2933,7 +2980,7 @@ Message / Issue Description
 <script src="runtime-config.js"></script>
 <script src="config.js"></script>
 <script src="auth.js"></script>
-<script src="app.js?v=ai-recommendation-card-20260619-8"></script>
+<script src="app.js?v=pilot-access-admin-20260620-12"></script>
 
 
 </div>

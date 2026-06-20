@@ -67,13 +67,14 @@ googleBtn.title = "Continue with Google"
 
 let paidNotice = document.getElementById("paidSignupNotice")
 let checkoutBtn = document.getElementById("checkoutBtn")
+let isPilotInvite = (document.getElementById("accessCode")?.value || "").startsWith("pilot_")
 paidAccessConfig.checkoutUrl = data.checkout_url || ""
 paidAccessConfig.salesEmail = data.sales_contact_email || "sales@example.com"
 if(paidNotice){
-paidNotice.classList.toggle("hidden", !data.paid_signup_required)
+paidNotice.classList.toggle("hidden", !data.paid_signup_required && !isPilotInvite)
 }
 if(checkoutBtn){
-checkoutBtn.classList.toggle("hidden", !data.paid_signup_required)
+checkoutBtn.classList.toggle("hidden", !data.paid_signup_required || isPilotInvite)
 checkoutBtn.innerText = "View Plans & Buy Access"
 checkoutBtn.onclick = () => startPaidSignup()
 }
@@ -89,6 +90,24 @@ googleBtn.title = "Continue with Google"
 document.addEventListener("DOMContentLoaded", () => {
 completeOAuthLogin()
 showOAuthErrorFromUrl()
+let inviteParams = new URLSearchParams(window.location.search)
+let inviteCode = inviteParams.get("access_code") || ""
+let invitedEmail = inviteParams.get("email") || ""
+let accessInput = document.getElementById("accessCode")
+let emailInput = document.getElementById("email")
+if(accessInput && inviteCode) accessInput.value = inviteCode
+if(emailInput && invitedEmail) emailInput.value = invitedEmail
+if(inviteCode.startsWith("pilot_")){
+let signupButton = document.getElementById("signupButton")
+let checkoutButton = document.getElementById("checkoutBtn")
+let paidNotice = document.getElementById("paidSignupNotice")
+if(signupButton) signupButton.innerText = "Create Pilot Account"
+if(checkoutButton) checkoutButton.classList.add("hidden")
+if(paidNotice){
+paidNotice.innerText = "Your pilot access invitation is ready. Complete your details to activate the account—no payment is required."
+paidNotice.classList.remove("hidden")
+}
+}
 if(document.getElementById("googleBtn") || document.getElementById("checkoutBtn") || document.getElementById("paidSignupNotice")){
 refreshAuthProviders()
 }

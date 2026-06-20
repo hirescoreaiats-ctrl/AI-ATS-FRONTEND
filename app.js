@@ -794,6 +794,7 @@ shortlistExplanation: "Recruiter",
 communication: "Outreach",
 communicationResults: "Outreach",
 interviewDashboard: "Interview Dashboard",
+pilotUsers: "Pilot Access",
 support: "Support"
 }
 
@@ -903,6 +904,7 @@ let pages=[
 "communicationPage",
 "communicationResultsPage",
 "interviewDashboardPage",
+"pilotUsersPage",
 
 ]
 pages.forEach(id=>{
@@ -937,7 +939,8 @@ document.body.classList.toggle(
 "allJobs",
 "communication",
 "communicationResults",
-"interviewDashboard"
+"interviewDashboard",
+"pilotUsers"
 ].includes(page)
 )
 setActiveNavForPage(page)
@@ -968,6 +971,10 @@ if(page==="communication"){
 
 if(page==="interviewDashboard"){
     loadInterviewDashboard()
+}
+
+if(page === "pilotUsers"){
+    loadPilotUsers()
 }
 
 if(page === "dashboard"){
@@ -1005,6 +1012,135 @@ return {
     "Content-Type": "application/json",
     "Authorization": "Bearer " + localStorage.getItem("token")
 }
+}
+
+async function loadPilotAdminAccess(){
+    let nav = document.getElementById("pilotUsersNav")
+    if(!nav) return
+    try{
+        let res = await fetch(API + "/me", {headers: authHeaders()})
+        let profile = await res.json().catch(()=>({}))
+        let isAdmin = res.ok && ["admin", "super_admin"].includes(profile.role)
+        nav.classList.toggle("hidden", !isAdmin)
+        window.currentAccessProfile = isAdmin ? profile : null
+    }catch(error){
+        nav.classList.add("hidden")
+    }
+}
+
+function pilotStatusBadge(status){
+    let normalized = safeText(status || "pending").toLowerCase()
+    let className = normalized === "active" ? "is-active" : normalized === "inactive" ? "is-inactive" : "is-pending"
+    let label = normalized.replace(/\b\w/g, letter => letter.toUpperCase())
+    return `<span class="ats-pilot-status ${className}">${safeHtml(label)}</span>`
+}
+
+async function loadPilotUsers(){
+    let table = document.getElementById("pilotUsersTable")
+    if(!table) return
+    table.innerHTML = `<tr><td colspan="4" class="ats-pilot-empty">Loading pilot access...</td></tr>`
+    try{
+        let res = await fetch(API + "/admin/pilot-users", {headers: authHeaders()})
+        let data = await res.json().catch(()=>({}))
+        if(!res.ok){
+            table.innerHTML = `<tr><td colspan="4" class="ats-pilot-empty">${safeHtml(data.detail || "Admin access is required")}</td></tr>`
+            return
+        }
+        let users = Array.isArray(data.users) ? data.users : []
+        let invitations = (Array.isArray(data.invitations) ? data.invitations : []).filter(invite => invite.status === "pending")
+        let rows = [
+            ...users.map(user => `
+                <tr>
+                    <td><strong>${safeHtml(user.name || "Pilot Recruiter")}</strong><small>${safeHtml(user.email || "")}</small></td>
+                    <td><span class="ats-pilot-plan">Pilot</span></td>
+                    <td>${pilotStatusBadge(user.status)}</td>
+                    <td>${user.status === "active" ? `<button class="ats-pilot-row-action is-danger" onclick="deactivatePilotUser('${safeJs(user.id)}','${safeJs(user.email || "")}')">Deactivate</button>` : "—"}</td>
+                </tr>
+            `),
+            ...invitations.map(invite => `
+                <tr>
+                    <td><strong>Invitation</strong><small>${safeHtml(invite.email || "")}</small></td>
+                    <td><span class="ats-pilot-plan">7-day invite</span></td>
+                    <td>${pilotStatusBadge(invite.status)}</td>
+                    <td><button class="ats-pilot-row-action" onclick="copyPilotText('${safeJs(invite.signup_url || "")}')">Copy Link</button></td>
+                </tr>
+            `)
+        ]
+        table.innerHTML = rows.length ? rows.join("") : `<tr><td colspan="4" class="ats-pilot-empty">No pilot users or invitations yet.</td></tr>`
+    }catch(error){
+        table.innerHTML = `<tr><td colspan="4" class="ats-pilot-empty">Could not load pilot access.</td></tr>`
+    }
+}
+
+async function createPilotUser(event){
+    event.preventDefault()
+    let emailInput = document.getElementById("pilotUserEmail")
+    let email = safeText(emailInput?.value).trim()
+    let button = document.getElementById("pilotCreateButton")
+    if(!email || !email.includes("@")){
+        alert("Enter a valid pilot user email.")
+        return
+    }
+    setButtonLoading(button, true, "Creating...")
+    try{
+        let res = await fetch(API + "/admin/pilot-users", {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({email})
+        })
+        let data = await res.json().catch(()=>({}))
+        if(!res.ok){
+            alert("Pilot access failed: " + (data.detail || "Please try again"))
+            return
+        }
+        let result = document.getElementById("pilotInviteResult")
+        let urlInput = document.getElementById("pilotInviteUrl")
+        let copyButton = document.getElementById("pilotCopyButton")
+        let message = document.getElementById("pilotInviteMessage")
+        let hasInvite = Boolean(data.signup_url)
+        if(result) result.classList.remove("hidden")
+        if(message) message.innerText = data.message || "Pilot access created"
+        if(urlInput){
+            urlInput.value = data.signup_url || ""
+            urlInput.parentElement?.classList.toggle("hidden", !hasInvite)
+        }
+        if(copyButton) copyButton.classList.toggle("hidden", !hasInvite)
+        if(emailInput) emailInput.value = ""
+        await loadPilotUsers()
+    }catch(error){
+        alert("Could not create pilot access.")
+    }finally{
+        setButtonLoading(button, false)
+    }
+}
+
+async function copyPilotText(value){
+    if(!value) return
+    try{
+        await navigator.clipboard.writeText(value)
+        alert("Pilot signup link copied.")
+    }catch(error){
+        prompt("Copy this pilot signup link", value)
+    }
+}
+
+function copyPilotInvite(){
+    copyPilotText(document.getElementById("pilotInviteUrl")?.value || "")
+}
+
+async function deactivatePilotUser(userId, email){
+    if(!confirm(`Deactivate pilot access for ${email || "this user"}?`)) return
+    try{
+        let res = await fetch(API + `/admin/pilot-users/${encodeURIComponent(userId)}/deactivate`, {method:"POST", headers:authHeaders()})
+        let data = await res.json().catch(()=>({}))
+        if(!res.ok){
+            alert("Could not deactivate pilot user: " + (data.detail || "Please try again"))
+            return
+        }
+        await loadPilotUsers()
+    }catch(error){
+        alert("Could not deactivate pilot user.")
+    }
 }
 
 function getRecruiterEmailFromSession(){
@@ -6564,6 +6700,7 @@ if(profile){
 }
 updateGmailConnectStatus()
 restoreBulkSessionFromStorage()
+loadPilotAdminAccess()
 }
 
 function connectGmailForOutreach(){
