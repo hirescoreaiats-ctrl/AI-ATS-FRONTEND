@@ -881,6 +881,10 @@ showPage(pageForCurrentPath())
 
 function showPage(page){
 
+if(page === "pilotUsers" && !["admin", "super_admin"].includes(window.currentAccessProfile?.role)){
+return
+}
+
 // hide pages
 let pages=[
 "dashboardPage",
@@ -1022,9 +1026,14 @@ async function loadPilotAdminAccess(){
         let profile = await res.json().catch(()=>({}))
         let isAdmin = res.ok && ["admin", "super_admin"].includes(profile.role)
         nav.classList.toggle("hidden", !isAdmin)
+        nav.hidden = !isAdmin
+        nav.setAttribute("aria-hidden", String(!isAdmin))
         window.currentAccessProfile = isAdmin ? profile : null
     }catch(error){
         nav.classList.add("hidden")
+        nav.hidden = true
+        nav.setAttribute("aria-hidden", "true")
+        window.currentAccessProfile = null
     }
 }
 
