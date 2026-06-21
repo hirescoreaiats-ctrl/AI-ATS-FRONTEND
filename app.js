@@ -884,6 +884,9 @@ function showPage(page){
 if(page === "pilotUsers" && !["admin", "super_admin"].includes(window.currentAccessProfile?.role)){
 return
 }
+if(page !== "jobResult" && typeof stopJobResultLiveRefresh === "function"){
+stopJobResultLiveRefresh()
+}
 
 // hide pages
 let pages=[
@@ -2433,9 +2436,48 @@ container.innerHTML += createRecruiterJobCard(job)
 // ---------------- OPEN JOB RESULT PAGE ----------------
 // ---------------- OPEN JOB RESULT PAGE ----------------
 
+let jobResultRefreshTimer = null
+
+function stopJobResultLiveRefresh(){
+if(jobResultRefreshTimer){
+clearTimeout(jobResultRefreshTimer)
+jobResultRefreshTimer = null
+}
+}
+
+function renderJobResultProcessing(progress){
+let banner = document.getElementById("jobResultProcessing")
+if(!banner) return
+let pending = Number(progress?.pending || 0)
+let processing = Number(progress?.processing || 0)
+let total = Number(progress?.total || 0)
+let done = Number(progress?.done ?? (Number(progress?.completed || 0) + Number(progress?.failed || 0)))
+let percent = Number(progress?.percent || 0)
+let active = pending + processing > 0
+banner.classList.toggle("hidden", !active)
+if(!active){
+banner.innerHTML = ""
+return
+}
+banner.innerHTML = `
+<div><span class="ats-live-dot"></span><strong>AI screening in progress</strong><small>${safeHtml(done)} of ${safeHtml(total)} candidate${total === 1 ? "" : "s"} processed. Results refresh automatically.</small></div>
+<span>${safeHtml(percent)}%</span>
+<i style="--result-progress:${Math.max(3, Math.min(100, percent))}%"></i>`
+}
+
+function scheduleJobResultLiveRefresh(jobId, progress){
+stopJobResultLiveRefresh()
+let active = Number(progress?.pending || 0) + Number(progress?.processing || 0) > 0
+if(!active || String(window.currentJobId || "") !== String(jobId || "")) return
+jobResultRefreshTimer = setTimeout(()=>{
+loadResults(jobId, {silent:true})
+}, 3000)
+}
+
 function openJobResult(jobId, jobTitle){
 
 showPage("jobResult")
+stopJobResultLiveRefresh()
 window.currentJobId = jobId
 window.currentJobTitle = jobTitle
 
@@ -2453,7 +2495,7 @@ loadResults(jobId)
 // ---------------- LOAD RESULTS ----------------
 
 
-async function loadResults(jobId){
+async function loadResults(jobId, options={}){
 
 if(!jobId){
 jobId=document.getElementById("jobIdResults").value
@@ -2464,40 +2506,60 @@ alert("Enter Job ID")
 return
 }
 
-let res = await fetch(API+"/results/"+jobId)
-let data = await res.json()
-
 let table=document.getElementById("resultsTable")
 if(!table) return
+
+if(!options.silent){
+table.innerHTML=`<tr><td colspan="18" class="ats-result-loading-cell"><span></span>Loading candidate results...</td></tr>`
+let totalEl = document.getElementById("stat_total_app")
+let avgEl = document.getElementById("stat_avg_score")
+let topEl = document.getElementById("stat_top_score")
+let shortlistEl = document.getElementById("stat_shortlisted_count")
+if(totalEl) totalEl.innerText = "..."
+if(avgEl) avgEl.innerText = "..."
+if(topEl) topEl.innerText = "..."
+if(shortlistEl) shortlistEl.innerText = "..."
+}
+
+let res
+let data
+try{
+res = await fetch(API+"/results/"+encodeURIComponent(jobId), {headers:authHeaders()})
+data = await res.json().catch(()=>({}))
+if(!res.ok || data.error) throw new Error(data.detail || data.error || "Could not load candidate results")
+}catch(error){
+if(!options.silent){
+table.innerHTML=`<tr><td colspan="18" class="ats-result-loading-cell is-error">${safeHtml(error.message || "Could not load candidate results")}</td></tr>`
+stopJobResultLiveRefresh()
+}else if(String(window.currentJobId || "") === String(jobId || "")){
+stopJobResultLiveRefresh()
+jobResultRefreshTimer = setTimeout(()=>loadResults(jobId, {silent:true}), 5000)
+}
+return
+}
+
+if(String(window.currentJobId || "") !== String(jobId || "")) return
 
 table.innerHTML=""
 
 let results = Array.isArray(data) ? data : data.results || []
+let progress = data.processing || {
+total: results.length,
+pending: results.filter(candidate => safeText(candidate.processing_status).toLowerCase() === "pending").length,
+processing: results.filter(candidate => safeText(candidate.processing_status).toLowerCase() === "processing").length,
+completed: results.filter(candidate => safeText(candidate.processing_status).toLowerCase() === "completed").length,
+failed: results.filter(candidate => safeText(candidate.processing_status).toLowerCase() === "failed").length,
+}
+progress.done = Number(progress.done ?? (Number(progress.completed || 0) + Number(progress.failed || 0)))
+progress.percent = Number(progress.percent ?? (progress.total ? Math.round((progress.done / progress.total) * 100) : 0))
+renderJobResultProcessing(progress)
 
 // * YAHI ADD KARNA HAI (START)
 
-let jdSkills = []
-
-try{
-    let jobRes = await fetch(API + "/jobs", {
-    headers: {
-        "Authorization": "Bearer " + localStorage.getItem("token")
-    }
-})
-    let jobs = await jobRes.json()
-
-    let currentJob = Array.isArray(jobs)
-        ? jobs.find(j => String(j.id) === String(jobId))
-        : null
-
-    if(currentJob){
-        jdSkills = normalizeScreeningSkills(
-            currentJob.required_skills || [],
-            currentJob.jd_text || ""
-        )
-    }
-}catch(err){
-}
+let jdSkills = normalizeScreeningSkills(
+    data.job?.required_skills || [],
+    data.job?.jd_text || ""
+)
 
 // fallback (agar JD fail ho)
 if(jdSkills.length === 0){
@@ -2524,38 +2586,37 @@ renderSkillDropdown()
 
 currentResults = results
 
-
-
-
-
-currentResults = results
-
 let totalApplicants = results.length
 
 let totalScore = 0
 let topScore = 0
 let shortlistedCount = 0
 
+let scoredApplicants = results.filter(candidate => !["pending", "processing"].includes(safeText(candidate.processing_status).toLowerCase()))
+
+scoredApplicants.forEach(r=>{
+totalScore += Number(r.final_score || 0)
+topScore = Math.max(topScore, Number(r.final_score || 0))
+})
 results.forEach(r=>{
-totalScore += r.final_score || 0
-topScore = Math.max(topScore, r.final_score || 0)
 if(safeText(getDisplayStatus(r)).toLowerCase().includes("shortlist")){
 shortlistedCount++
 }
 })
 
-let avgScore = totalApplicants ? (totalScore / totalApplicants).toFixed(1) : 0
+let avgScore = scoredApplicants.length ? (totalScore / scoredApplicants.length).toFixed(1) : (Number(progress.pending || 0) + Number(progress.processing || 0) > 0 ? "..." : 0)
 
 document.getElementById("stat_total_app").innerText = totalApplicants
 document.getElementById("stat_avg_score").innerText = avgScore
 let topScoreEl = document.getElementById("stat_top_score")
 let shortlistedEl = document.getElementById("stat_shortlisted_count")
-if(topScoreEl) topScoreEl.innerText = topScore
+if(topScoreEl) topScoreEl.innerText = scoredApplicants.length ? topScore : (Number(progress.pending || 0) + Number(progress.processing || 0) > 0 ? "..." : 0)
 if(shortlistedEl) shortlistedEl.innerText = shortlistedCount
 
 results.forEach((c,index)=>{
 let profileId = registerCandidateProfile(c)
 let searchText = candidateResultSearchText(c)
+let candidateIsProcessing = ["pending", "processing"].includes(safeText(c.processing_status).toLowerCase())
 
 table.innerHTML += `
 
@@ -2593,7 +2654,7 @@ ${candidateProfileNameButton(c, "ats-candidate-name-link ats-result-name-link")}
 <td class="hidden">${formatEducation(c.education)}</td>
 
 <td><span class="ats-result-status ${getStatusClass(getDisplayStatus(c))}">${getDisplayStatus(c)}</span></td> 
-<td><span class="score-badge">${formatScore(c.final_score)}</span></td>
+<td>${candidateIsProcessing ? `<span class="ats-score-processing"><i></i>Processing</span>` : `<span class="score-badge">${formatScore(c.final_score)}</span>`}</td>
 <td class="hidden">
 <button onclick="openResumeDownload('${safeJs(c.resume_id)}')"
 class="ats-result-row-action ats-result-row-download ${c.resume_available ? "" : "is-unlinked"}"
@@ -2620,6 +2681,12 @@ Delete
 
 `
 })
+
+if(results.length === 0){
+table.innerHTML = `<tr><td colspan="18" class="ats-result-loading-cell">No candidate applications yet.</td></tr>`
+}
+
+scheduleJobResultLiveRefresh(jobId, progress)
 
 }
 

@@ -13604,3 +13604,39 @@ padding:0 0 28px !important;
     .ats-pilot-hero { flex-direction: column; padding: 21px; }
     .ats-pilot-hero h2 { font-size: 26px; }
 }
+
+/* Live candidate result processing */
+.ats-result-processing {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin: 0 20px 16px;
+    padding: 13px 15px 16px;
+    overflow: hidden;
+    border: 1px solid #cddafe;
+    border-radius: 11px;
+    background: #f5f8ff;
+    color: #243554;
+}
+.ats-result-processing.hidden { display: none !important; }
+.ats-result-processing > div { display: grid; grid-template-columns: auto auto; align-items: center; gap: 3px 8px; }
+.ats-result-processing strong { font-size: 12px; }
+.ats-result-processing small { grid-column: 2; color: #687892; font-size: 10px; }
+.ats-result-processing > span { color: #315bea; font-size: 12px; font-weight: 800; }
+.ats-result-processing > i { position: absolute; right: 0; bottom: 0; left: 0; height: 3px; background: #e0e7ff; }
+.ats-result-processing > i::after { display: block; width: var(--result-progress); height: 100%; border-radius: 99px; background: linear-gradient(90deg, #315bea, #6d5dfc); transition: width .35s ease; content: ""; }
+.ats-live-dot { grid-row: 1 / span 2; width: 9px; height: 9px; border-radius: 50%; background: #315bea; box-shadow: 0 0 0 5px rgba(49,91,234,.12); animation: ats-live-pulse 1.4s ease-in-out infinite; }
+.ats-result-loading-cell { height: 170px; color: #6f7e94 !important; font-size: 12px; text-align: center !important; }
+.ats-result-loading-cell > span { display: inline-block; width: 13px; height: 13px; margin-right: 8px; border: 2px solid #cbd5e1; border-top-color: #315bea; border-radius: 50%; vertical-align: -2px; animation: ats-result-spin .75s linear infinite; }
+.ats-result-loading-cell.is-error { color: #b42318 !important; }
+.ats-score-processing { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 999px; background: #eef3ff; color: #315bea; font-size: 10px; font-weight: 800; white-space: nowrap; }
+.ats-score-processing i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: ats-live-pulse 1.4s ease-in-out infinite; }
+@keyframes ats-result-spin { to { transform: rotate(360deg); } }
+@keyframes ats-live-pulse { 50% { opacity: .4; transform: scale(.82); } }
+
+@media (max-width: 680px) {
+    .ats-result-processing { align-items: flex-start; margin: 0 12px 14px; }
+    .ats-result-processing small { max-width: 230px; }
+}
