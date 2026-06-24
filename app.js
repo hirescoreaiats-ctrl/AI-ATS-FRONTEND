@@ -198,6 +198,18 @@ return text
 .filter(Boolean)
 }
 
+function normalizeMixedList(value){
+if(!value) return []
+if(Array.isArray(value)) return value.filter(item => item !== null && item !== undefined && safeText(typeof item === "object" ? JSON.stringify(item) : item).trim())
+let text = safeText(value).trim()
+if(!text) return []
+try{
+let parsed = JSON.parse(text)
+if(Array.isArray(parsed)) return parsed.filter(item => item !== null && item !== undefined)
+}catch{}
+return normalizeList(value)
+}
+
 function uniqueCleanList(values){
 let seen = new Set()
 let output = [];
@@ -367,6 +379,12 @@ window.__rankedCandidateProfileClickBound = true
 
 function scoreBand(score, candidate={}){
 let value = Number(score) || 0
+let decision = safeText(candidate.shortlist_decision || "").toLowerCase()
+if(decision === "strong match") return {label:"Strong Match", className:"is-strong"}
+if(decision === "good match") return {label:"Good Match", className:"is-good"}
+if(decision === "maybe") return {label:"Maybe", className:"is-review"}
+if(decision === "needs review") return {label:"Needs Review", className:"is-review"}
+if(decision === "reject") return {label:"Reject", className:"is-low"}
 let status = safeText(candidate.status || candidate.current_stage || "").toLowerCase()
 let reason = safeText(candidate.ranking_reason || candidate.ai_confidence_reason || candidate.explanation || "").toLowerCase()
 let flags = normalizeList(candidate.recruiter_flags || candidate.parser_flags || candidate.risk_points || []).join(" ").toLowerCase()
@@ -389,6 +407,68 @@ if(value >= 85 && status.includes("shortlist")) return {label:"Strong fit", clas
 if(value >= 75) return {label:"Good match", className:"is-good"}
 if(value >= 60) return {label:"Review required", className:"is-review"}
 return {label:"Low match", className:"is-low"}
+}
+
+function candidateInsightItems(candidate, limit=5){
+let items = []
+if(candidate?.stale_score) items.push({label:"Score outdated - JD changed", className:"is-stale"})
+normalizeList(candidate?.missing_critical_skills).slice(0,2).forEach(skill => items.push({label:`Missing critical: ${skill}`, className:"is-risk"}))
+normalizeList(candidate?.missing_core_skill_groups).slice(0,2).forEach(group => items.push({label:`Missing core: ${group}`, className:"is-risk"}))
+normalizeMixedList(candidate?.score_caps_applied).slice(0,2).forEach(cap => {
+let reason = typeof cap === "string" ? cap : safeText(cap?.reason || "")
+if(reason) items.push({label:`Cap: ${shortText(reason, 54)}`, className:"is-cap"})
+})
+let parserAction = safeText(candidate?.parser_quality_action || "").replace(/_/g," ")
+if(parserAction && parserAction !== "auto rank ok") items.push({label:`Parser: ${parserAction}`, className:"is-parser"})
+let confidence = Number(candidate?.parser_confidence ?? candidate?.parser_quality_score)
+if(Number.isFinite(confidence) && confidence < 65) items.push({label:`Parser confidence ${Math.round(confidence)}%`, className:"is-parser"})
+return items.slice(0, limit)
+}
+
+function candidateInsightBadges(candidate, limit=5){
+let items = candidateInsightItems(candidate, limit)
+if(!items.length) return ""
+return `<div class="ats-result-insight-badges">${items.map(item=>`<span class="${safeHtml(item.className)}">${safeHtml(item.label)}</span>`).join("")}</div>`
+}
+
+function renderRecruiterEvidencePanel(candidate){
+let strengths = normalizeList(candidate?.strengths)
+let concerns = normalizeList(candidate?.concerns)
+let flags = normalizeList(candidate?.risk_flags || candidate?.recruiter_flags)
+let caps = normalizeMixedList(candidate?.score_caps_applied).map(item => typeof item === "string" ? item : safeText(item?.reason || item?.cap_reason || "Score cap applied")).filter(Boolean)
+let warnings = normalizeMixedList(candidate?.parser_warnings || candidate?.parser_quality_flags).map(item => typeof item === "string" ? item : safeText(item?.message || item?.code || "")).filter(Boolean)
+let missingCritical = normalizeList(candidate?.missing_critical_skills)
+let missingCore = normalizeList(candidate?.missing_core_skill_groups)
+let decision = safeText(candidate?.shortlist_decision || "Review")
+let reason = safeText(candidate?.decision_reason || candidate?.ranking_reason || "Review candidate evidence before moving forward.")
+let parserConfidence = Number(candidate?.parser_confidence ?? candidate?.parser_quality_score)
+let parserLabel = Number.isFinite(parserConfidence) ? `${Math.round(parserConfidence)}%` : "Not available"
+
+return `
+<div class="ats-candidate-panel ats-recruiter-visibility-panel">
+<div class="ats-panel-title-row">
+<div>
+<h4>Recruiter Visibility</h4>
+<p>Decision, caps, parser trust, and missing role-critical evidence.</p>
+</div>
+<span>${safeHtml(decision)}</span>
+</div>
+<p class="ats-recruiter-decision-reason">${safeHtml(reason)}</p>
+<div class="ats-candidate-detail-grid">
+${topCandidateDetail("Parser Confidence", parserLabel)}
+${topCandidateDetail("AI Parse Status", safeText(candidate?.ai_parse_status || "Not recorded").replace(/_/g," "))}
+${topCandidateDetail("Fit Band", safeText(candidate?.fit_band || "Review").replace(/_/g," "))}
+${topCandidateDetail("Rank Reason", shortText(candidate?.ranking_reason || "", 80))}
+</div>
+${candidateInsightBadges(candidate, 8)}
+<div class="ats-recruiter-signal-grid">
+<article><strong>Strengths</strong><ul>${(strengths.length ? strengths : ["No strengths stored yet."]).slice(0,5).map(item=>`<li>${safeHtml(item)}</li>`).join("")}</ul></article>
+<article><strong>Concerns</strong><ul>${(concerns.length ? concerns : ["No major concerns stored."]).slice(0,6).map(item=>`<li>${safeHtml(item)}</li>`).join("")}</ul></article>
+<article><strong>Missing Critical/Core</strong><ul>${[...missingCritical.map(item=>`Critical: ${item}`), ...missingCore.map(item=>`Core: ${item}`)].slice(0,6).map(item=>`<li>${safeHtml(item)}</li>`).join("") || "<li>No critical gaps stored.</li>"}</ul></article>
+<article><strong>Caps & Parser Warnings</strong><ul>${[...caps, ...warnings, ...flags.map(item=>`Flag: ${item}`)].slice(0,7).map(item=>`<li>${safeHtml(item)}</li>`).join("") || "<li>No caps or parser warnings stored.</li>"}</ul></article>
+</div>
+</div>
+`
 }
 
 function topCandidateDetail(label, value){
@@ -2474,6 +2554,61 @@ loadResults(jobId, {silent:true})
 }, 3000)
 }
 
+function renderRescoreBanner(jobId, results=[]){
+let banner = document.getElementById("jobResultRescoreBanner")
+if(!banner) return
+let staleCount = (results || []).filter(candidate => candidate && candidate.stale_score).length
+if(!staleCount){
+banner.classList.add("hidden")
+banner.innerHTML = ""
+return
+}
+banner.classList.remove("hidden")
+banner.innerHTML = `
+<div>
+<strong>Score outdated - JD changed</strong>
+<span>${safeHtml(staleCount)} candidate score${staleCount === 1 ? "" : "s"} should be refreshed against the latest JD.</span>
+</div>
+<button type="button" onclick="rescoreJobCandidates('${safeJs(jobId)}')">Re-score candidates</button>
+`
+}
+
+async function rescoreJobCandidates(jobId){
+if(!jobId) jobId = window.currentJobId || ""
+if(!jobId){
+alert("Open a job result first.")
+return
+}
+let banner = document.getElementById("jobResultRescoreBanner")
+let oldHtml = banner ? banner.innerHTML : ""
+if(banner){
+banner.classList.remove("hidden")
+banner.innerHTML = `<div><strong>Re-scoring candidates...</strong><span>Refreshing scores against the latest JD.</span></div>`
+}
+try{
+let res = await fetch(API + "/jobs/" + encodeURIComponent(jobId) + "/rescore", {
+method:"POST",
+headers:authHeaders()
+})
+let data = await res.json().catch(()=>({}))
+if(!res.ok || data.error){
+throw new Error(data.detail || data.error || "Could not re-score candidates")
+}
+if(banner){
+banner.innerHTML = `<div><strong>Re-score complete</strong><span>${safeHtml(data.rescored || 0)} refreshed, ${safeHtml(data.failed || 0)} failed.</span></div>`
+}
+await loadResults(jobId)
+if(data.failed){
+alert(`Re-score completed with ${data.failed} failure(s). Check candidate rows for review flags.`)
+}
+}catch(error){
+if(banner){
+banner.innerHTML = oldHtml || `<div><strong>Re-score failed</strong><span>${safeHtml(error.message || "Could not re-score candidates.")}</span></div>`
+}
+alert(error.message || "Could not re-score candidates.")
+}
+}
+
 function openJobResult(jobId, jobTitle){
 
 showPage("jobResult")
@@ -2553,6 +2688,7 @@ failed: results.filter(candidate => safeText(candidate.processing_status).toLowe
 progress.done = Number(progress.done ?? (Number(progress.completed || 0) + Number(progress.failed || 0)))
 progress.percent = Number(progress.percent ?? (progress.total ? Math.round((progress.done / progress.total) * 100) : 0))
 renderJobResultProcessing(progress)
+renderRescoreBanner(jobId, results)
 
 // * YAHI ADD KARNA HAI (START)
 
@@ -2629,6 +2765,7 @@ table.innerHTML += `
 <span>
 ${candidateProfileNameButton(c, "ats-candidate-name-link ats-result-name-link")}
 <small>${safeHtml(c.email || "No email available")}</small>
+${candidateInsightBadges(c, 3)}
 </span>
 </td>
 
@@ -4437,7 +4574,26 @@ tags: candidate.tags || [],
 projects: candidate.projects || [],
 resume_available: candidate.resume_available,
 resume_original_filename: candidate.resume_original_filename || "",
-resume_content_type: candidate.resume_content_type || ""
+resume_content_type: candidate.resume_content_type || "",
+stale_score: Boolean(candidate.stale_score),
+shortlist_decision: candidate.shortlist_decision || "",
+decision_reason: candidate.decision_reason || "",
+recruiter_explanation: candidate.recruiter_explanation || "",
+strengths: candidate.strengths || [],
+concerns: candidate.concerns || [],
+score_breakdown: candidate.score_breakdown || candidate.scoring_breakdown || {},
+scoring_breakdown: candidate.scoring_breakdown || candidate.score_breakdown || {},
+risk_flags: candidate.risk_flags || [],
+recruiter_flags: candidate.recruiter_flags || [],
+score_caps_applied: candidate.score_caps_applied || candidate.applied_caps || [],
+missing_core_skill_groups: candidate.missing_core_skill_groups || [],
+missing_critical_skills: candidate.missing_critical_skills || [],
+matched_critical_skills: candidate.matched_critical_skills || [],
+parser_quality_action: candidate.parser_quality_action || "",
+parser_confidence: candidate.parser_confidence ?? candidate.parser_quality_score ?? "",
+parser_warnings: candidate.parser_warnings || candidate.parser_quality_flags || [],
+ai_parse_status: candidate.ai_parse_status || "",
+cap_reason: candidate.cap_reason || ""
 }
 }
 
@@ -4611,6 +4767,8 @@ ${candidateQaActions(candidate, candidateId, showReparse)}
 </div>
 
 ${topCandidateSkillCoverage(candidate)}
+
+${renderRecruiterEvidencePanel(candidate)}
 
 <div class="ats-candidate-panel">
 <div class="ats-panel-title-row">
@@ -8958,7 +9116,10 @@ function getDisplayStatus(c){
   if(processingStatus === "pending") return "Pending Processing"
   if(processingStatus === "processing") return "Processing"
   if(processingStatus === "failed") return "Failed"
-  if(processingStatus === "completed" && !["shortlisted","rejected","communication"].includes(safeText(c.stage).toLowerCase())) return "Scored"
+  if(processingStatus === "completed" && !["shortlisted","rejected","communication"].includes(safeText(c.stage).toLowerCase())){
+      if(c.shortlist_decision) return c.shortlist_decision
+      return "Scored"
+  }
 
   // target STAGE FIRST
 
@@ -8987,6 +9148,10 @@ function getStatusClass(status){
   if(normalized.includes("pending_processing")) return "is-pending"
   if(normalized.includes("processing")) return "is-processing"
   if(normalized.includes("scored")) return "is-scored"
+  if(normalized.includes("strong_match")) return "is-shortlisted"
+  if(normalized.includes("good_match")) return "is-shortlisted"
+  if(normalized.includes("maybe")) return "is-review"
+  if(normalized.includes("needs_review")) return "is-review"
   if(normalized.includes("failed")) return "is-failed"
   if(normalized.includes("communication")) return "is-communication"
   if(normalized.includes("shortlist")) return "is-shortlisted"
