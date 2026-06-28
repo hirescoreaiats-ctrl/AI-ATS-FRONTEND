@@ -5749,63 +5749,57 @@ alert("Apply link copied")
 
 }
 
-async function loadDashboard(force=false){
-let now = Date.now()
-if(dashboardLoadPromise) return dashboardLoadPromise
-if(!force && now - lastDashboardLoadAt < 1500) return Promise.resolve()
-
-let table = document.getElementById("dashboardJobTable")
-if(table && !dashboardJobs.length && !table.children.length){
-table.innerHTML = `
-<tr>
-<td colspan="5" class="p-4 text-center text-gray-500">Loading jobs...</td>
-</tr>
-`
+function dashboardJobCompany(job){
+return safeText(job?.company_name || job?.company || "Company not specified").trim() || "Company not specified"
 }
 
-dashboardLoadPromise = (async()=>{
-lastDashboardLoadAt = Date.now()
-let res = await fetch(API + "/jobs", {
-    headers: authHeaders()
+function selectedDashboardCompany(){
+return safeText(document.getElementById("dashboardCompanyFilter")?.value || "").trim()
+}
+
+function populateDashboardCompanyFilter(jobs){
+let select = document.getElementById("dashboardCompanyFilter")
+if(!select) return
+let current = selectedDashboardCompany()
+let companies = [...new Set((Array.isArray(jobs) ? jobs : [])
+.filter(job => job.is_active !== false)
+.map(dashboardJobCompany)
+.filter(Boolean))]
+.sort((a,b)=>a.localeCompare(b))
+select.innerHTML = `<option value="">All companies</option>` + companies.map(company => `
+<option value="${safeHtml(company)}"${company === current ? " selected" : ""}>${safeHtml(company)}</option>
+`).join("")
+if(current && !companies.includes(current)) select.value = ""
+}
+
+function filteredDashboardJobs(){
+let company = selectedDashboardCompany().toLowerCase()
+return dashboardJobs.filter(job => {
+if(job.is_active === false) return false
+if(!company) return true
+return dashboardJobCompany(job).toLowerCase() === company
 })
-let jobs = await res.json()
+}
 
-dashboardJobs = Array.isArray(jobs) ? jobs : []
-
-document.getElementById("dash_active_jobs").innerText =
-dashboardJobs.filter(j => j.is_active !== false).length
-
-let totalApplicants = 0
-let topScore = 0
-let totalScore = 0
-let scoreCount = 0
-
+function renderDashboardJobTable(){
+let table = document.getElementById("dashboardJobTable")
 if(!table) return
 
-table.innerHTML=""
-
-let activeJobs = dashboardJobs.filter(job => job.is_active !== false)
+let activeJobs = filteredDashboardJobs()
+table.innerHTML = ""
 
 if(activeJobs.length === 0){
+let message = selectedDashboardCompany() ? "No active jobs for this company" : "No active jobs yet"
 table.innerHTML = `
 <tr>
-<td colspan="5" class="p-4 text-center text-gray-500">No active jobs yet</td>
+<td colspan="5" class="p-4 text-center text-gray-500">${safeHtml(message)}</td>
 </tr>
 `
+return
 }
 
 activeJobs.forEach(job=>{
-
-totalApplicants += job.total_applicants || 0
-
-if(job.top_score > topScore){
-topScore = job.top_score
-}
-
-totalScore += job.top_score || 0
-scoreCount++
-
-let companyName = safeText(job.company_name || job.company || "Company not specified").trim() || "Company not specified"
+let companyName = dashboardJobCompany(job)
 
 table.innerHTML += `
 
@@ -5892,13 +5886,35 @@ Deactivate
 `
 
 })
+}
 
-document.getElementById("dash_total_applicants").innerText = totalApplicants
-document.getElementById("dash_top_score").innerText = topScore
+async function loadDashboard(force=false){
+let now = Date.now()
+if(dashboardLoadPromise) return dashboardLoadPromise
+if(!force && now - lastDashboardLoadAt < 1500) return Promise.resolve()
 
-let avg = scoreCount ? Math.round(totalScore/scoreCount) : 0
-document.getElementById("dash_avg_score").innerText = avg
+let table = document.getElementById("dashboardJobTable")
+if(table && !dashboardJobs.length && !table.children.length){
+table.innerHTML = `
+<tr>
+<td colspan="5" class="p-4 text-center text-gray-500">Loading jobs...</td>
+</tr>
+`
+}
 
+dashboardLoadPromise = (async()=>{
+lastDashboardLoadAt = Date.now()
+let res = await fetch(API + "/jobs", {
+    headers: authHeaders()
+})
+let jobs = await res.json()
+
+dashboardJobs = Array.isArray(jobs) ? jobs : []
+
+if(!table) return
+
+populateDashboardCompanyFilter(dashboardJobs)
+renderDashboardJobTable()
 updateDashboardCards()
 
 loadTopCandidate()
@@ -5947,11 +5963,12 @@ let checkboxes = document.querySelectorAll(".jobFilterCheckbox:checked")
 let selectedIds = [...checkboxes].map(c=>c.value)
 
 let jobsToCalculate=[]
+let baseJobs = filteredDashboardJobs()
 
 if(selectedIds.length===0){
-jobsToCalculate = dashboardJobs.filter(j => j.is_active !== false)
+jobsToCalculate = baseJobs
 }else{
-jobsToCalculate = dashboardJobs.filter(j=>j.is_active !== false && selectedIds.includes(j.id))
+jobsToCalculate = baseJobs.filter(j=>selectedIds.includes(String(j.id)))
 }
 
 let totalApplicants=0
@@ -5974,6 +5991,7 @@ count++
 
 let avg = count ? Math.round(totalScore/count) : 0
 
+document.getElementById("dash_active_jobs").innerText = jobsToCalculate.length
 document.getElementById("dash_total_applicants").innerText = totalApplicants
 document.getElementById("dash_top_score").innerText = topScore
 document.getElementById("dash_avg_score").innerText = avg

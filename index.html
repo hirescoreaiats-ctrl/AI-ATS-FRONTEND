@@ -20,7 +20,7 @@
 <link rel="stylesheet" href="sidebar.css">
 <link rel="stylesheet" href="createjob.css">
 <link rel="stylesheet" href="Dashbord.css">
-<link rel="stylesheet" href="ui-fix.css?v=dashboard-company-20260628-01">
+<link rel="stylesheet" href="ui-fix.css?v=dashboard-company-filter-20260628-02">
 
 </head>
 
@@ -286,6 +286,12 @@ No source data yet. Share tracked apply links to start tracking candidate source
 <h3>Job Management</h3>
 <p>Open candidate results, review top candidates, and manage active job status.</p>
 </div>
+<label class="ats-dashboard-company-filter">
+<span>Company</span>
+<select id="dashboardCompanyFilter" onchange="renderDashboardJobTable(); updateDashboardCards()">
+<option value="">All companies</option>
+</select>
+</label>
 </div>
 
 <div class="dashboard-table-scroll dashboard-table-fixed">
@@ -2983,7 +2989,7 @@ Message / Issue Description
 <script src="runtime-config.js"></script>
 <script src="config.js"></script>
 <script src="auth.js"></script>
-<script src="app.js?v=dashboard-company-20260628-01"></script>
+<script src="app.js?v=dashboard-company-filter-20260628-02"></script>
 
 
 </div>
