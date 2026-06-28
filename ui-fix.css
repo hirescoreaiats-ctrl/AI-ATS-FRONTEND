@@ -7185,6 +7185,49 @@ color:#64748b;
 margin:4px 0 0;
 }
 
+.ats-dashboard-company-filter{
+display:grid;
+gap:6px;
+min-width:190px;
+}
+
+.ats-dashboard-company-filter span{
+font-size:10px;
+font-weight:950;
+letter-spacing:.08em;
+text-transform:uppercase;
+color:#64748b;
+}
+
+.ats-dashboard-company-filter select{
+height:36px;
+border:1px solid #cbd5e1;
+border-radius:8px;
+background:#ffffff;
+color:#0f172a;
+font-size:12px;
+font-weight:850;
+padding:0 32px 0 12px;
+box-shadow:0 8px 18px rgba(15,23,42,.05);
+outline:none;
+}
+
+.ats-dashboard-company-filter select:focus{
+border-color:#6366f1;
+box-shadow:0 0 0 3px rgba(99,102,241,.13);
+}
+
+@media (max-width: 768px){
+.ats-dashboard-table-head{
+align-items:stretch;
+flex-direction:column;
+}
+
+.ats-dashboard-company-filter{
+width:100%;
+}
+}
+
 .ats-dashboard-card-head > span{
 display:inline-flex;
 align-items:center;
