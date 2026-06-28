@@ -5805,6 +5805,8 @@ topScore = job.top_score
 totalScore += job.top_score || 0
 scoreCount++
 
+let companyName = safeText(job.company_name || job.company || "Company not specified").trim() || "Company not specified"
+
 table.innerHTML += `
 
 <tr class="ats-job-row">
@@ -5823,7 +5825,7 @@ onchange="updateDashboardCards()"
 <span class="ats-ellipsis ats-job-title" title="${safeHtml(job.job_title)}">
 ${safeHtml(job.job_title)}
 </span>
-<small>Screening pipeline ready</small>
+<small class="ats-ellipsis ats-job-company" title="${safeHtml(companyName)}">${safeHtml(companyName)}</small>
 </span>
 
 </td>
@@ -6370,18 +6372,20 @@ titleCounts[key] = (titleCounts[key] || 0) + 1
 let seenTitles = {}
 let chartJobs = jobs.map(job => {
 let title = safeText(job.job_title || "Untitled Job").trim() || "Untitled Job"
+let company = safeText(job.company_name || job.company || "Company not specified").trim() || "Company not specified"
 let key = title.toLowerCase()
 seenTitles[key] = (seenTitles[key] || 0) + 1
 
 return {
 title:titleCounts[key] > 1 ? `${title} #${seenTitles[key]}` : title,
+company,
 applicants:Number(job.total_applicants || 0),
 topScore:Number(job.top_score || 0)
 }
 })
 
 if(!chartJobs.length){
-chartJobs = [{title:"No active jobs",applicants:0,topScore:0}]
+chartJobs = [{title:"No active jobs",company:"Company not specified",applicants:0,topScore:0}]
 }
 
 if(jobChart){
@@ -6408,7 +6412,7 @@ widget.innerHTML = `
 <div class="ats-job-volume-leader">
 <span>Leading Role</span>
 <strong>${safeHtml(top.title)}</strong>
-<small>${top.applicants || 0} applicants${top.topScore ? " | top score " + formatScore(top.topScore) : ""}</small>
+<small>${safeHtml(top.company)} | ${top.applicants || 0} applicants${top.topScore ? " | top score " + formatScore(top.topScore) : ""}</small>
 </div>
 </div>
 <div class="ats-job-volume-list">
@@ -6420,7 +6424,7 @@ return `
 <div class="ats-job-volume-top">
 <div>
 <strong title="${safeHtml(job.title)}">${safeHtml(shortText(job.title, 34))}</strong>
-<span>${score ? `Top score ${safeHtml(formatScore(score))}` : "No score yet"}</span>
+<span title="${safeHtml(job.company)}">${safeHtml(shortText(job.company, 30))} | ${score ? `Top score ${safeHtml(formatScore(score))}` : "No score yet"}</span>
 </div>
 <b>${job.applicants || 0}</b>
 </div>

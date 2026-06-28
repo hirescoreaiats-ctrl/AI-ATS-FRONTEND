@@ -7512,6 +7512,10 @@ line-height:1.25;
 color:#64748b;
 }
 
+.ats-job-company{
+max-width:210px;
+}
+
 .ats-job-metric-cell,
 .ats-job-status-cell{
 white-space:nowrap;
