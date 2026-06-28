@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import { EnterpriseSidebar } from "../components/recruiter/EnterpriseSidebar.jsx";
 import { CommandMenu } from "../components/design-system/CommandMenu.jsx";
 import { OrganizationSwitcher } from "../components/recruiter/OrganizationSwitcher.jsx";
@@ -88,6 +89,7 @@ export function App() {
           { label: "Move filtered candidates", hint: "Bulk action", action: () => setStage("hiring_manager_review") }
         ]}
       />
+      <SpeedInsights />
     </div>
   );
 }
