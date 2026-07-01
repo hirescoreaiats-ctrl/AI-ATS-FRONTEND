@@ -20,6 +20,11 @@ assert.match(help, /Guide Agent/, "guide mode should exist");
 assert.match(help, /Action Agent - Requires permission/, "locked action mode should exist");
 assert.match(help, /Enable Action Agent\?/, "permission modal should exist");
 assert.match(help, /I will not perform sensitive actions|I will never perform sensitive actions/, "action safety copy should exist");
+assert.match(help, /\/api\/v1\/help\/parse-intent/, "frontend should call backend intent parser");
+assert.match(help, /Understanding your request\.\.\./, "loading state should be shown while parsing intent");
+assert.match(help, /function\s+shouldRequireCandidate/, "candidate requirement helper should exist");
+assert.match(help, /view_shortlisted_candidates/, "shortlisted candidate list intent should exist");
+assert.match(help, /Open Shortlisted Candidates/, "shortlisted candidates action should exist");
 
 for (const workflow of [
   "create_job",
@@ -29,6 +34,8 @@ for (const workflow of [
   "review_ai_ranked_candidates",
   "view_candidate_profile",
   "explain_candidate_score",
+  "view_shortlisted_candidates",
+  "view_candidates_by_stage",
   "shortlist_candidate",
   "reject_candidate",
   "send_candidate_email",
@@ -44,6 +51,8 @@ for (const workflow of [
 
 assert.match(help, /upl\s\*aod|upl\\s\*aod|upl\.aod|uplod/, "upload typo handling should exist");
 assert.match(help, /cv.*resume.*profile|profile.*resume/, "resume synonym handling should exist");
+assert.match(help, /candiate/, "candidate typo handling should exist");
+assert.match(help, /candidate_group:\s*text\.includes\("shortlisted"\)/, "shortlisted group extraction should exist");
 assert.match(help, /data-help-id/, "tour should use data-help-id selectors");
 assert.match(help, /dashboard_overview/, "dashboard overview tour should exist");
 assert.match(help, /showTourStep/, "visual tour runner should exist");

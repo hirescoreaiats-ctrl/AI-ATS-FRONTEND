@@ -49,6 +49,18 @@ description:"Review AI-ranked candidates, fit bands, and recruiter signals.",
 steps:["Open Recruiter.","Choose a job.","Review ranking, score, and score signals.","Open candidate profiles for details."],
 allowedModes:["guide"], isSensitiveAction:false
 },
+view_shortlisted_candidates: {
+id:"view_shortlisted_candidates", title:"View Shortlisted Candidates", category:"Candidates", requiredContext:["job"], route:"results", tourId:"review_ai_ranked_candidates",
+description:"Open the shortlisted candidates for a selected job.",
+steps:["Open Recruiter.","Select the job.","Filter or review candidates in the shortlisted stage.","Open candidate profiles as needed."],
+allowedModes:["guide"], isSensitiveAction:false
+},
+view_candidates_by_stage: {
+id:"view_candidates_by_stage", title:"View Candidates by Stage", category:"Candidates", requiredContext:["job"], route:"results", tourId:"review_ai_ranked_candidates",
+description:"Open candidates for a selected job by pipeline stage.",
+steps:["Open Recruiter.","Select the job.","Choose the candidate stage filter.","Review the candidates in that stage."],
+allowedModes:["guide"], isSensitiveAction:false
+},
 view_candidate_profile: {
 id:"view_candidate_profile", title:"View Candidate Profile", category:"Candidates", requiredContext:["candidate"], route:"results", tourId:"review_ai_ranked_candidates",
 description:"Open candidate profile details from results.",
@@ -246,12 +258,12 @@ intent = "create_job"; confidence = 0.9;
 intent = "share_public_apply_link"; confidence = 0.88;
 }else if(includesAny(text, ["score", "ranking", "ranked", "ai score", "top score", "explain"])){
 intent = text.includes("explain") ? "explain_candidate_score" : "review_ai_ranked_candidates"; confidence = 0.82;
+}else if(includesAny(text, ["mail", "email", "message", "bhejna"])){
+intent = "send_candidate_email"; confidence = 0.84;
 }else if(includesAny(text, ["shortlist", "select", "top candidate", "top candidates"])){
 intent = "shortlist_candidate"; confidence = 0.86;
 }else if(includesAny(text, ["reject", "not fit"])){
 intent = "reject_candidate"; confidence = 0.82;
-}else if(includesAny(text, ["mail", "email", "message", "bhejna"])){
-intent = "send_candidate_email"; confidence = 0.84;
 }else if(includesAny(text, ["interview", "call", "meeting", "schedule"])){
 intent = "schedule_interview"; confidence = 0.86;
 }else if(includesAny(text, ["test", "assessment", "screening"])){
@@ -266,10 +278,19 @@ let entities = {
 job_title: extractJobTitle(raw),
 candidate_name: extractCandidateName(raw),
 candidate_group: text.includes("shortlisted") || text.includes("shortlist") ? "shortlisted" : null,
+stage: text.includes("shortlisted") || text.includes("shortlist") ? "shortlisted" : null,
 date_time: null,
 email: (raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i) || [null])[0],
 plan: includesAny(text, ["plan", "limit", "usage", "billing"]) ? "usage" : null
 };
+
+if((text.includes("shortlisted") || text.includes("shortlist")) && /\b(want|show|view|list|candidate|candidates|candiate)\b/.test(text)){
+intent = "view_shortlisted_candidates";
+confidence = 0.9;
+entities.candidate_group = "shortlisted";
+entities.stage = "shortlisted";
+entities.candidate_name = null;
+}
 
 if(!intent){
 return {
@@ -284,6 +305,73 @@ clarification_question:"What would you like help with?"
 let workflow = WORKFLOWS[intent];
 let needsClarification = confidence < 0.55 || !workflow;
 return {intent, entities, confidence, clarification_needed:needsClarification, clarification_question:needsClarification ? "Which workflow do you mean?" : ""};
+}
+
+function currentHelpRoute(){
+return window.location?.pathname || "dashboard";
+}
+
+function currentHelpContext(){
+return {
+job_id: state.selectedJob?.id || null,
+candidate_id: state.selectedCandidate?.id || null
+};
+}
+
+async function parseIntentWithBackend(message){
+let base = (window.API_BASE_URL || window.__HIRESCORE_API_BASE__ || "").replace(/\/$/, "");
+if(!base) throw new Error("API base unavailable");
+let controller = new AbortController();
+let timeout = setTimeout(()=>controller.abort(), 4500);
+try{
+let headers = typeof authHeaders === "function" ? authHeaders() : {"Content-Type":"application/json","Authorization":"Bearer " + localStorage.getItem("token")};
+if(!headers["Content-Type"] && !(headers instanceof Headers)) headers["Content-Type"] = "application/json";
+let res = await fetch(base + "/api/v1/help/parse-intent", {
+method:"POST",
+headers,
+signal:controller.signal,
+body:JSON.stringify({
+message,
+current_route:currentHelpRoute(),
+current_context:currentHelpContext()
+})
+});
+let data = await res.json().catch(()=>null);
+if(!res.ok || !data) throw new Error("Intent parser unavailable");
+return normalizeIntentResult(data);
+}finally{
+clearTimeout(timeout);
+}
+}
+
+function normalizeIntentResult(data){
+let fallback = {intent:null, entities:{}, confidence:0.2, clarification_needed:true, clarification_question:"What would you like help with?"};
+data = data && typeof data === "object" ? data : fallback;
+let entities = data.entities && typeof data.entities === "object" ? data.entities : {};
+return {
+intent: typeof data.intent === "string" ? data.intent : null,
+entities: {
+job_title: entities.job_title || null,
+candidate_name: entities.candidate_name || null,
+candidate_group: entities.candidate_group || null,
+stage: entities.stage || null,
+date_time: entities.date_time || null,
+email: entities.email || null,
+plan: entities.plan || null
+},
+confidence: Number(data.confidence || 0),
+clarification_needed: Boolean(data.clarification_needed),
+clarification_question: data.clarification_question || null
+};
+}
+
+function shouldRequireCandidate(intentResult){
+let intent = intentResult?.intent;
+if(["view_candidate_profile", "explain_candidate_score"].includes(intent)) return true;
+if(["schedule_interview", "reject_candidate", "shortlist_candidate"].includes(intent)){
+return Boolean(intentResult?.entities?.candidate_name);
+}
+return false;
 }
 
 async function getJobs(){
@@ -316,6 +404,14 @@ return hay.includes(q) || q.split(" ").some(part => part.length > 2 && hay.inclu
 function addMessage(role, html, actions){
 state.messages.push({role, html, actions: actions || []});
 renderMessages();
+}
+
+function removeMessage(message){
+let index = state.messages.indexOf(message);
+if(index >= 0){
+state.messages.splice(index, 1);
+renderMessages();
+}
 }
 
 function actionButton(label, action, data){
@@ -394,7 +490,7 @@ actionButton("View All Jobs","openPage",{page:"dashboard"})
 return;
 }
 
-if(workflow.requiredContext.includes("candidate") && !contextOverride?.candidate){
+if(shouldRequireCandidate(intentResult) && !contextOverride?.candidate){
 state.pendingContextType = "candidate";
 let candidateName = intentResult.entities.candidate_name;
 let question = candidateName ? `I found the name "${esc(candidateName)}", but I need you to choose the candidate from results.` : "Which candidate should I use?";
@@ -406,10 +502,15 @@ return;
 }
 
 let actions = [
-actionButton("Start Visual Guide","tour",{tourId:workflow.tourId}),
-actionButton("Open Page","openPage",{page:workflow.route}),
+actionButton(workflow.id === "view_shortlisted_candidates" ? "Start Visual Guide" : "Start Visual Guide","tour",{tourId:workflow.tourId}),
+actionButton(workflow.id === "view_shortlisted_candidates" ? "Open Shortlisted Candidates" : "Open Page","openPage",{page:workflow.route}),
 actionButton("Read Guide","readGuide",{workflowId:workflow.id})
 ];
+if(workflow.id === "view_shortlisted_candidates" && contextOverride?.job){
+let jobTitle = contextOverride.job.job_title || "selected";
+addMessage("agent", `<strong>I can show shortlisted candidates for the ${esc(jobTitle)} job.</strong><p>I will open the right recruiter view and guide you. I will not change any candidate status.</p>`, actions);
+return;
+}
 if(mode() === "guide" && SENSITIVE_INTENTS.has(workflow.id)){
 addMessage("agent", `<strong>I can guide you, but I will not perform this action.</strong>${workflowHtml(workflow, contextOverride)}`, actions);
 return;
@@ -452,7 +553,17 @@ if(state.lastJobOptions[map[key]]) return selectJob(map[key]);
 }
 }
 
-let result = resolveIntent(value);
+let loadingMessage = {role:"agent", html:"<em>Understanding your request...</em>", actions:[]};
+state.messages.push(loadingMessage);
+renderMessages();
+let result;
+try{
+result = await parseIntentWithBackend(value);
+}catch(error){
+result = resolveIntent(value);
+}finally{
+removeMessage(loadingMessage);
+}
 if(result.clarification_needed) return showClarification();
 return handleWorkflow(result);
 }
