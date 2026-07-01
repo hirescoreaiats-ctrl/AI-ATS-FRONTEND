@@ -1,0 +1,56 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+const html = readFileSync("index.html", "utf8");
+const help = readFileSync("help-agent.js", "utf8");
+const css = readFileSync("help-agent.css", "utf8");
+
+assert.match(html, /help-agent\.css\?v=guide-agent-20260701-01/, "help css should be loaded");
+assert.match(html, /help-agent\.js\?v=guide-agent-20260701-01/, "help js should be loaded");
+assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
+assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
+
+assert.match(help, /hs_help_onboarding_seen/, "onboarding persistence key should exist");
+assert.match(help, /hs_help_agent_mode/, "mode persistence key should exist");
+assert.match(help, /hs_action_agent_enabled/, "action permission key should exist");
+assert.match(help, /Start Product Walkthrough/, "onboarding walkthrough option should exist");
+assert.match(help, /Ask Help Agent/, "onboarding ask option should exist");
+assert.match(help, /Skip for now/, "onboarding skip option should exist");
+assert.match(help, /Guide Agent/, "guide mode should exist");
+assert.match(help, /Action Agent - Requires permission/, "locked action mode should exist");
+assert.match(help, /Enable Action Agent\?/, "permission modal should exist");
+assert.match(help, /I will not perform sensitive actions|I will never perform sensitive actions/, "action safety copy should exist");
+
+for (const workflow of [
+  "create_job",
+  "edit_job",
+  "share_public_apply_link",
+  "upload_resumes",
+  "review_ai_ranked_candidates",
+  "view_candidate_profile",
+  "explain_candidate_score",
+  "shortlist_candidate",
+  "reject_candidate",
+  "send_candidate_email",
+  "schedule_interview",
+  "send_screening_test",
+  "view_test_result",
+  "invite_pilot_user",
+  "deactivate_pilot_user",
+  "view_plan_usage_limits"
+]) {
+  assert.match(help, new RegExp(`${workflow}:`), `${workflow} workflow should be registered`);
+}
+
+assert.match(help, /upl\s\*aod|upl\\s\*aod|upl\.aod|uplod/, "upload typo handling should exist");
+assert.match(help, /cv.*resume.*profile|profile.*resume/, "resume synonym handling should exist");
+assert.match(help, /data-help-id/, "tour should use data-help-id selectors");
+assert.match(help, /dashboard_overview/, "dashboard overview tour should exist");
+assert.match(help, /showTourStep/, "visual tour runner should exist");
+
+assert.match(css, /\.hs-help-drawer/, "drawer styles should exist");
+assert.match(css, /\.hs-help-button/, "floating button styles should exist");
+assert.match(css, /\.hs-tour-target/, "tour target highlight styles should exist");
+assert.match(css, /@media \(max-width: 720px\)/, "mobile drawer styles should exist");
+
+console.log("Help Agent smoke checks passed.");

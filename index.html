@@ -21,6 +21,7 @@
 <link rel="stylesheet" href="createjob.css">
 <link rel="stylesheet" href="Dashbord.css">
 <link rel="stylesheet" href="ui-fix.css?v=dashboard-company-filter-20260628-02">
+<link rel="stylesheet" href="help-agent.css?v=guide-agent-20260701-01">
 
 </head>
 
@@ -58,7 +59,7 @@ HireScore AI
 
 <div class="ats-nav-label">Workspace</div>
 
-<button class="nav-btn" onclick="showPage('dashboard')">
+<button class="nav-btn" onclick="showPage('dashboard')" data-help-id="jobs-menu">
 <span class="ats-nav-icon" aria-hidden="true">JD</span>
 <span class="nav-text">Jobs</span>
 <small>Open roles and analytics</small>
@@ -83,7 +84,7 @@ HireScore AI
 <small>Scheduling pipeline</small>
 </button>
 
-<button id="pilotUsersNav" class="nav-btn hidden" hidden aria-hidden="true" onclick="showPage('pilotUsers')">
+<button id="pilotUsersNav" class="nav-btn hidden" hidden aria-hidden="true" onclick="showPage('pilotUsers')" data-help-id="admin-menu">
 <span class="ats-nav-icon" aria-hidden="true">PU</span>
 <span class="nav-text">Pilot Access</span>
 <small>Admin-created pilot users</small>
@@ -162,12 +163,12 @@ Logout
 <p>Track active roles, candidate volume, AI scores, and recruiter actions from one focused workspace.</p>
 </div>
 <div class="ats-dashboard-hero-actions">
-<button onclick="showPage('job')" class="ats-dashboard-primary-action">Create Job</button>
+<button onclick="showPage('job')" class="ats-dashboard-primary-action" data-help-id="create-job-button">Create Job</button>
 <button onclick="showPage('applyJob')" class="ats-dashboard-secondary-action">Apply Pages</button>
 </div>
 </div>
 
-<div class="dashboard-cards ats-dashboard-stats">
+<div class="dashboard-cards ats-dashboard-stats" data-help-id="dashboard-summary">
 <div class="stat-card ats-stat-blue">
 <span class="ats-stat-icon">JB</span>
 <div class="stat-label">Active Jobs</div>
@@ -198,7 +199,7 @@ Logout
 </div>
 
 <div class="ats-dashboard-main-grid">
-<div class="dashboard-graph-card">
+<div class="dashboard-graph-card" data-help-id="ai-score-column">
 <div class="ats-dashboard-card-head">
 <div>
 <h2>Applications per Job</h2>
@@ -305,7 +306,7 @@ No source data yet. Share tracked apply links to start tracking candidate source
 <th>Action</th>
 </tr>
 </thead>
-<tbody id="dashboardJobTable"></tbody>
+<tbody id="dashboardJobTable" data-help-id="job-card"></tbody>
 </table>
 </div>
 </div>
@@ -2990,6 +2991,7 @@ Message / Issue Description
 <script src="config.js"></script>
 <script src="auth.js"></script>
 <script src="app.js?v=dashboard-company-filter-20260628-02"></script>
+<script src="help-agent.js?v=guide-agent-20260701-01"></script>
 
 
 </div>
