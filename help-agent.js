@@ -159,9 +159,27 @@ allowedModes:["guide"], isSensitiveAction:false
 
 const QUICK_ACTIONS = [
 ["create_job","Create Job"],["upload_resumes","Upload Resumes"],["review_ai_ranked_candidates","Review AI Scores"],
-["shortlist_candidate","Shortlist Candidates"],["send_candidate_email","Send Email"],["schedule_interview","Schedule Interview"],
+["candidate_workflow","Shortlist Candidates"],["send_candidate_email","Send Email"],["schedule_interview","Schedule Interview"],
 ["send_screening_test","Screening Test"],["invite_pilot_user","Admin / Pilot Access"],["view_plan_usage_limits","Plan / Usage Limits"]
 ];
+
+const INTENT_ALIASES = {
+review_ai_scores: "review_ai_ranked_candidates",
+shortlist_candidates: "candidate_workflow",
+send_email: "send_candidate_email",
+screening_test: "send_screening_test",
+admin_pilot_access: "invite_pilot_user",
+plan_usage_limits: "view_plan_usage_limits",
+open_create_job: "create_job",
+open_upload_resumes: "upload_resumes",
+open_ai_scores: "review_ai_ranked_candidates",
+open_shortlist: "candidate_workflow",
+open_communication: "send_candidate_email",
+open_interviews: "schedule_interview",
+open_screening_test: "send_screening_test",
+open_admin_access: "invite_pilot_user",
+open_plan_usage: "view_plan_usage_limits"
+};
 
 const TOURS = {
 dashboard_overview: [
@@ -172,16 +190,16 @@ dashboard_overview: [
 ["ai-score-column","Applications and AI ranking","This area shows job volume and scoring signals across active jobs."],
 ["help-agent-button","Help Agent","Open this guide anytime when you are unsure what to do next."]
 ],
-create_job: [["create-job-button","Create Job","Click Create Job, fill JD details, and save the opening."],["jobs-menu","Jobs menu","Return to Jobs to review the created role."]],
-upload_resumes: [["job-card","Upload resumes","Find the job row and use Folder or upload entry to add resumes."],["ai-score-column","Wait for scoring","After upload, parsing and AI scoring will update candidate results."]],
-review_ai_ranked_candidates: [["jobs-menu","Open Recruiter","Use the Recruiter area to review AI-ranked candidates."],["ai-score-column","AI score signals","Scores help rank candidates, but recruiter review still matters."]],
-explain_candidate_score: [["ai-score-column","Score explanation","Open candidate profile to inspect matched skills, gaps, caps, strengths, and concerns."]],
-shortlist_candidate: [["job-card","Open results","Open job results first, then shortlist after reviewing evidence."]],
-send_candidate_email: [["jobs-menu","Outreach","Open Outreach, select candidates, preview email, then send manually."]],
-schedule_interview: [["jobs-menu","Interview dashboard","Open Interview Dashboard, pick candidate/date/time, then confirm manually."]],
-send_screening_test: [["jobs-menu","Screening test","Open the candidate workflow and send screening tests after review."]],
-invite_pilot_user: [["admin-menu","Pilot access","Admins can invite pilot users from this menu when available."]],
-view_plan_usage_limits: [["help-agent-button","Need limits help?","Use Help Agent or Support for plan and usage questions."]]
+create_job: [["create-job-button","Create Job","Click Create Job, fill role details, add skills/JD, and save the opening."],["job-form","Job details form","Complete the required fields before saving."],["jobs-menu","Jobs menu","Return to Jobs to review the created role."]],
+upload_resumes: [["job-card","Choose the job","Find the job row where resumes should be uploaded."],["job-upload-button","Upload resumes","Use the Folder/Upload action on that job row to add resumes."],["ai-score-column","Wait for scoring","After upload, parsing and AI scoring will update candidate results."]],
+review_ai_ranked_candidates: [["recruiter-menu","Open Recruiter","Use the Recruiter workspace to review AI-ranked candidates."],["recruiter-job-list","Choose a job","Open candidate results for the role you want to inspect."],["candidate-results-table","AI-ranked results","Review score, matched skills, missing skills, and evidence before acting."]],
+explain_candidate_score: [["candidate-results-table","Score explanation","Open a candidate profile to inspect matched skills, gaps, caps, strengths, and concerns."]],
+shortlist_candidate: [["candidate-results-table","Review candidates","Open job results first and validate evidence."],["shortlist-button","Shortlist action","Use shortlist only after checking the profile and score explanation."]],
+send_candidate_email: [["outreach-menu","Open Outreach","Go to Outreach for role-specific communication queues."],["communication-job-list","Choose outreach job","Open the job queue and preview candidates."],["communication-email-button","Preview email","Check the message before sending."]],
+schedule_interview: [["interview-menu","Open Interview Dashboard","Use Interview Dashboard for scheduling."],["schedule-interview-button","New schedule","Choose candidate, round, date, time, and interviewer."],["interview-table","Interview pipeline","Track scheduled and pending interview rounds here."]],
+send_screening_test: [["candidate-results-table","Open candidate workflow","Choose the candidate first."],["screening-test-button","Screening test","Preview the assessment before sending."]],
+invite_pilot_user: [["admin-menu","Pilot access","Admins can invite pilot users from this menu when available."],["pilot-create-form","Create pilot invite","Enter email and create controlled access."]],
+view_plan_usage_limits: [["support-menu","Support","Open Support for plan, usage, and limit questions."],["support-form","Support case","Submit a case if plan or usage needs review."]]
 };
 
 const state = {
@@ -380,12 +398,16 @@ candidate_ids: state.selectedCandidate?.id ? [state.selectedCandidate.id] : []
 async function parseIntentWithBackend(message){
 let base = (window.API_BASE_URL || window.__HIRESCORE_API_BASE__ || "").replace(/\/$/, "");
 if(!base) throw new Error("API base unavailable");
+let localResult = resolveIntent(message);
+let endpoints = ["/parse-intent", "/api/v1/parse-intent", "/api/v1/help/parse-intent"];
+let lastError = null;
+for(let endpoint of endpoints){
 let controller = new AbortController();
 let timeout = setTimeout(()=>controller.abort(), 4500);
 try{
 let headers = typeof authHeaders === "function" ? authHeaders() : {"Content-Type":"application/json","Authorization":"Bearer " + localStorage.getItem("token")};
 if(!headers["Content-Type"] && !(headers instanceof Headers)) headers["Content-Type"] = "application/json";
-let res = await fetch(base + "/api/v1/help/parse-intent", {
+let res = await fetch(base + endpoint, {
 method:"POST",
 headers,
 signal:controller.signal,
@@ -397,44 +419,95 @@ current_context:currentHelpContext()
 });
 let data = await res.json().catch(()=>null);
 if(!res.ok || !data) throw new Error("Intent parser unavailable");
-return normalizeIntentResult(data);
+return normalizeIntentResult(data, localResult);
+}catch(error){
+lastError = error;
 }finally{
 clearTimeout(timeout);
 }
 }
+throw lastError || new Error("Intent parser unavailable");
+}
 
-function normalizeIntentResult(data){
+function workflowIdFromBackend(data){
+let raw = data?.workflow || data?.intent || data?.action || null;
+if(typeof raw !== "string") return null;
+return INTENT_ALIASES[raw] || raw;
+}
+
+function normalizeIntentResult(data, localResult){
 let fallback = {intent:null, entities:{}, confidence:0.2, clarification_needed:true, clarification_question:"What would you like help with?"};
 data = data && typeof data === "object" ? data : fallback;
+let backendIntent = workflowIdFromBackend(data);
+let localIntent = localResult?.intent || null;
+let intent = WORKFLOWS[backendIntent] ? backendIntent : localIntent;
+if(localIntent === "select_top_candidates" && ["review_ai_ranked_candidates", "candidate_workflow"].includes(intent)){
+intent = localIntent;
+}
+if(localIntent === "candidate_workflow" && intent === "send_candidate_email"){
+intent = localIntent;
+}
 let entities = data.entities && typeof data.entities === "object" ? data.entities : {};
+let localEntities = localResult?.entities || {};
+let mergedEntities = Object.assign({}, localEntities, entities);
+let actionPlan = data.action_agent_plan && typeof data.action_agent_plan === "object" ? data.action_agent_plan : null;
+let actions = Array.isArray(data.actions) ? data.actions : [];
+if(!actionPlan) actionPlan = buildLocalActionPlan(intent, mergedEntities, data);
+if(!actions.length && Array.isArray(actionPlan?.actions)) actions = actionPlan.actions;
+let clarificationNeeded = Boolean(data.clarification_needed || data.requires_clarification);
+if(data.intent === "unknown" || data.intent === "clarify_workflow") clarificationNeeded = true;
 return {
-intent: typeof data.intent === "string" ? data.intent : null,
+intent,
 entities: {
-job_id: entities.job_id || null,
-job_title: entities.job_title || null,
-candidate_name: entities.candidate_name || null,
-candidate_ids: Array.isArray(entities.candidate_ids) ? entities.candidate_ids : null,
-candidate_group: entities.candidate_group || null,
-stage: entities.stage || null,
-target_stage: entities.target_stage || null,
-date_time: entities.date_time || null,
-meeting_url: entities.meeting_url || null,
-email: entities.email || null,
-plan: entities.plan || null,
-limit: entities.limit || null
+job_id: mergedEntities.job_id || null,
+job_title: mergedEntities.job_title || null,
+candidate_name: mergedEntities.candidate_name || null,
+candidate_ids: Array.isArray(mergedEntities.candidate_ids) ? mergedEntities.candidate_ids : null,
+candidate_group: mergedEntities.candidate_group || null,
+stage: mergedEntities.stage || null,
+target_stage: mergedEntities.target_stage || null,
+date_time: mergedEntities.date_time || null,
+meeting_url: mergedEntities.meeting_url || null,
+email: mergedEntities.email || null,
+plan: mergedEntities.plan || null,
+limit: mergedEntities.limit || null
 },
 tasks: Array.isArray(data.tasks) ? data.tasks : [],
-actions: Array.isArray(data.actions) ? data.actions : [],
+actions,
 visual_tour: data.visual_tour && typeof data.visual_tour === "object" ? data.visual_tour : null,
-action_agent_plan: data.action_agent_plan && typeof data.action_agent_plan === "object" ? data.action_agent_plan : null,
+action_agent_plan: actionPlan,
 missing_fields: Array.isArray(data.missing_fields) ? data.missing_fields : [],
-ready_for_action_agent: Boolean(data.ready_for_action_agent),
+ready_for_action_agent: Boolean(data.ready_for_action_agent || actions.length),
 requires_confirmation: Boolean(data.requires_confirmation),
-guidance: data.guidance || null,
+guidance: data.guidance || data.message || null,
 confidence: Number(data.confidence || 0),
-clarification_needed: Boolean(data.clarification_needed),
+clarification_needed: clarificationNeeded || !intent,
 clarification_question: data.clarification_question || null
 };
+}
+
+function buildLocalActionPlan(intent, entities, data){
+if(!intent || !WORKFLOWS[intent]) return null;
+let actions = [];
+let missing = [];
+if(["select_top_candidates", "candidate_workflow"].includes(intent)){
+actions.push({action_id:"find_top_candidates", label:"Find top candidates"});
+if(intent === "candidate_workflow"){
+actions.push({action_id:"shortlist_candidates", label:"Shortlist top candidates"});
+if(entities?.target_stage === "communication") actions.push({action_id:"move_to_communication", label:"Move shortlisted candidates to Communication"});
+}
+}
+if(intent === "move_candidates_to_communication"){
+actions.push({action_id:"move_to_communication", label:"Move shortlisted candidates to Communication"});
+}
+if(["candidate_workflow", "select_top_candidates", "move_candidates_to_communication"].includes(intent) && !entities?.job_id && !entities?.job_title && !state.selectedJob?.id){
+missing.push("job");
+}
+return actions.length ? {
+summary: data?.message || WORKFLOWS[intent].description,
+actions,
+missing_fields: missing
+} : null;
 }
 
 function shouldRequireCandidate(intentResult){
@@ -589,7 +662,7 @@ return;
 }
 
 let actions = [
-actionButton("Start Visual Tour", intentResult.visual_tour ? "planTour" : "tour", {tourId:workflow.tourId}),
+actionButton("Start Visual Tour", intentResult.visual_tour ? "planTour" : "tour", {tourId:workflow.tourId, page:workflow.route}),
 actionButton(workflow.id === "view_shortlisted_candidates" ? "Open Shortlisted Candidates" : "Open Page","openPage",{page:workflow.route}),
 actionButton("Read Guide","readGuide",{workflowId:workflow.id})
 ];
@@ -661,12 +734,16 @@ window.showPage(page || "dashboard");
 function readGuide(workflowId){
 let workflow = WORKFLOWS[workflowId] || WORKFLOWS.create_job;
 addMessage("agent", workflowHtml(workflow, state.selectedJob ? {job:state.selectedJob} : null), [
-actionButton("Start Visual Guide","tour",{tourId:workflow.tourId}),
+actionButton("Start Visual Guide","tour",{tourId:workflow.tourId, page:workflow.route}),
 actionButton("Open Page","openPage",{page:workflow.route})
 ]);
 }
 
-function startTour(tourId){
+function startTour(tourId, page){
+if(page){
+openPage(page);
+return setTimeout(()=>startTour(tourId), 500);
+}
 let steps = (TOURS[tourId] || TOURS.dashboard_overview).map(step => ({id:step[0], title:step[1], body:step[2]}));
 state.tour = {active:true, steps, index:0};
 document.body.classList.add("hs-help-tour-active");
@@ -733,8 +810,9 @@ if(mode() !== "action" || !actionEnabled()){
 showPermission();
 return;
 }
-if(Array.isArray(actionPlan.missing_fields) && actionPlan.missing_fields.length){
-addMessage("agent", `<strong>I need a little more detail before taking action.</strong><p>Missing: ${esc(actionPlan.missing_fields.join(", "))}</p>`);
+let missingFields = Array.isArray(actionPlan.missing_fields) ? actionPlan.missing_fields.filter(field => !(field === "job" && (state.selectedJob?.id || plan?.entities?.job_id))) : [];
+if(missingFields.length){
+addMessage("agent", `<strong>I need a little more detail before taking action.</strong><p>Missing: ${esc(missingFields.join(", "))}</p>`);
 return;
 }
 let ok = window.confirm("Action Agent will perform the planned workflow. Continue?");
@@ -752,34 +830,44 @@ renderMessages();
 
 try{
 let job = await resolvePlanJob(plan);
-let context = {job_id: job.id, candidate_ids: Array.isArray(plan.entities?.candidate_ids) ? [...plan.entities.candidate_ids] : []};
+let context = {job_id: job.id, candidate_ids: Array.isArray(plan.entities?.candidate_ids) ? [...plan.entities.candidate_ids] : [], candidates: []};
 let limit = Number(plan.entities?.limit || 10);
+let didChangeCandidates = false;
 
 for(let action of actions){
 if(action.action_id === "find_top_candidates"){
 let data = await fetchJson(`${base}/results/${encodeURIComponent(context.job_id)}`, {headers:requestHeaders()});
 let rows = Array.isArray(data?.results) ? data.results : [];
-context.candidate_ids = rows
+context.candidates = rows
 .filter(row => !["Rejected","Dropped","Communication"].includes(row.status))
-.slice(0, limit)
-.map(row => row.id)
-.filter(Boolean);
+.slice(0, limit);
+context.candidate_ids = context.candidates.map(row => row.id).filter(Boolean);
 if(!context.candidate_ids.length) throw new Error("No candidate IDs found in top results.");
 }
 if(action.action_id === "shortlist_candidates"){
 for(let candidateId of context.candidate_ids){
 await fetchJson(`${base}/shortlist/${encodeURIComponent(candidateId)}`, {method:"POST", headers:requestHeaders()});
 }
+didChangeCandidates = true;
 }
 if(action.action_id === "move_to_communication"){
 await fetchJson(`${base}/move-to-communication?job_id=${encodeURIComponent(context.job_id)}`, {method:"POST", headers:requestHeaders()});
+didChangeCandidates = true;
 }
 }
 
 removeMessage(loadingMessage);
+if(!didChangeCandidates){
+let preview = context.candidates.slice(0, 5).map((candidate, index) => `<li>#${index + 1} ${esc(candidate.full_name || candidate.name || "Candidate")} - score ${esc(candidate.final_score ?? candidate.score ?? "N/A")}</li>`).join("");
+addMessage("agent", `<strong>Top candidates found for ${esc(job.job_title || "the selected job")}.</strong><ol>${preview}</ol><p>No candidate status was changed.</p>`, [
+actionButton("Open Recruiter","openPage",{page:"results"}),
+actionButton("Start Visual Tour","tour",{tourId:"review_ai_ranked_candidates", page:"results"})
+]);
+return;
+}
 addMessage("agent", `<strong>Action Agent completed.</strong><p>${esc(context.candidate_ids.length)} candidate${context.candidate_ids.length === 1 ? "" : "s"} processed for ${esc(job.job_title || "the selected job")}.</p>`, [
 actionButton("Open Communication","openPage",{page:"communication"}),
-actionButton("Start Visual Tour","planTour",{})
+actionButton("Start Visual Tour","tour",{tourId:"send_candidate_email", page:"communication"})
 ]);
 }catch(error){
 removeMessage(loadingMessage);
@@ -791,10 +879,11 @@ actionButton("Start Visual Tour","planTour",{})
 
 function showTourStep(){
 cleanupTourStep();
+applyRuntimeHelpIds();
 let tour = state.tour;
 if(!tour.active || !tour.steps.length) return endTour();
 let step = tour.steps[tour.index];
-let target = document.querySelector(`[data-help-id="${step.id}"]`);
+let target = findTourTarget(step);
 let overlay = document.createElement("div");
 overlay.className = "hs-tour-overlay";
 overlay.id = "hsTourOverlay";
@@ -819,6 +908,32 @@ target.scrollIntoView({behavior:"smooth", block:"center", inline:"center"});
 setTimeout(()=>positionTourCard(target, card), 250);
 }else{
 card.classList.add("is-centered");
+}
+
+function findTourTarget(step){
+let id = step?.id || "";
+let direct = document.querySelector(`[data-help-id="${id}"]`);
+if(direct) return direct;
+if(id && document.getElementById(id)) return document.getElementById(id);
+let fallbackSelectors = {
+"recruiter-menu":"button[onclick*=\"showPage('results')\"]",
+"outreach-menu":"button[onclick*=\"showPage('communication')\"]",
+"interview-menu":"button[onclick*=\"showPage('interviewDashboard')\"]",
+"support-menu":"button[onclick*=\"support\"], button[onclick*=\"navigateToPage('support')\"]",
+"job-form":"#jobPage form",
+"recruiter-job-list":"#resultsPage .ats-recruiter-job-card, #resultsPage button[onclick*='viewResults'], #resultsPage",
+"candidate-results-table":"#resultsTable, #jobResultPage",
+"job-upload-button":"button[onclick*='uploadResume'], button[onclick*='upload'], input[type='file'], #dashboardJobTable button",
+"communication-job-list":"#communicationJobsContainer, #communicationJobSelect, #communicationPage",
+"communication-email-button":"#communicationResultsPage button, #communicationPage button",
+"schedule-interview-button":"button[onclick*='startNewInterviewSchedule'], #interviewDashboardPage button",
+"interview-table":"#interviewDashboardTable, #interviewDashboardPage",
+"pilot-create-form":"#pilotUsersPage form, #pilotUsersPage",
+"support-form":"#supportForm, #supportPage form, #supportPage",
+"screening-test-button":"button[onclick*='sendAssessment'], button[onclick*='screening'], button[onclick*='test']"
+};
+let selector = fallbackSelectors[id];
+return selector ? document.querySelector(selector) : null;
 }
 }
 
@@ -969,19 +1084,30 @@ renderModeInfo();
 
 function applyRuntimeHelpIds(){
 let mappings = [
+["button[onclick*=\"showPage('results')\"]","recruiter-menu"],
+["button[onclick*=\"showPage('communication')\"]","outreach-menu"],
+["button[onclick*=\"showPage('interviewDashboard')\"]","interview-menu"],
+["button[onclick*=\"navigateToPage('support')\"], button[onclick*=\"showPage('support')\"]","support-menu"],
 ["button[onclick*=\"showPage('applyJob')\"]","public-apply-link-button"],
 ["button[onclick*=\"showPage('job')\"]","create-job-button"],
+["#jobPage form","job-form"],
 ["#dashboardJobTable","job-card"],
-["#resultsTable, #shortlistTable","candidates-table"],
+["#dashboardJobTable button[onclick*='upload'], #dashboardJobTable button[onclick*='Folder'], input[type='file']","job-upload-button"],
+["#resultsPage .ats-recruiter-job-card, #resultsPage button[onclick*='viewResults'], #resultsPage","recruiter-job-list"],
+["#resultsTable, #shortlistTable","candidate-results-table"],
 ["#jobResultPage, #resultsPage","job-details-section"],
 ["#resumeUpload, input[type='file']","resume-file-dropzone"],
 ["button[onclick*='shortlist'], .shortlist-btn","shortlist-button"],
 ["button[onclick*='reject'], .reject-btn","reject-button"],
-["button[onclick*='Communication'], #communicationPage button","communication-email-button"],
-["button[onclick*='Interview'], #interviewDashboardPage button","schedule-interview-button"],
+["#communicationJobsContainer, #communicationJobSelect, #communicationPage","communication-job-list"],
+["button[onclick*='Communication'], #communicationResultsPage button, #communicationPage button","communication-email-button"],
+["button[onclick*='startNewInterviewSchedule'], button[onclick*='Interview'], #interviewDashboardPage button","schedule-interview-button"],
+["#interviewDashboardTable, #interviewDashboardPage","interview-table"],
 ["button[onclick*='test'], button[onclick*='assessment']","screening-test-button"],
 ["#pilotUsersPage","pilot-access-tab"],
+["#pilotUsersPage form","pilot-create-form"],
 ["#applicationsBySourceCard","plan-usage-card"],
+["#supportForm, #supportPage form","support-form"],
 [".ats-recruiter-visibility-panel","matched-skills-section"],
 [".ats-recruiter-visibility-panel","missing-skills-section"],
 ["button[onclick*='candidateProfile'], button[onclick*='openCandidate']","candidate-profile-button"]
@@ -1014,7 +1140,7 @@ runMessageAction:function(messageIndex, actionIndex){
 let item = state.messages[messageIndex]?.actions?.[actionIndex];
 if(!item) return;
 if(item.action === "openPage") openPage(item.data.page);
-if(item.action === "tour") startTour(item.data.tourId);
+if(item.action === "tour") startTour(item.data.tourId, item.data.page);
 if(item.action === "planTour") startPlanTour();
 if(item.action === "actionAgent") executeActionAgent();
 if(item.action === "readGuide") readGuide(item.data.workflowId);
