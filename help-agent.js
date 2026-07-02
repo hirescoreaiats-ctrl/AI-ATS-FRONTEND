@@ -48,8 +48,8 @@ steps:["Open Edit Job.","Choose the job.","Update details.","Save changes."],
 allowedModes:["guide"], isSensitiveAction:false
 },
 share_public_apply_link: {
-id:"share_public_apply_link", title:"Share Public Apply Link", category:"Jobs", requiredContext:["job"], route:"applyJob", tourId:"create_job",
-description:"Copy public apply links for a job and share them with candidates.",
+id:"share_public_apply_link", title:"Apply Pages", category:"Jobs", requiredContext:[], route:"applyJob", tourId:"share_public_apply_link",
+description:"Open public apply pages, copy job application links, and share them with candidates.",
 steps:["Open Apply Pages.","Choose the job.","Copy the public apply link.","Share it on your sourcing channel."],
 allowedModes:["guide"], isSensitiveAction:false
 },
@@ -159,7 +159,7 @@ allowedModes:["guide"], isSensitiveAction:false
 
 const QUICK_ACTIONS = [
 ["create_job","Create Job"],["upload_resumes","Upload Resumes"],["review_ai_ranked_candidates","Review AI Scores"],
-["candidate_workflow","Shortlist Candidates"],["send_candidate_email","Send Email"],["schedule_interview","Schedule Interview"],
+["share_public_apply_link","Apply Pages"],["candidate_workflow","Shortlist Candidates"],["send_candidate_email","Send Email"],["schedule_interview","Schedule Interview"],
 ["send_screening_test","Screening Test"],["invite_pilot_user","Admin / Pilot Access"],["view_plan_usage_limits","Plan / Usage Limits"]
 ];
 
@@ -191,6 +191,7 @@ dashboard_overview: [
 ["help-agent-button","Help Agent","Open this guide anytime when you are unsure what to do next."]
 ],
 create_job: [["create-job-button","Create Job","Click Create Job, fill role details, add skills/JD, and save the opening."],["job-form","Job details form","Complete the required fields before saving."],["jobs-menu","Jobs menu","Return to Jobs to review the created role."]],
+share_public_apply_link: [["public-apply-link-button","Apply Pages","Open Apply Pages from the Jobs dashboard."],["apply-page-list","Job apply links","Choose the job and copy the public application link."],["jobs-menu","Jobs menu","Return to Jobs when you need to manage openings."]],
 upload_resumes: [["job-card","Choose the job","Find the job row where resumes should be uploaded."],["job-upload-button","Upload resumes","Use the Folder/Upload action on that job row to add resumes."],["ai-score-column","Wait for scoring","After upload, parsing and AI scoring will update candidate results."]],
 review_ai_ranked_candidates: [["recruiter-menu","Open Recruiter","Use the Recruiter workspace to review AI-ranked candidates."],["recruiter-job-list","Choose a job","Open candidate results for the role you want to inspect."],["candidate-results-table","AI-ranked results","Review score, matched skills, missing skills, and evidence before acting."]],
 explain_candidate_score: [["candidate-results-table","Score explanation","Open a candidate profile to inspect matched skills, gaps, caps, strengths, and concerns."]],
@@ -212,6 +213,8 @@ selectedJob: null,
 selectedCandidate: null,
 lastParsedPlan: null,
 jobsCache: null,
+clarificationAttempts: 0,
+lastClarificationText: "",
 tour: {active:false, steps:[], index:0}
 };
 
@@ -324,7 +327,7 @@ intent = "select_top_candidates"; confidence = 0.88;
 intent = "upload_resumes"; confidence = 0.92;
 }else if(includesAny(text, ["new job", "create job", "job create", "opening create", "jd add", "jd banana", "role create"])){
 intent = "create_job"; confidence = 0.9;
-}else if(includesAny(text, ["apply link", "public link", "share link"])){
+}else if(includesAny(text, ["apply link", "apply page", "apply pages", "application page", "application link", "public link", "share link"])){
 intent = "share_public_apply_link"; confidence = 0.88;
 }else if(includesAny(text, ["score", "ranking", "ranked", "ai score", "top score", "explain"])){
 intent = text.includes("explain") ? "explain_candidate_score" : "review_ai_ranked_candidates"; confidence = 0.82;
@@ -455,7 +458,10 @@ let actions = Array.isArray(data.actions) ? data.actions : [];
 if(!actionPlan) actionPlan = buildLocalActionPlan(intent, mergedEntities, data);
 if(!actions.length && Array.isArray(actionPlan?.actions)) actions = actionPlan.actions;
 let clarificationNeeded = Boolean(data.clarification_needed || data.requires_clarification);
-if(data.intent === "unknown" || data.intent === "clarify_workflow") clarificationNeeded = true;
+if((data.intent === "unknown" || data.intent === "clarify_workflow") && !intent) clarificationNeeded = true;
+if(intent && localResult?.confidence >= 0.55 && (data.intent === "unknown" || data.intent === "clarify_workflow" || !WORKFLOWS[backendIntent])){
+clarificationNeeded = false;
+}
 return {
 intent,
 entities: {
@@ -691,8 +697,64 @@ return `<div class="hs-help-card-list">${jobs.map((job, index)=>`
 `).join("")}</div>`;
 }
 
-function showClarification(){
-addMessage("agent", `<strong>I need one more detail.</strong><p>Please mention the job, candidate, or workflow you want. Example: "show top 5 Backend Developer candidates".</p>`);
+function clarificationActions(raw){
+let text = normalizeText(raw || "");
+let actions = [];
+if(includesAny(text, ["apply", "application", "public", "link"])){
+actions.push(actionButton("Open Apply Pages","workflow",{workflowId:"share_public_apply_link"}));
+}
+if(includesAny(text, ["job", "role", "jd", "opening"])){
+actions.push(actionButton("Create Job","workflow",{workflowId:"create_job"}));
+actions.push(actionButton("View Jobs","openPage",{page:"dashboard"}));
+}
+if(includesAny(text, ["resume", "cv", "upload"])){
+actions.push(actionButton("Upload Resumes","workflow",{workflowId:"upload_resumes"}));
+}
+if(includesAny(text, ["candidate", "score", "rank", "shortlist", "top"])){
+actions.push(actionButton("Review AI Scores","workflow",{workflowId:"review_ai_ranked_candidates"}));
+actions.push(actionButton("Shortlist Candidates","workflow",{workflowId:"candidate_workflow"}));
+}
+if(includesAny(text, ["mail", "email", "message", "outreach", "communication"])){
+actions.push(actionButton("Send Email","workflow",{workflowId:"send_candidate_email"}));
+}
+if(includesAny(text, ["interview", "schedule", "meeting", "call"])){
+actions.push(actionButton("Schedule Interview","workflow",{workflowId:"schedule_interview"}));
+}
+if(includesAny(text, ["test", "assessment", "screening"])){
+actions.push(actionButton("Screening Test","workflow",{workflowId:"send_screening_test"}));
+}
+if(includesAny(text, ["plan", "limit", "usage", "support", "help"])){
+actions.push(actionButton("Plan / Usage","workflow",{workflowId:"view_plan_usage_limits"}));
+}
+if(!actions.length){
+actions = [
+actionButton("Create Job","workflow",{workflowId:"create_job"}),
+actionButton("Apply Pages","workflow",{workflowId:"share_public_apply_link"}),
+actionButton("Upload Resumes","workflow",{workflowId:"upload_resumes"}),
+actionButton("Review AI Scores","workflow",{workflowId:"review_ai_ranked_candidates"}),
+actionButton("Shortlist Candidates","workflow",{workflowId:"candidate_workflow"})
+];
+}
+let seen = new Set();
+return actions.filter(action => {
+let key = action.label + action.action + JSON.stringify(action.data || {});
+if(seen.has(key)) return false;
+seen.add(key);
+return true;
+}).slice(0, 6);
+}
+
+function showClarification(intentResult, raw){
+let normalized = normalizeText(raw || "");
+state.clarificationAttempts = state.lastClarificationText === normalized ? state.clarificationAttempts + 1 : 1;
+state.lastClarificationText = normalized;
+let actions = clarificationActions(raw);
+let title = state.clarificationAttempts > 1 ? "I am still not fully sure." : "Which workflow do you mean?";
+let body = state.clarificationAttempts > 1
+? "Choose one option below, or write it like: create job, apply page, upload resumes for Backend Developer, review AI scores, send email, or schedule interview."
+: "I can ask follow-up questions when the request is unclear. Pick the closest workflow below, or add the job/candidate name.";
+let question = intentResult?.clarification_question ? `<p>${esc(intentResult.clarification_question)}</p>` : "";
+addMessage("agent", `<strong>${title}</strong>${question}<p>${esc(body)}</p>`, actions);
 }
 
 async function handleUserText(text){
@@ -721,7 +783,9 @@ result = resolveIntent(value);
 }finally{
 removeMessage(loadingMessage);
 }
-if(result.clarification_needed) return showClarification();
+if(result.clarification_needed) return showClarification(result, value);
+state.clarificationAttempts = 0;
+state.lastClarificationText = "";
 return handleWorkflow(result);
 }
 
@@ -920,6 +984,7 @@ let fallbackSelectors = {
 "outreach-menu":"button[onclick*=\"showPage('communication')\"]",
 "interview-menu":"button[onclick*=\"showPage('interviewDashboard')\"]",
 "support-menu":"button[onclick*=\"support\"], button[onclick*=\"navigateToPage('support')\"]",
+"apply-page-list":"#applyJobPage select, #applyJobPage table, #applyJobPage",
 "job-form":"#jobPage form",
 "recruiter-job-list":"#resultsPage .ats-recruiter-job-card, #resultsPage button[onclick*='viewResults'], #resultsPage",
 "candidate-results-table":"#resultsTable, #jobResultPage",
@@ -1089,6 +1154,7 @@ let mappings = [
 ["button[onclick*=\"showPage('interviewDashboard')\"]","interview-menu"],
 ["button[onclick*=\"navigateToPage('support')\"], button[onclick*=\"showPage('support')\"]","support-menu"],
 ["button[onclick*=\"showPage('applyJob')\"]","public-apply-link-button"],
+["#applyJobPage select, #applyJobPage table, #applyJobPage","apply-page-list"],
 ["button[onclick*=\"showPage('job')\"]","create-job-button"],
 ["#jobPage form","job-form"],
 ["#dashboardJobTable","job-card"],
