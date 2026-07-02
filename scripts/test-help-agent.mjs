@@ -5,8 +5,8 @@ const html = readFileSync("index.html", "utf8");
 const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 
-assert.match(html, /help-agent\.css\?v=guide-agent-20260701-01/, "help css should be loaded");
-assert.match(html, /help-agent\.js\?v=guide-agent-20260701-01/, "help js should be loaded");
+assert.match(html, /help-agent\.css\?v=guide-agent-20260702-02/, "help css should be loaded");
+assert.match(html, /help-agent\.js\?v=guide-agent-20260702-02/, "help js should be loaded");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
 assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
 
@@ -31,6 +31,8 @@ for (const workflow of [
   "edit_job",
   "share_public_apply_link",
   "upload_resumes",
+  "candidate_workflow",
+  "select_top_candidates",
   "review_ai_ranked_candidates",
   "view_candidate_profile",
   "explain_candidate_score",
@@ -38,6 +40,8 @@ for (const workflow of [
   "view_candidates_by_stage",
   "shortlist_candidate",
   "reject_candidate",
+  "move_candidates_to_communication",
+  "move_candidates_to_interview",
   "send_candidate_email",
   "schedule_interview",
   "send_screening_test",
@@ -52,13 +56,17 @@ for (const workflow of [
 assert.match(help, /upl\s\*aod|upl\\s\*aod|upl\.aod|uplod/, "upload typo handling should exist");
 assert.match(help, /cv.*resume.*profile|profile.*resume/, "resume synonym handling should exist");
 assert.match(help, /candiate/, "candidate typo handling should exist");
-assert.match(help, /candidate_group:\s*text\.includes\("shortlisted"\)/, "shortlisted group extraction should exist");
+assert.match(help, /candidateSelection \? "top_candidates"/, "top candidate group extraction should exist");
+assert.match(help, /extractLimit/, "top candidate limit extraction should exist");
+assert.match(help, /show top 5 Backend Developer candidates/, "clarification should be contextual instead of hardcoded buttons");
 assert.match(help, /data-help-id/, "tour should use data-help-id selectors");
 assert.match(help, /dashboard_overview/, "dashboard overview tour should exist");
 assert.match(help, /showTourStep/, "visual tour runner should exist");
 
 assert.match(css, /\.hs-help-drawer/, "drawer styles should exist");
 assert.match(css, /\.hs-help-button/, "floating button styles should exist");
+assert.match(css, /#hsHelpRoot\.has-messages \.hs-help-quick/, "quick chips should hide after chat starts");
+assert.match(css, /height:100dvh/, "drawer should use dynamic viewport height");
 assert.match(css, /\.hs-tour-target/, "tour target highlight styles should exist");
 assert.match(css, /@media \(max-width: 720px\)/, "mobile drawer styles should exist");
 

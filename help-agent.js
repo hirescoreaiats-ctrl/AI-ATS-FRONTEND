@@ -223,6 +223,10 @@ return clean(text).toLowerCase()
 .replace(/\bupl\s*aod\b/g,"upload")
 .replace(/\buplod\b/g,"upload")
 .replace(/\buplaod\b/g,"upload")
+.replace(/\bcandiate\b/g,"candidate")
+.replace(/\bcandiadte\b/g,"candidate")
+.replace(/\bcommincation\b|\bcommuncation\b|\bcomunication\b/g,"communication")
+.replace(/\bsehdule\b|\bshedule\b/g,"schedule")
 .replace(/\bkrna\b/g,"karna")
 .replace(/\bkarni\b/g,"karna")
 .replace(/\bwali\b/g,"wali");
@@ -251,6 +255,8 @@ return dp[a.length][b.length];
 function extractJobTitle(raw){
 let text = clean(raw);
 let patterns = [
+/(\d+|one|two|three|four|five|six|seven|eight|nine|ten)?\s*(?:top\s*)?(?:candidate|candidates|resume|profile)s?\s+(?:of|for)\s+([a-z0-9 .+#-]+)/i,
+/(?:give|get|show|find|list)\s+(?:me\s+)?(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)?\s*(?:top\s*)?(?:candidate|candidates|resume|profile)s?\s+(?:of|for)\s+([a-z0-9 .+#-]+)/i,
 /([a-z0-9 .+#-]+?)\s+wali\s+job/i,
 /([a-z0-9 .+#-]+?)\s+job\s+me/i,
 /for\s+([a-z0-9 .+#-]+?)\s+job/i,
@@ -258,7 +264,8 @@ let patterns = [
 ];
 for(let pattern of patterns){
 let match = text.match(pattern);
-if(match && match[1]) return clean(match[1]).replace(/\b(the|this|that)\b/ig,"").trim();
+let value = match && (match[2] || match[1]);
+if(value) return clean(value).replace(/\b(the|this|that|want|you|to|give|get|top|candidate|candidates|of|for)\b/ig,"").trim();
 }
 let knownJobs = Array.isArray(window.dashboardJobs) ? window.dashboardJobs : [];
 let lowered = text.toLowerCase();
@@ -266,8 +273,19 @@ let found = knownJobs.find(job => clean(job.job_title).length > 2 && lowered.inc
 return found ? clean(found.job_title) : null;
 }
 
+function extractLimit(raw){
+let text = normalizeText(raw);
+let words = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10};
+let match = text.match(/\btop\s+(\d{1,3})\b/) || text.match(/\b(\d{1,3})\s+top\s+(?:candidate|candidates|resume|resumes|profile|profiles)\b/) || text.match(/\b(\d{1,3})\s+(?:candidate|candidates|resume|resumes|profile|profiles)\b/);
+if(match) return Math.max(1, Math.min(Number(match[1]), 100));
+match = text.match(new RegExp("\\b(?:" + Object.keys(words).join("|") + ")\\s+(?:top\\s+)?(?:candidate|candidates|resume|resumes|profile|profiles)\\b"));
+if(match) return words[match[0].split(/\s+/)[0]];
+return null;
+}
+
 function extractCandidateName(raw){
 let text = clean(raw);
+if(/\b(?:top\s*)?(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)?\s*(?:candidate|candidates)\s+(?:of|for)\b/i.test(text)) return null;
 let match = text.match(/\b([A-Z][a-z]{2,})\s+(?:ka|ke|ki)?\s*(?:interview|mail|email|test|profile|score|shortlist)/);
 if(match) return match[1];
 match = text.match(/\b(?:candidate|profile)\s+([A-Za-z]{2,})\b/i);
@@ -278,8 +296,13 @@ function resolveIntent(raw){
 let text = normalizeText(raw);
 let intent = null;
 let confidence = 0.25;
+let candidateSelection = /\b(?:top\s+)?\d{1,3}\s+(?:top\s+)?(?:candidate|candidates|resume|resumes|profile|profiles)\b/.test(text) || includesAny(text, ["top candidate", "top candidates", "best candidate", "best candidates", "candidate of", "candidates of"]);
 
-if(includesAny(text, ["cv", "resume", "profile"]) && (includesAny(text, ["upload", "add", "dalna", "dalo", "add karna"]) || fuzzyContains(text, "upload"))){
+if(candidateSelection && includesAny(text, ["communication", "outreach"])){
+intent = "candidate_workflow"; confidence = 0.9;
+}else if(candidateSelection){
+intent = "select_top_candidates"; confidence = 0.88;
+}else if(includesAny(text, ["cv", "resume", "profile"]) && (includesAny(text, ["upload", "add", "dalna", "dalo", "add karna"]) || fuzzyContains(text, "upload"))){
 intent = "upload_resumes"; confidence = 0.92;
 }else if(includesAny(text, ["new job", "create job", "job create", "opening create", "jd add", "jd banana", "role create"])){
 intent = "create_job"; confidence = 0.9;
@@ -306,11 +329,16 @@ intent = "view_plan_usage_limits"; confidence = 0.86;
 let entities = {
 job_title: extractJobTitle(raw),
 candidate_name: extractCandidateName(raw),
-candidate_group: text.includes("shortlisted") || text.includes("shortlist") ? "shortlisted" : null,
+candidate_group: candidateSelection ? "top_candidates" : (text.includes("shortlisted") || text.includes("shortlist") ? "shortlisted" : null),
 stage: text.includes("shortlisted") || text.includes("shortlist") ? "shortlisted" : null,
+target_stage: text.includes("communication") ? "communication" : (text.includes("interview") ? "interview_scheduling" : null),
 date_time: null,
+meeting_url: null,
 email: (raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i) || [null])[0],
-plan: includesAny(text, ["plan", "limit", "usage", "billing"]) ? "usage" : null
+plan: includesAny(text, ["plan", "limit", "usage", "billing"]) ? "usage" : null,
+limit: extractLimit(raw),
+job_id: null,
+candidate_ids: null
 };
 
 if((text.includes("shortlisted") || text.includes("shortlist")) && /\b(want|show|view|list|candidate|candidates|candiate)\b/.test(text)){
@@ -465,6 +493,7 @@ return {label, action, data:data || {}};
 function renderMessages(){
 let box = document.getElementById("hsHelpMessages");
 if(!box) return;
+document.getElementById("hsHelpRoot")?.classList.toggle("has-messages", state.messages.length > 0);
 box.innerHTML = state.messages.map((msg, index) => `
 <div class="hs-help-message is-${esc(msg.role)}">
 <div class="hs-help-bubble">${msg.html}</div>
@@ -590,13 +619,7 @@ return `<div class="hs-help-card-list">${jobs.map((job, index)=>`
 }
 
 function showClarification(){
-addMessage("agent", `<strong>I want to guide you correctly.</strong><p>Which workflow do you mean?</p>`, [
-actionButton("Upload Resumes","workflow",{workflowId:"upload_resumes"}),
-actionButton("Create Job","workflow",{workflowId:"create_job"}),
-actionButton("Send Email","workflow",{workflowId:"send_candidate_email"}),
-actionButton("Schedule Interview","workflow",{workflowId:"schedule_interview"}),
-actionButton("View Plan / Usage","workflow",{workflowId:"view_plan_usage_limits"})
-]);
+addMessage("agent", `<strong>I need one more detail.</strong><p>Please mention the job, candidate, or workflow you want. Example: "show top 5 Backend Developer candidates".</p>`);
 }
 
 async function handleUserText(text){
