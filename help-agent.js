@@ -10,8 +10,12 @@ confirmationRequired: "hs_action_confirmation_required"
 
 const SENSITIVE_INTENTS = new Set([
 "upload_resumes",
+"candidate_workflow",
+"select_top_candidates",
 "shortlist_candidate",
 "reject_candidate",
+"move_candidates_to_communication",
+"move_candidates_to_interview",
 "send_candidate_email",
 "schedule_interview",
 "send_screening_test",
@@ -19,6 +23,18 @@ const SENSITIVE_INTENTS = new Set([
 ]);
 
 const WORKFLOWS = {
+candidate_workflow: {
+id:"candidate_workflow", title:"Candidate Workflow", category:"Action Agent", requiredContext:["job"], route:"results", tourId:"review_ai_ranked_candidates",
+description:"Guide or execute a multi-step candidate workflow such as selecting top candidates and moving them to Communication.",
+steps:["Open the job's candidate results.","Review top AI-ranked candidates.","Confirm selected candidates.","Action Agent can shortlist and move them only after permission."],
+allowedModes:["guide","action"], isSensitiveAction:true
+},
+select_top_candidates: {
+id:"select_top_candidates", title:"Select Top Candidates", category:"Candidates", requiredContext:["job"], route:"results", tourId:"review_ai_ranked_candidates",
+description:"Find the highest-ranked candidates for a selected job.",
+steps:["Open candidate results.","Sort by AI score/rank.","Review evidence for the top candidates.","Select the candidates you want to move forward."],
+allowedModes:["guide","action"], isSensitiveAction:false
+},
 create_job: {
 id:"create_job", title:"Create Job", category:"Jobs", requiredContext:[], route:"job", tourId:"create_job",
 description:"Create a new job, add JD details, and start a screening pipeline.",
@@ -84,6 +100,18 @@ id:"reject_candidate", title:"Reject Candidate", category:"Candidates", required
 description:"Reject candidates after recruiter review.",
 steps:["Open candidate results.","Review score and evidence.","Use reject action only after validation."],
 allowedModes:["guide"], isSensitiveAction:true
+},
+move_candidates_to_communication: {
+id:"move_candidates_to_communication", title:"Move to Communication", category:"Communication", requiredContext:["job"], route:"communication", tourId:"send_candidate_email",
+description:"Move recruiter-approved shortlisted candidates into Communication.",
+steps:["Open candidate results.","Shortlist approved candidates.","Open Communication.","Move shortlisted candidates into outreach after confirmation."],
+allowedModes:["guide","action"], isSensitiveAction:true
+},
+move_candidates_to_interview: {
+id:"move_candidates_to_interview", title:"Move to Interview", category:"Interview", requiredContext:["job"], route:"interviewDashboard", tourId:"schedule_interview",
+description:"Move communication-ready candidates into interview scheduling.",
+steps:["Open Communication.","Confirm candidate interest/test status.","Move candidates into Interview Scheduling.","Add interview slot details."],
+allowedModes:["guide","action"], isSensitiveAction:true
 },
 send_candidate_email: {
 id:"send_candidate_email", title:"Send Email", category:"Communication", requiredContext:["job"], route:"communication", tourId:"send_candidate_email",
@@ -164,6 +192,7 @@ lastJobOptions: [],
 lastCandidateOptions: [],
 selectedJob: null,
 selectedCandidate: null,
+lastParsedPlan: null,
 jobsCache: null,
 tour: {active:false, steps:[], index:0}
 };
@@ -314,7 +343,9 @@ return window.location?.pathname || "dashboard";
 function currentHelpContext(){
 return {
 job_id: state.selectedJob?.id || null,
-candidate_id: state.selectedCandidate?.id || null
+job_title: state.selectedJob?.job_title || null,
+candidate_id: state.selectedCandidate?.id || null,
+candidate_ids: state.selectedCandidate?.id ? [state.selectedCandidate.id] : []
 };
 }
 
@@ -351,14 +382,27 @@ let entities = data.entities && typeof data.entities === "object" ? data.entitie
 return {
 intent: typeof data.intent === "string" ? data.intent : null,
 entities: {
+job_id: entities.job_id || null,
 job_title: entities.job_title || null,
 candidate_name: entities.candidate_name || null,
+candidate_ids: Array.isArray(entities.candidate_ids) ? entities.candidate_ids : null,
 candidate_group: entities.candidate_group || null,
 stage: entities.stage || null,
+target_stage: entities.target_stage || null,
 date_time: entities.date_time || null,
+meeting_url: entities.meeting_url || null,
 email: entities.email || null,
-plan: entities.plan || null
+plan: entities.plan || null,
+limit: entities.limit || null
 },
+tasks: Array.isArray(data.tasks) ? data.tasks : [],
+actions: Array.isArray(data.actions) ? data.actions : [],
+visual_tour: data.visual_tour && typeof data.visual_tour === "object" ? data.visual_tour : null,
+action_agent_plan: data.action_agent_plan && typeof data.action_agent_plan === "object" ? data.action_agent_plan : null,
+missing_fields: Array.isArray(data.missing_fields) ? data.missing_fields : [],
+ready_for_action_agent: Boolean(data.ready_for_action_agent),
+requires_confirmation: Boolean(data.requires_confirmation),
+guidance: data.guidance || null,
 confidence: Number(data.confidence || 0),
 clarification_needed: Boolean(data.clarification_needed),
 clarification_question: data.clarification_question || null
@@ -441,8 +485,8 @@ if(mode() === "action"){
 modeInfo.innerHTML = `
 <strong>Action Agent is active</strong>
 <p>I can perform supported tasks for you, but I will always ask for confirmation first.</p>
-<ul><li>Upload resumes after confirmation</li><li>Shortlist candidates after preview</li><li>Send emails after email preview</li><li>Schedule interviews after confirmation</li><li>Send screening tests after confirmation</li></ul>
-<small>I will never perform sensitive actions without your confirmation. Real action execution is scaffolded only in this version.</small>
+<ul><li>Find top candidates</li><li>Shortlist selected candidates after preview</li><li>Move shortlisted candidates to Communication</li><li>Prepare interview scheduling when slot details are available</li></ul>
+<small>I will never perform sensitive actions without your confirmation.</small>
 `;
 }else{
 modeInfo.innerHTML = `
@@ -459,7 +503,20 @@ let title = esc(workflow.title);
 let body = esc(workflow.description);
 let steps = workflow.steps.map(step => `<li>${esc(step)}</li>`).join("");
 let contextLine = context && context.job ? `<p><strong>Job:</strong> ${esc(context.job.job_title || "Selected job")} ${context.job.company_name ? "at " + esc(context.job.company_name) : ""}</p>` : "";
-return `<strong>${title}</strong><p>${body}</p>${contextLine}<ol>${steps}</ol><p>I will guide only. I will not perform sensitive actions in this version.</p>`;
+return `<strong>${title}</strong><p>${body}</p>${contextLine}<ol>${steps}</ol><p>Guide Agent shows the visual tour. Action Agent can execute supported actions only after you enable it and confirm.</p>`;
+}
+
+function plannerHtml(intentResult, workflow, context){
+let title = workflow?.title || "Hiring Workflow";
+let guidance = intentResult.guidance || workflow?.description || "I can guide this workflow visually.";
+let taskHtml = Array.isArray(intentResult.tasks) && intentResult.tasks.length
+? `<ol>${intentResult.tasks.map(task => `<li>${esc(task.description || task.intent)}</li>`).join("")}</ol>`
+: "";
+let missing = Array.isArray(intentResult.missing_fields) && intentResult.missing_fields.length
+? `<p><strong>Need before action:</strong> ${esc(intentResult.missing_fields.join(", "))}</p>`
+: "";
+let contextLine = context && context.job ? `<p><strong>Job:</strong> ${esc(context.job.job_title || "Selected job")}</p>` : "";
+return `<strong>${esc(title)}</strong><p>${esc(guidance)}</p>${contextLine}${taskHtml}${missing}<p>Helping Agent will show the visual tour. Action Agent will act only after permission and confirmation.</p>`;
 }
 
 async function handleWorkflow(intentResult, contextOverride){
@@ -469,6 +526,7 @@ return;
 }
 let workflow = WORKFLOWS[intentResult.intent];
 state.lastIntent = intentResult.intent;
+state.lastParsedPlan = intentResult;
 
 if(workflow.requiredContext.includes("job") && !contextOverride?.job){
 let jobs = await getJobs();
@@ -502,20 +560,23 @@ return;
 }
 
 let actions = [
-actionButton(workflow.id === "view_shortlisted_candidates" ? "Start Visual Guide" : "Start Visual Guide","tour",{tourId:workflow.tourId}),
+actionButton("Start Visual Tour", intentResult.visual_tour ? "planTour" : "tour", {tourId:workflow.tourId}),
 actionButton(workflow.id === "view_shortlisted_candidates" ? "Open Shortlisted Candidates" : "Open Page","openPage",{page:workflow.route}),
 actionButton("Read Guide","readGuide",{workflowId:workflow.id})
 ];
+if(intentResult.action_agent_plan && intentResult.actions?.length){
+actions.push(actionButton(mode() === "action" && actionEnabled() ? "Run Action Agent" : "Enable Action Agent","actionAgent",{}));
+}
 if(workflow.id === "view_shortlisted_candidates" && contextOverride?.job){
 let jobTitle = contextOverride.job.job_title || "selected";
 addMessage("agent", `<strong>I can show shortlisted candidates for the ${esc(jobTitle)} job.</strong><p>I will open the right recruiter view and guide you. I will not change any candidate status.</p>`, actions);
 return;
 }
 if(mode() === "guide" && SENSITIVE_INTENTS.has(workflow.id)){
-addMessage("agent", `<strong>I can guide you, but I will not perform this action.</strong>${workflowHtml(workflow, contextOverride)}`, actions);
+addMessage("agent", plannerHtml(intentResult, workflow, contextOverride), actions);
 return;
 }
-addMessage("agent", workflowHtml(workflow, contextOverride), actions);
+addMessage("agent", plannerHtml(intentResult, workflow, contextOverride), actions);
 }
 
 function renderJobCards(jobs){
@@ -587,6 +648,122 @@ let steps = (TOURS[tourId] || TOURS.dashboard_overview).map(step => ({id:step[0]
 state.tour = {active:true, steps, index:0};
 document.body.classList.add("hs-help-tour-active");
 showTourStep();
+}
+
+function startPlanTour(){
+let visualTour = state.lastParsedPlan?.visual_tour;
+if(!visualTour || !Array.isArray(visualTour.steps) || !visualTour.steps.length){
+let workflow = WORKFLOWS[state.lastIntent] || WORKFLOWS.create_job;
+return startTour(workflow.tourId);
+}
+if(visualTour.primary_route) openPage(visualTour.primary_route);
+let steps = visualTour.steps.map(step => ({
+id: step.target || step.id || "help-agent-button",
+title: step.title || "Next Step",
+body: step.body || "Follow this step in the dashboard."
+}));
+setTimeout(() => {
+state.tour = {active:true, steps, index:0};
+document.body.classList.add("hs-help-tour-active");
+showTourStep();
+}, visualTour.primary_route ? 450 : 0);
+}
+
+function apiBase(){
+return (window.API_BASE_URL || window.__HIRESCORE_API_BASE__ || "").replace(/\/$/, "");
+}
+
+function requestHeaders(){
+let headers = typeof authHeaders === "function" ? authHeaders() : {"Authorization":"Bearer " + localStorage.getItem("token")};
+if(!headers["Content-Type"] && !(headers instanceof Headers)) headers["Content-Type"] = "application/json";
+return headers;
+}
+
+async function fetchJson(url, options){
+let res = await fetch(url, options || {});
+let data = await res.json().catch(()=>null);
+if(!res.ok) throw new Error((data && (data.detail || data.error || data.message)) || "Request failed");
+return data;
+}
+
+async function resolvePlanJob(plan){
+if(plan?.entities?.job_id) return {id:plan.entities.job_id, job_title:plan.entities.job_title || "Selected job"};
+if(state.selectedJob?.id) return state.selectedJob;
+let jobs = await getJobs();
+let matches = matchJobs(jobs, plan?.entities?.job_title);
+if(matches.length === 1){
+state.selectedJob = matches[0];
+return matches[0];
+}
+throw new Error(matches.length ? "Please select the exact job first." : "Job not found. Open or select the job first.");
+}
+
+async function executeActionAgent(){
+let plan = state.lastParsedPlan;
+let actionPlan = plan?.action_agent_plan || {};
+let actions = Array.isArray(actionPlan.actions) ? actionPlan.actions : (Array.isArray(plan?.actions) ? plan.actions : []);
+if(!actions.length){
+addMessage("agent", "<strong>No executable action is available.</strong><p>I can still show the visual guide.</p>");
+return;
+}
+if(mode() !== "action" || !actionEnabled()){
+showPermission();
+return;
+}
+if(Array.isArray(actionPlan.missing_fields) && actionPlan.missing_fields.length){
+addMessage("agent", `<strong>I need a little more detail before taking action.</strong><p>Missing: ${esc(actionPlan.missing_fields.join(", "))}</p>`);
+return;
+}
+let ok = window.confirm("Action Agent will perform the planned workflow. Continue?");
+if(!ok) return;
+
+let base = apiBase();
+if(!base){
+addMessage("agent", "<strong>API base is unavailable.</strong><p>I cannot run actions from this page yet.</p>");
+return;
+}
+
+let loadingMessage = {role:"agent", html:"<em>Action Agent is working...</em>", actions:[]};
+state.messages.push(loadingMessage);
+renderMessages();
+
+try{
+let job = await resolvePlanJob(plan);
+let context = {job_id: job.id, candidate_ids: Array.isArray(plan.entities?.candidate_ids) ? [...plan.entities.candidate_ids] : []};
+let limit = Number(plan.entities?.limit || 10);
+
+for(let action of actions){
+if(action.action_id === "find_top_candidates"){
+let data = await fetchJson(`${base}/results/${encodeURIComponent(context.job_id)}`, {headers:requestHeaders()});
+let rows = Array.isArray(data?.results) ? data.results : [];
+context.candidate_ids = rows
+.filter(row => !["Rejected","Dropped","Communication"].includes(row.status))
+.slice(0, limit)
+.map(row => row.id)
+.filter(Boolean);
+if(!context.candidate_ids.length) throw new Error("No candidate IDs found in top results.");
+}
+if(action.action_id === "shortlist_candidates"){
+for(let candidateId of context.candidate_ids){
+await fetchJson(`${base}/shortlist/${encodeURIComponent(candidateId)}`, {method:"POST", headers:requestHeaders()});
+}
+}
+if(action.action_id === "move_to_communication"){
+await fetchJson(`${base}/move-to-communication?job_id=${encodeURIComponent(context.job_id)}`, {method:"POST", headers:requestHeaders()});
+}
+}
+
+removeMessage(loadingMessage);
+addMessage("agent", `<strong>Action Agent completed.</strong><p>${esc(context.candidate_ids.length)} candidate${context.candidate_ids.length === 1 ? "" : "s"} processed for ${esc(job.job_title || "the selected job")}.</p>`, [
+actionButton("Open Communication","openPage",{page:"communication"}),
+actionButton("Start Visual Tour","planTour",{})
+]);
+}catch(error){
+removeMessage(loadingMessage);
+addMessage("agent", `<strong>Action Agent could not complete this.</strong><p>${esc(error.message || "Please try again.")}</p>`, [
+actionButton("Start Visual Tour","planTour",{})
+]);
+}
 }
 
 function showTourStep(){
@@ -692,7 +869,7 @@ setSetting(SETTINGS_KEYS.mode, "action");
 setSetting(SETTINGS_KEYS.confirmationRequired, "true");
 document.getElementById("hsActionPermission")?.classList.add("hidden");
 renderModeInfo();
-addMessage("agent", `<strong>Action Agent is enabled, but real actions are still disabled in this first version.</strong><p>I will continue to guide and preview only unless a safe confirmed action registry is added later.</p>`);
+addMessage("agent", `<strong>Action Agent is enabled.</strong><p>I can now run supported candidate workflows after you confirm each action plan.</p>`);
 }
 
 function changeMode(value){
@@ -815,6 +992,8 @@ let item = state.messages[messageIndex]?.actions?.[actionIndex];
 if(!item) return;
 if(item.action === "openPage") openPage(item.data.page);
 if(item.action === "tour") startTour(item.data.tourId);
+if(item.action === "planTour") startPlanTour();
+if(item.action === "actionAgent") executeActionAgent();
 if(item.action === "readGuide") readGuide(item.data.workflowId);
 if(item.action === "workflow") handleWorkflow({intent:item.data.workflowId, entities:{}, confidence:1, clarification_needed:false});
 },
@@ -824,9 +1003,12 @@ if(!job) return;
 state.selectedJob = job;
 state.pendingContextType = null;
 addMessage("user", esc(job.job_title || "Selected job"));
-handleWorkflow({intent:state.lastIntent || "upload_resumes", entities:{}, confidence:1, clarification_needed:false}, {job});
+let plan = state.lastParsedPlan || {intent:state.lastIntent || "upload_resumes", entities:{}, confidence:1, clarification_needed:false};
+plan.entities = Object.assign({}, plan.entities || {}, {job_id:job.id, job_title:job.job_title || plan.entities?.job_title});
+handleWorkflow(plan, {job});
 },
 nextTour, prevTour, endTour,
+startPlanTour, executeActionAgent,
 resolveIntent,
 _state: state,
 _workflows: WORKFLOWS
