@@ -5,8 +5,8 @@ const html = readFileSync("index.html", "utf8");
 const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 
-assert.match(html, /help-agent\.css\?v=guide-agent-20260714-10/, "help css should be loaded");
-assert.match(html, /help-agent\.js\?v=guide-agent-20260714-10/, "help js should be loaded");
+assert.match(html, /help-agent\.css\?v=guide-agent-20260714-11/, "help css should be loaded");
+assert.match(html, /help-agent\.js\?v=guide-agent-20260714-11/, "help js should be loaded");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
 assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
 
@@ -33,6 +33,11 @@ assert.match(help, /localConversation/, "local conversational understanding shou
 assert.match(help, /To check job results, open Recruiter/, "job-result how-to questions should receive a direct answer");
 assert.match(help, /function\s+conversationHistory/, "recent conversation memory should be collected");
 assert.match(help, /conversation_history:conversationHistory\(\)/, "conversation memory should be sent to the backend AI");
+assert.match(help, /isCandidateGroup/, "candidate cardinality should distinguish groups from individual profiles");
+assert.match(help, /AI explanation for/, "group score explanations should render candidate-wise evidence");
+assert.match(help, /candidate\.recruiter_explanation\s*\|\|\s*candidate\.ranking_reason/, "candidate explanations should use stored AI evidence");
+assert.match(help, /selectedJobLabel/, "duplicate job-title selections should echo identifying context");
+assert.match(help, /if\(state\.lastUserText\)\{[\s\S]*parseIntentWithBackend\(state\.lastUserText\)/, "job selection should rebuild every plan with the resolved job id");
 assert.match(help, /function\s+shouldRequireCandidate/, "candidate requirement helper should exist");
 assert.match(help, /view_shortlisted_candidates/, "shortlisted candidate list intent should exist");
 assert.match(help, /Open Shortlisted Candidates/, "shortlisted candidates action should exist");

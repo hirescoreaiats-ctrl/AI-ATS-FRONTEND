@@ -594,6 +594,9 @@ missing_fields: missing
 
 function shouldRequireCandidate(intentResult){
 let intent = intentResult?.intent;
+let entities = intentResult?.entities || {};
+let isCandidateGroup = ["top_candidates","all","shortlisted"].includes(entities.candidate_group) || Number(entities.limit || 0) > 1;
+if(isCandidateGroup) return false;
 if(["view_candidate_profile", "explain_candidate_score"].includes(intent)) return true;
 if(["schedule_interview", "reject_candidate", "shortlist_candidate"].includes(intent)){
 return Boolean(intentResult?.entities?.candidate_name);
@@ -716,7 +719,13 @@ let missing = Array.isArray(intentResult.missing_fields) && intentResult.missing
 : "";
 let contextLine = context && context.job ? `<p><strong>Job:</strong> ${esc(context.job.job_title || "Selected job")}</p>` : "";
 let previewRows = Array.isArray(intentResult.candidate_preview) ? intentResult.candidate_preview.slice(0, 10) : [];
-let preview = previewRows.length ? `<div class="hs-help-agent-preview"><strong>Candidate preview (${intentResult.candidate_preview.length})</strong><ol>${previewRows.map(candidate => `<li><span>${esc(candidate.full_name || "Candidate")}</span><small>Score ${esc(candidate.rank_score ?? candidate.final_score ?? "N/A")} | ${esc(candidate.status || candidate.stage || "Review")}</small></li>`).join("")}</ol></div>` : "";
+let preview = previewRows.length ? `<div class="hs-help-agent-preview"><strong>AI explanation for ${intentResult.candidate_preview.length} candidate${intentResult.candidate_preview.length === 1 ? "" : "s"}</strong><ol>${previewRows.map((candidate, index) => {
+let explanation = candidate.recruiter_explanation || candidate.ranking_reason || "Open the candidate profile to review detailed score evidence.";
+let strengths = Array.isArray(candidate.strengths) && candidate.strengths.length ? `<p><b>Strengths:</b> ${esc(candidate.strengths.join("; "))}</p>` : "";
+let concerns = Array.isArray(candidate.concerns) && candidate.concerns.length ? `<p><b>Gaps:</b> ${esc(candidate.concerns.join("; "))}</p>` : "";
+let skills = Array.isArray(candidate.matched_skills) && candidate.matched_skills.length ? `<p><b>Matched skills:</b> ${esc(candidate.matched_skills.join(", "))}</p>` : "";
+return `<li><span>#${index + 1} ${esc(candidate.full_name || "Candidate")}</span><small>Score ${esc(candidate.rank_score ?? candidate.final_score ?? "N/A")} | ${esc(candidate.recommendation || candidate.status || candidate.stage || "Review")}</small><p>${esc(explanation)}</p>${strengths}${concerns}${skills}</li>`;
+}).join("")}</ol></div>` : "";
 let confirmation = intentResult.confirmation?.summary ? `<p><strong>Confirmation:</strong> ${esc(intentResult.confirmation.summary)}</p>` : "";
 return `<strong>${esc(title)}</strong><p>${esc(guidance)}</p>${contextLine}${taskHtml}${preview}${confirmation}${missing}<p>Helping Agent will show the visual tour. Action Agent will act only after permission and confirmation.</p>`;
 }
@@ -1390,10 +1399,11 @@ state.selectedJob = job;
 state.selectedCandidate = null;
 state.conversationContext = Object.assign({}, state.conversationContext, {job_id:job.id, job_title:job.job_title, candidate_ids:[]});
 state.pendingContextType = null;
-addMessage("user", esc(job.job_title || "Selected job"));
+let selectedJobLabel = [job.job_title, job.company_name ? `at ${job.company_name}` : "", job.location ? `(${job.location})` : ""].filter(Boolean).join(" ");
+addMessage("user", esc(selectedJobLabel || "Selected job"));
 let plan = state.lastParsedPlan || {intent:state.lastIntent || "upload_resumes", entities:{}, confidence:1, clarification_needed:false};
 plan.entities = Object.assign({}, plan.entities || {}, {job_id:job.id, job_title:job.job_title || plan.entities?.job_title});
-if(state.lastUserText && plan.requires_confirmation && !plan.confirmation?.token){
+if(state.lastUserText){
 try{
 let refreshed = await parseIntentWithBackend(state.lastUserText);
 state.conversationContext = mergeEntities(state.conversationContext, refreshed.entities || {});
