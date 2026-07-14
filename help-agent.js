@@ -22,6 +22,11 @@ const SENSITIVE_INTENTS = new Set([
 "deactivate_pilot_user"
 ]);
 
+const AGENT_CONTRACT_VERSION = "2026-07-general-v1";
+const MUTATING_ACTION_IDS = new Set([
+"shortlist_candidates","reject_candidates","move_to_communication","move_to_interview_scheduling","schedule_interview_slot","send_mail"
+]);
+
 const WORKFLOWS = {
 search_talent: {
 id:"search_talent", title:"Talent Search", category:"Candidates", requiredContext:[], route:"results", tourId:"review_ai_ranked_candidates",
@@ -508,32 +513,36 @@ let fallback = {intent:null, entities:{}, confidence:0.2, clarification_needed:t
 data = data && typeof data === "object" ? data : fallback;
 let backendIntent = workflowIdFromBackend(data);
 let localIntent = localResult?.intent || null;
-let intent = WORKFLOWS[backendIntent] ? backendIntent : localIntent;
-if(localIntent === "select_top_candidates" && ["review_ai_ranked_candidates", "candidate_workflow"].includes(intent)){
+let authoritative = data.agent_contract_version === AGENT_CONTRACT_VERSION;
+let intent = WORKFLOWS[backendIntent] ? backendIntent : (authoritative ? null : localIntent);
+if(!authoritative && localIntent === "select_top_candidates" && ["review_ai_ranked_candidates", "candidate_workflow"].includes(intent)){
 intent = localIntent;
 }
-if(localIntent === "candidate_workflow" && intent === "send_candidate_email"){
+if(!authoritative && localIntent === "candidate_workflow" && intent === "send_candidate_email"){
 intent = localIntent;
 }
 let entities = data.entities && typeof data.entities === "object" ? data.entities : {};
 let localEntities = localResult?.entities || {};
-let mergedEntities = mergeEntities(localEntities, entities);
+let mergedEntities = authoritative ? entities : mergeEntities(localEntities, entities);
 let actionPlan = data.action_agent_plan && typeof data.action_agent_plan === "object" ? data.action_agent_plan : null;
 let actions = Array.isArray(data.actions) ? data.actions : [];
-if(!actionPlan) actionPlan = buildLocalActionPlan(intent, mergedEntities, data);
-if(!actions.length && Array.isArray(actionPlan?.actions)) actions = actionPlan.actions;
-let localConversation = localResult?.response_type === "conversation";
+if(!authoritative && !actionPlan) actionPlan = buildLocalActionPlan(intent, mergedEntities, data);
+if(!authoritative && !actions.length && Array.isArray(actionPlan?.actions)) actions = actionPlan.actions;
+if(authoritative && !actionPlan) actionPlan = {enabled:false, actions:[], missing_fields:[], requires_confirmation:false};
+let localConversation = !authoritative && localResult?.response_type === "conversation";
 let clarificationNeeded = Boolean(data.clarification_needed || data.requires_clarification);
 if((data.intent === "unknown" || data.intent === "clarify_workflow") && !intent) clarificationNeeded = true;
-if(intent && localResult?.confidence >= 0.55 && (data.intent === "unknown" || data.intent === "clarify_workflow" || !WORKFLOWS[backendIntent])){
+if(!authoritative && intent && localResult?.confidence >= 0.55 && (data.intent === "unknown" || data.intent === "clarify_workflow" || !WORKFLOWS[backendIntent])){
 clarificationNeeded = false;
 }
-return {
-response_type: localConversation
+let responseType = localConversation
 ? "conversation"
 : (["conversation","workflow","clarification"].includes(data.response_type)
 ? data.response_type
-: (intent ? "workflow" : "clarification")),
+: (intent ? "workflow" : "clarification"));
+return {
+agent_contract_version: data.agent_contract_version || null,
+response_type: responseType,
 assistant_reply: localConversation
 ? (data.response_type === "conversation" ? (data.assistant_reply || data.reply || localResult?.assistant_reply) : localResult?.assistant_reply)
 : (data.assistant_reply || data.reply || localResult?.assistant_reply || null),
@@ -558,16 +567,21 @@ actions,
 visual_tour: data.visual_tour && typeof data.visual_tour === "object" ? data.visual_tour : null,
 action_agent_plan: actionPlan,
 missing_fields: Array.isArray(data.missing_fields) ? data.missing_fields : [],
-ready_for_action_agent: Boolean(data.ready_for_action_agent || actions.length),
+ready_for_action_agent: authoritative ? Boolean(data.ready_for_action_agent) : Boolean(data.ready_for_action_agent || actions.length),
 requires_confirmation: Boolean(data.requires_confirmation),
 candidate_preview: Array.isArray(data.candidate_preview) ? data.candidate_preview : [],
 job_options: Array.isArray(data.job_options) ? data.job_options : [],
 confirmation: data.confirmation && typeof data.confirmation === "object" ? data.confirmation : null,
 guidance: data.assistant_reply || data.guidance || data.message || null,
 confidence: Number(data.confidence || 0),
-clarification_needed: clarificationNeeded || !intent,
+clarification_needed: responseType === "clarification" ? (clarificationNeeded || !intent) : false,
 clarification_question: data.clarification_question || null
 };
+}
+
+function mutationActions(intentResult){
+let actions = Array.isArray(intentResult?.actions) ? intentResult.actions : [];
+return actions.filter(action => MUTATING_ACTION_IDS.has(action?.action_id));
 }
 
 function mergeEntities(localEntities, backendEntities){
@@ -742,6 +756,45 @@ let confirmation = intentResult.confirmation?.summary ? `<p><strong>Confirmation
 return `<strong>${esc(title)}</strong><p>${esc(guidance)}</p>${contextLine}${taskHtml}${preview}${confirmation}${missing}<p>Helping Agent will show the visual tour. Action Agent will act only after permission and confirmation.</p>`;
 }
 
+function talentSearchHtml(query, candidates, total){
+let rows = (candidates || []).slice(0, 10);
+if(!rows.length){
+return `<strong>No strong matches found for ${esc(query)}</strong><p>Try adding core skills, seniority, domain, or location—for example: “senior TPM with cloud migration”.</p>`;
+}
+let cards = rows.map((candidate, index) => {
+let score = candidate.recruiter_rank_score ?? candidate.rank_score ?? candidate.final_score ?? "N/A";
+let reason = candidate.recruiter_explanation || candidate.ranking_reason || "Matched using role, skills, and resume evidence.";
+return `<li><span>#${index + 1} ${esc(candidate.full_name || "Candidate")}</span><small>${esc(candidate.designation || "Role not specified")} | ATS score ${esc(score)}</small><p>${esc(reason)}</p></li>`;
+}).join("");
+return `<strong>Found ${esc(total ?? rows.length)} candidate match${Number(total ?? rows.length) === 1 ? "" : "es"} for ${esc(query)}</strong><div class="hs-help-agent-preview"><ol>${cards}</ol></div><p><small>Results are ranked across your talent pool using role, skills, resume evidence, and ATS score.</small></p>`;
+}
+
+async function handleTalentSearch(intentResult){
+state.lastIntent = "search_talent";
+state.lastParsedPlan = Object.assign({}, intentResult, {actions:[], requires_confirmation:false, ready_for_action_agent:false});
+state.selectedJob = null;
+state.selectedCandidate = null;
+state.conversationContext = Object.assign({}, state.conversationContext, {job_id:null, job_title:null, candidate_id:null, candidate_ids:[]});
+let query = intentResult?.entities?.search_query || intentResult?.entities?.job_title || state.lastUserText;
+if(!query){
+addMessage("agent", "<strong>What kind of candidates do you need?</strong><p>Tell me the role, skills, seniority, domain, or location.</p>");
+return;
+}
+let candidates = Array.isArray(intentResult.candidate_preview) ? intentResult.candidate_preview : [];
+let total = candidates.length;
+if(!candidates.length){
+try{
+let data = await fetchJson(`${apiBase()}/api/v1/talent/search?q=${encodeURIComponent(query)}&stage=all&page=1&page_size=10`, {headers:requestHeaders()});
+candidates = Array.isArray(data?.results) ? data.results : [];
+total = Number(data?.total ?? candidates.length);
+}catch(error){
+addMessage("agent", `<strong>I could not search the talent pool.</strong><p>${esc(error.message || "Please try again.")}</p>`);
+return;
+}
+}
+addMessage("agent", talentSearchHtml(query, candidates, total));
+}
+
 async function handleWorkflow(intentResult, contextOverride){
 if(!intentResult || !intentResult.intent || !WORKFLOWS[intentResult.intent]){
 showClarification();
@@ -750,6 +803,10 @@ return;
 let workflow = WORKFLOWS[intentResult.intent];
 state.lastIntent = intentResult.intent;
 state.lastParsedPlan = intentResult;
+
+if(workflow.id === "search_talent"){
+return handleTalentSearch(intentResult);
+}
 
 if(workflow.requiredContext.includes("job") && !contextOverride?.job){
 if(intentResult.entities?.job_id){
@@ -795,7 +852,7 @@ actionButton("Start Visual Tour", intentResult.visual_tour ? "planTour" : "tour"
 actionButton(workflow.id === "view_shortlisted_candidates" ? "Open Shortlisted Candidates" : "Open Page","openPage",{page:workflow.route}),
 actionButton("Read Guide","readGuide",{workflowId:workflow.id})
 ];
-if(intentResult.action_agent_plan && intentResult.actions?.length && (intentResult.requires_confirmation || !intentResult.candidate_preview?.length)){
+if(intentResult.requires_confirmation && mutationActions(intentResult).length){
 actions.push(actionButton(mode() === "action" && actionEnabled() ? "Run Action Agent" : "Enable Action Agent","actionAgent",{}));
 }
 if(workflow.id === "view_shortlisted_candidates" && contextOverride?.job){
@@ -903,6 +960,11 @@ let key = ordinal[1];
 if(state.lastJobOptions[map[key]]) return selectJob(map[key]);
 }
 }
+if(state.pendingContextType){
+state.pendingContextType = null;
+state.lastJobOptions = [];
+state.lastCandidateOptions = [];
+}
 
 let loadingMessage = {role:"agent", html:"<em>Understanding your request...</em>", actions:[]};
 state.messages.push(loadingMessage);
@@ -916,7 +978,9 @@ result = resolveIntent(value);
 removeMessage(loadingMessage);
 }
 if(result?.entities){
-state.conversationContext = mergeEntities(state.conversationContext, result.entities);
+state.conversationContext = result.agent_contract_version === AGENT_CONTRACT_VERSION
+? Object.assign({}, state.conversationContext, result.entities)
+: mergeEntities(state.conversationContext, result.entities);
 }
 if(result.response_type === "conversation"){
 state.pendingContextType = null;
@@ -1044,8 +1108,9 @@ async function executeActionAgent(){
 let plan = state.lastParsedPlan;
 let actionPlan = plan?.action_agent_plan || {};
 let actions = Array.isArray(actionPlan.actions) ? actionPlan.actions : (Array.isArray(plan?.actions) ? plan.actions : []);
-if(!actions.length){
-addMessage("agent", "<strong>No executable action is available.</strong><p>I can still show the visual guide.</p>");
+let mutations = actions.filter(action => MUTATING_ACTION_IDS.has(action?.action_id));
+if(!mutations.length){
+addMessage("agent", "<strong>This is a read-only result.</strong><p>No Action Agent step is required.</p>");
 return;
 }
 if(mode() !== "action" || !actionEnabled()){

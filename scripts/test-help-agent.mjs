@@ -5,8 +5,8 @@ const html = readFileSync("index.html", "utf8");
 const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 
-assert.match(html, /help-agent\.css\?v=guide-agent-20260714-12/, "help css should be loaded");
-assert.match(html, /help-agent\.js\?v=guide-agent-20260714-12/, "help js should be loaded");
+assert.match(html, /help-agent\.css\?v=guide-agent-20260714-13/, "help css should be loaded");
+assert.match(html, /help-agent\.js\?v=guide-agent-20260714-13/, "help js should be loaded");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
 assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
 
@@ -94,6 +94,15 @@ assert.match(help, /wantsShortlistAction/, "shortlist action should be distingui
 assert.match(help, /candidateSelection \? "top_candidates"/, "top candidate group extraction should exist");
 assert.match(help, /extractLimit/, "top candidate limit extraction should exist");
 assert.match(help, /discoveryQuery/, "role and skill candidate discovery should be supported across jobs");
+assert.match(help, /function\s+handleTalentSearch/, "talent search should use a dedicated read-only result flow");
+assert.match(help, /workflow\.id === "search_talent"[\s\S]*handleTalentSearch/, "talent search should bypass generic workflow actions");
+assert.match(help, /\/api\/v1\/talent\/search\?q=/, "talent search should fetch actual cross-job candidate matches");
+assert.match(help, /AGENT_CONTRACT_VERSION/, "frontend should enforce a versioned backend agent contract");
+assert.match(help, /authoritative \? entities : mergeEntities/, "current backend contract should be the single intent authority");
+assert.match(help, /MUTATING_ACTION_IDS/, "read-only tools should be separated from mutation execution");
+assert.match(help, /if\(state\.pendingContextType\)\{[\s\S]*state\.lastJobOptions = \[\]/, "new requests should clear stale pending selections");
+assert.match(help, /result\.agent_contract_version === AGENT_CONTRACT_VERSION[\s\S]*Object\.assign/, "authoritative null entities should clear stale context");
+assert.match(help, /state\.selectedJob = null;[\s\S]*job_id:null/, "cross-job talent search should clear stale job scope");
 assert.match(help, /Which workflow do you mean\?/, "clarification should ask a focused follow-up question");
 assert.match(help, /clarificationActions/, "clarification should show workflow choices");
 assert.match(help, /data-help-id/, "tour should use data-help-id selectors");
