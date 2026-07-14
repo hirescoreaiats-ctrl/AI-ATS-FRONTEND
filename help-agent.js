@@ -329,6 +329,16 @@ return ["shortlist","select","reject","show","find","list","upload"].includes(ma
 
 function resolveIntent(raw){
 let text = normalizeText(raw);
+if(/^(?:hi|hello|hey|hii+|heyy+|namaste|namaskar|good (?:morning|afternoon|evening))(?: (?:there|bhai|bro|sir|team))?$/.test(text)){
+return {
+response_type:"conversation",
+assistant_reply:"Hello! How can I help with your hiring workflow today? You can ask me to find candidates, upload resumes, shortlist profiles, send outreach, or schedule interviews.",
+intent:null,
+entities:{},
+confidence:1,
+clarification_needed:false
+};
+}
 let intent = null;
 let confidence = 0.25;
 let candidateSelection = /\b(?:top\s+)?\d{1,3}\s+(?:top\s+)?(?:candidate|candidates|resume|resumes|profile|profiles)\b/.test(text) || includesAny(text, ["top candidate", "top candidates", "best candidate", "best candidates", "candidate of", "candidates of"]);
@@ -485,6 +495,10 @@ if(intent && localResult?.confidence >= 0.55 && (data.intent === "unknown" || da
 clarificationNeeded = false;
 }
 return {
+response_type: ["conversation","workflow","clarification"].includes(data.response_type)
+? data.response_type
+: (intent ? "workflow" : "clarification"),
+assistant_reply: data.assistant_reply || data.reply || localResult?.assistant_reply || null,
 intent,
 entities: {
 job_id: mergedEntities.job_id || null,
@@ -510,7 +524,7 @@ requires_confirmation: Boolean(data.requires_confirmation),
 candidate_preview: Array.isArray(data.candidate_preview) ? data.candidate_preview : [],
 job_options: Array.isArray(data.job_options) ? data.job_options : [],
 confirmation: data.confirmation && typeof data.confirmation === "object" ? data.confirmation : null,
-guidance: data.guidance || data.message || null,
+guidance: data.assistant_reply || data.guidance || data.message || null,
 confidence: Number(data.confidence || 0),
 clarification_needed: clarificationNeeded || !intent,
 clarification_question: data.clarification_question || null
@@ -854,6 +868,17 @@ removeMessage(loadingMessage);
 }
 if(result?.entities){
 state.conversationContext = mergeEntities(state.conversationContext, result.entities);
+}
+if(result.response_type === "conversation"){
+state.pendingContextType = null;
+state.lastJobOptions = [];
+addMessage("agent", `<p>${esc(result.assistant_reply || "How can I help with your hiring workflow?")}</p>`);
+return;
+}
+if(result.response_type === "clarification" && result.assistant_reply){
+state.pendingContextType = null;
+addMessage("agent", `<p>${esc(result.assistant_reply)}</p>`, clarificationActions(value));
+return;
 }
 if(result.clarification_needed) return showClarification(result, value);
 state.clarificationAttempts = 0;
