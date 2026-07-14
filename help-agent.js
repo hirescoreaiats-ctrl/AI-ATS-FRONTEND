@@ -239,8 +239,10 @@ function actionEnabled(){ return getSetting(SETTINGS_KEYS.actionEnabled, "false"
 
 function normalizeText(text){
 return clean(text).toLowerCase()
-.replace(/[._-]+/g," ")
+.replace(/[^a-z0-9+#]+/g," ")
 .replace(/\s+/g," ")
+.replace(/\bshort\s*(?:list|ist|lst|lis)\b/g,"shortlist")
+.replace(/\bshortlisted\b/g,"shortlisted")
 .replace(/\bupl\s*aod\b/g,"upload")
 .replace(/\buplod\b/g,"upload")
 .replace(/\buplaod\b/g,"upload")
@@ -250,7 +252,8 @@ return clean(text).toLowerCase()
 .replace(/\bsehdule\b|\bshedule\b/g,"schedule")
 .replace(/\bkrna\b/g,"karna")
 .replace(/\bkarni\b/g,"karna")
-.replace(/\bwali\b/g,"wali");
+.replace(/\bwali\b/g,"wali")
+.trim();
 }
 
 function includesAny(text, words){ return words.some(word => text.includes(word)); }
@@ -274,24 +277,30 @@ return dp[a.length][b.length];
 }
 
 function extractJobTitle(raw){
-let text = clean(raw);
+let text = normalizeText(raw);
 let patterns = [
-/(\d+|one|two|three|four|five|six|seven|eight|nine|ten)?\s*(?:top\s*)?(?:candidate|candidates|resume|profile)s?\s+(?:of|for)\s+([a-z0-9 .+#-]+)/i,
-/(?:give|get|show|find|list)\s+(?:me\s+)?(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)?\s*(?:top\s*)?(?:candidate|candidates|resume|profile)s?\s+(?:of|for)\s+([a-z0-9 .+#-]+)/i,
-/([a-z0-9 .+#-]+?)\s+wali\s+job/i,
-/([a-z0-9 .+#-]+?)\s+job\s+me/i,
-/for\s+([a-z0-9 .+#-]+?)\s+job/i,
-/in\s+([a-z0-9 .+#-]+?)\s+job/i
+/(?:top\s*)?(?:candidate|candidates|resume|resumes|profile|profiles)\s+(?:of|for|in)\s+(.+?)(?:\s+(?:job|role|opening)\b|$)/i,
+/(?:shortlist|select|review|show|find|list|get|give)\s+(?:me\s+)?(?:top\s*)?(?:candidate|candidates|resume|resumes|profile|profiles)?\s*(?:of|for|in)\s+(.+?)(?:\s+(?:job|role|opening)\b|$)/i,
+/(.+?)\s+wali\s+job/i,
+/(.+?)\s+job\s+me/i,
+/(?:of|for|in)\s+(.+?)\s+(?:job|role|opening)\b/i
 ];
 for(let pattern of patterns){
 let match = text.match(pattern);
 let value = match && (match[2] || match[1]);
-if(value) return clean(value).replace(/\b(the|this|that|want|you|to|give|get|top|candidate|candidates|of|for)\b/ig,"").trim();
+if(value) return normalizeJobTitle(value);
 }
 let knownJobs = Array.isArray(window.dashboardJobs) ? window.dashboardJobs : [];
-let lowered = text.toLowerCase();
-let found = knownJobs.find(job => clean(job.job_title).length > 2 && lowered.includes(clean(job.job_title).toLowerCase()));
+let lowered = normalizeText(text);
+let found = knownJobs.find(job => clean(job.job_title).length > 2 && lowered.includes(normalizeText(job.job_title)));
 return found ? clean(found.job_title) : null;
+}
+
+function normalizeJobTitle(value){
+return normalizeText(value)
+.replace(/\b(the|this|that|want|need|please|you|to|give|get|show|find|list|top|candidate|candidates|resume|resumes|profile|profiles|of|for|in|job|role|opening|shortlist|select|review)\b/g," ")
+.replace(/\s+/g," ")
+.trim();
 }
 
 function extractLimit(raw){
@@ -318,8 +327,12 @@ let text = normalizeText(raw);
 let intent = null;
 let confidence = 0.25;
 let candidateSelection = /\b(?:top\s+)?\d{1,3}\s+(?:top\s+)?(?:candidate|candidates|resume|resumes|profile|profiles)\b/.test(text) || includesAny(text, ["top candidate", "top candidates", "best candidate", "best candidates", "candidate of", "candidates of"]);
+let wantsShortlistAction = includesAny(text, ["shortlist candidate", "shortlist candidates", "shortlist resume", "shortlist resumes", "select candidate", "select candidates"]);
+let wantsViewShortlisted = text.includes("shortlisted") || includesAny(text, ["view shortlist", "show shortlist", "list shortlist", "shortlist list", "shortlisted candidate", "shortlisted candidates"]);
 
-if(candidateSelection && includesAny(text, ["communication", "outreach"])){
+if((candidateSelection || wantsShortlistAction) && includesAny(text, ["communication", "outreach"])){
+intent = "candidate_workflow"; confidence = 0.9;
+}else if(wantsShortlistAction){
 intent = "candidate_workflow"; confidence = 0.9;
 }else if(candidateSelection){
 intent = "select_top_candidates"; confidence = 0.88;
@@ -350,8 +363,8 @@ intent = "view_plan_usage_limits"; confidence = 0.86;
 let entities = {
 job_title: extractJobTitle(raw),
 candidate_name: extractCandidateName(raw),
-candidate_group: candidateSelection ? "top_candidates" : (text.includes("shortlisted") || text.includes("shortlist") ? "shortlisted" : null),
-stage: text.includes("shortlisted") || text.includes("shortlist") ? "shortlisted" : null,
+ candidate_group: candidateSelection ? "top_candidates" : (wantsViewShortlisted ? "shortlisted" : null),
+ stage: wantsViewShortlisted ? "shortlisted" : null,
 target_stage: text.includes("communication") ? "communication" : (text.includes("interview") ? "interview_scheduling" : null),
 date_time: null,
 meeting_url: null,
@@ -362,7 +375,7 @@ job_id: null,
 candidate_ids: null
 };
 
-if((text.includes("shortlisted") || text.includes("shortlist")) && /\b(want|show|view|list|candidate|candidates|candiate)\b/.test(text)){
+if(wantsViewShortlisted && /\b(want|show|view|list|candidate|candidates|candiate)\b/.test(text)){
 intent = "view_shortlisted_candidates";
 confidence = 0.9;
 entities.candidate_group = "shortlisted";
@@ -452,7 +465,7 @@ intent = localIntent;
 }
 let entities = data.entities && typeof data.entities === "object" ? data.entities : {};
 let localEntities = localResult?.entities || {};
-let mergedEntities = Object.assign({}, localEntities, entities);
+let mergedEntities = mergeEntities(localEntities, entities);
 let actionPlan = data.action_agent_plan && typeof data.action_agent_plan === "object" ? data.action_agent_plan : null;
 let actions = Array.isArray(data.actions) ? data.actions : [];
 if(!actionPlan) actionPlan = buildLocalActionPlan(intent, mergedEntities, data);
@@ -490,6 +503,16 @@ confidence: Number(data.confidence || 0),
 clarification_needed: clarificationNeeded || !intent,
 clarification_question: data.clarification_question || null
 };
+}
+
+function mergeEntities(localEntities, backendEntities){
+let merged = Object.assign({}, localEntities || {});
+Object.keys(backendEntities || {}).forEach(key => {
+let value = backendEntities[key];
+let hasValue = Array.isArray(value) ? value.length > 0 : value !== null && value !== undefined && String(value).trim() !== "";
+if(hasValue) merged[key] = value;
+});
+return merged;
 }
 
 function buildLocalActionPlan(intent, entities, data){
@@ -546,10 +569,25 @@ function matchJobs(jobs, title){
 let active = (jobs || []).filter(job => job.is_active !== false);
 if(!title) return active;
 let q = normalizeText(title);
-return active.filter(job => {
+let qTokens = q.split(" ").filter(part => part.length > 2 && !["job","role","opening"].includes(part));
+let ranked = active.map(job => {
 let hay = normalizeText([job.job_title, job.company_name, job.location, job.work_mode].filter(Boolean).join(" "));
-return hay.includes(q) || q.split(" ").some(part => part.length > 2 && hay.includes(part));
-});
+let titleText = normalizeText(job.job_title || "");
+let tokenHits = qTokens.filter(part => hay.includes(part)).length;
+let score = 0;
+if(titleText === q) score += 100;
+if(titleText.includes(q)) score += 80;
+if(hay.includes(q)) score += 60;
+score += tokenHits * 12;
+if(qTokens.length && tokenHits === qTokens.length) score += 30;
+if(titleText && qTokens.length && qTokens.every(part => titleText.includes(part))) score += 40;
+return {job, score};
+}).filter(item => item.score > 0)
+.sort((a,b) => b.score - a.score);
+if(ranked.length > 1 && ranked[0].score >= 70 && ranked[0].score >= ranked[1].score + 25){
+return [ranked[0].job];
+}
+return ranked.map(item => item.job);
 }
 
 function addMessage(role, html, actions){

@@ -5,8 +5,8 @@ const html = readFileSync("index.html", "utf8");
 const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 
-assert.match(html, /help-agent\.css\?v=guide-agent-20260702-02/, "help css should be loaded");
-assert.match(html, /help-agent\.js\?v=guide-agent-20260702-02/, "help js should be loaded");
+assert.match(html, /help-agent\.css\?v=guide-agent-20260702-05/, "help css should be loaded");
+assert.match(html, /help-agent\.js\?v=guide-agent-20260702-05/, "help js should be loaded");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
 assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
 
@@ -56,9 +56,13 @@ for (const workflow of [
 assert.match(help, /upl\s\*aod|upl\\s\*aod|upl\.aod|uplod/, "upload typo handling should exist");
 assert.match(help, /cv.*resume.*profile|profile.*resume/, "resume synonym handling should exist");
 assert.match(help, /candiate/, "candidate typo handling should exist");
+assert.match(help, /short\\s\*\(\?:list\|ist\|lst\|lis\)|short\\s\*/, "shortlist typo handling should exist");
+assert.match(help, /mergeEntities/, "backend entities should not overwrite local NLP extraction with blank values");
+assert.match(help, /wantsShortlistAction/, "shortlist action should be distinguished from shortlisted list view");
 assert.match(help, /candidateSelection \? "top_candidates"/, "top candidate group extraction should exist");
 assert.match(help, /extractLimit/, "top candidate limit extraction should exist");
-assert.match(help, /show top 5 Backend Developer candidates/, "clarification should be contextual instead of hardcoded buttons");
+assert.match(help, /Which workflow do you mean\?/, "clarification should ask a focused follow-up question");
+assert.match(help, /clarificationActions/, "clarification should show workflow choices");
 assert.match(help, /data-help-id/, "tour should use data-help-id selectors");
 assert.match(help, /dashboard_overview/, "dashboard overview tour should exist");
 assert.match(help, /showTourStep/, "visual tour runner should exist");
