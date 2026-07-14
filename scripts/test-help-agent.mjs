@@ -5,8 +5,8 @@ const html = readFileSync("index.html", "utf8");
 const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 
-assert.match(html, /help-agent\.css\?v=guide-agent-20260714-13/, "help css should be loaded");
-assert.match(html, /help-agent\.js\?v=guide-agent-20260714-13/, "help js should be loaded");
+assert.match(html, /help-agent\.css\?v=guide-agent-20260714-14/, "help css should be loaded");
+assert.match(html, /help-agent\.js\?v=guide-agent-20260714-14/, "help js should be loaded");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
 assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
 
@@ -113,6 +113,10 @@ assert.match(css, /\.hs-help-drawer/, "drawer styles should exist");
 assert.match(css, /\.hs-help-button/, "floating button styles should exist");
 assert.match(css, /#hsHelpRoot\.has-messages \.hs-help-quick/, "quick chips should hide after chat starts");
 assert.match(css, /height:100dvh/, "drawer should use dynamic viewport height");
+assert.match(css, /grid-template-rows:auto auto minmax\(0,1fr\) auto auto/, "composer should have a dedicated fixed drawer row");
+assert.match(css, /\.hs-help-drawer\{[\s\S]*?overflow:hidden/, "the drawer itself should never scroll the composer away");
+assert.match(css, /\.hs-help-messages\{[\s\S]*?overflow-y:auto/, "only the conversation should scroll independently");
+assert.match(help, /<\/div>\s*<form id="hsHelpForm" class="hs-help-form">/, "query form should remain outside the scrollable mode panel");
 assert.match(css, /\.hs-tour-target/, "tour target highlight styles should exist");
 assert.match(css, /@media \(max-width: 720px\)/, "mobile drawer styles should exist");
 

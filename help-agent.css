@@ -44,7 +44,8 @@ width:min(460px,calc(100vw - 18px));
 height:100dvh;
 max-height:100dvh;
 display:grid;
-grid-template-rows:auto auto minmax(0,1fr) auto;
+grid-template-rows:auto auto minmax(0,1fr) auto auto;
+overflow:hidden;
 background:#f8fafc;
 border-left:1px solid #dbe4ef;
 box-shadow:-22px 0 60px rgba(15,23,42,.18);
@@ -236,10 +237,10 @@ color:#64748b;
 .hs-help-compose{
 display:grid;
 gap:8px;
-padding:10px 12px 12px;
+padding:10px 12px;
 background:#fff;
 border-top:1px solid #e2e8f0;
-max-height:42dvh;
+max-height:30dvh;
 overflow-y:auto;
 }
 
@@ -307,6 +308,13 @@ display:none;
 display:grid;
 grid-template-columns:minmax(0,1fr) 74px;
 gap:8px;
+position:relative;
+z-index:2;
+flex:0 0 auto;
+padding:10px 12px max(10px,env(safe-area-inset-bottom));
+background:#fff;
+border-top:1px solid #e2e8f0;
+box-shadow:0 -8px 22px rgba(15,23,42,.05);
 }
 
 .hs-help-form button,
@@ -469,7 +477,7 @@ transform:translateY(0);
 }
 
 .hs-help-compose{
-max-height:38dvh;
+max-height:26dvh;
 }
 
 .hs-help-mode-info ul{

@@ -1369,11 +1369,11 @@ ${QUICK_ACTIONS.map(item => `<button type="button" onclick="window.HireScoreHelp
 <div class="hs-help-compose">
 <label class="hs-agent-mode"><span>Agent Mode</span><select id="hsAgentMode" onchange="window.HireScoreHelpAgent.changeMode(this.value)"><option value="guide">Guide Agent</option><option value="action">Action Agent - Requires permission</option></select></label>
 <div id="hsHelpModeInfo" class="hs-help-mode-info"></div>
+</div>
 <form id="hsHelpForm" class="hs-help-form">
 <input id="hsHelpInput" type="text" placeholder="Ask me anything, like 'upload resumes for Data Analyst job'" autocomplete="off">
 <button type="submit">Send</button>
 </form>
-</div>
 </aside>
 <div id="hsHelpOnboarding" class="hs-help-modal-backdrop hidden">
 <section class="hs-help-modal" role="dialog" aria-modal="true">
