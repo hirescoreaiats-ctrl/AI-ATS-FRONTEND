@@ -638,7 +638,7 @@ score += tokenHits * 12;
 if(qTokens.length && tokenHits === qTokens.length) score += 30;
 if(titleText && qTokens.length && qTokens.every(part => titleText.includes(part))) score += 40;
 return {job, score};
-}).filter(item => item.score > 0)
+}).filter(item => item.score >= 50)
 .sort((a,b) => b.score - a.score);
 if(ranked.length > 1 && ranked[0].score >= 70 && ranked[0].score >= ranked[1].score + 25){
 return [ranked[0].job];
@@ -856,6 +856,7 @@ return true;
 }
 
 function showClarification(intentResult, raw){
+if(intentResult) state.lastParsedPlan = intentResult;
 if(Array.isArray(intentResult?.job_options) && intentResult.job_options.length){
 state.pendingContextType = "job";
 state.lastJobOptions = intentResult.job_options;
@@ -1390,7 +1391,19 @@ if(item.action === "tour") startTour(item.data.tourId, item.data.page);
 if(item.action === "planTour") startPlanTour();
 if(item.action === "actionAgent") executeActionAgent();
 if(item.action === "readGuide") readGuide(item.data.workflowId);
-if(item.action === "workflow") handleWorkflow({intent:item.data.workflowId, entities:{}, confidence:1, clarification_needed:false});
+if(item.action === "workflow"){
+let previousPlan = state.lastParsedPlan || {};
+let preservedEntities = mergeEntities(previousPlan.entities || {}, state.conversationContext || {});
+handleWorkflow({
+...previousPlan,
+response_type:"workflow",
+intent:item.data.workflowId,
+entities:preservedEntities,
+confidence:1,
+clarification_needed:false,
+clarification_question:null
+});
+}
 },
 selectJob:async function(index){
 let job = state.lastJobOptions[index];

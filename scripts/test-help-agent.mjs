@@ -38,6 +38,9 @@ assert.match(help, /AI explanation for/, "group score explanations should render
 assert.match(help, /candidate\.recruiter_explanation\s*\|\|\s*candidate\.ranking_reason/, "candidate explanations should use stored AI evidence");
 assert.match(help, /selectedJobLabel/, "duplicate job-title selections should echo identifying context");
 assert.match(help, /if\(state\.lastUserText\)\{[\s\S]*parseIntentWithBackend\(state\.lastUserText\)/, "job selection should rebuild every plan with the resolved job id");
+assert.match(help, /item\.score >= 50/, "weak job-title matches should not open unrelated jobs");
+assert.match(help, /if\(intentResult\) state\.lastParsedPlan = intentResult/, "clarifications should preserve the parsed conversation state");
+assert.match(help, /preservedEntities/, "clarification choices should preserve job and candidate entities");
 assert.match(help, /function\s+shouldRequireCandidate/, "candidate requirement helper should exist");
 assert.match(help, /view_shortlisted_candidates/, "shortlisted candidate list intent should exist");
 assert.match(help, /Open Shortlisted Candidates/, "shortlisted candidates action should exist");
