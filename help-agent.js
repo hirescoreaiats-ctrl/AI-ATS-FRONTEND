@@ -339,6 +339,16 @@ confidence:1,
 clarification_needed:false
 };
 }
+if(/\b(?:how (?:do|can|to)|where (?:do|can)|steps? (?:to|for))\b/.test(text) && /\b(?:job )?(?:result|results|candidate|candidates|score|scores|ranking|rankings)\b/.test(text)){
+return {
+response_type:"conversation",
+assistant_reply:"To check job results, open Recruiter, choose the job, and click View Results. You will see all candidates ranked with AI scores and evidence. Open any candidate to review the full profile, matched skills, gaps, and recommendation.",
+intent:null,
+entities:{},
+confidence:0.96,
+clarification_needed:false
+};
+}
 let intent = null;
 let confidence = 0.25;
 let allCandidates = /\b(?:all|every|saare|sare|sabhi|sabi)\s+(?:candidate|candidates|resume|resumes|profile|profiles)\b/.test(text);
@@ -433,6 +443,14 @@ previous_intent: state.lastParsedPlan?.intent || null
 });
 }
 
+function conversationHistory(){
+return state.messages.slice(0, -1).slice(-12).map(message => {
+let holder = document.createElement("div");
+holder.innerHTML = message.html || "";
+return {role:message.role === "user" ? "user" : "assistant", content:(holder.textContent || "").trim().slice(0, 1000)};
+}).filter(message => message.content);
+}
+
 async function parseIntentWithBackend(message){
 let base = (window.API_BASE_URL || window.__HIRESCORE_API_BASE__ || "").replace(/\/$/, "");
 if(!base) throw new Error("API base unavailable");
@@ -452,7 +470,8 @@ signal:controller.signal,
 body:JSON.stringify({
 message,
 current_route:currentHelpRoute(),
-current_context:currentHelpContext()
+current_context:currentHelpContext(),
+conversation_history:conversationHistory()
 })
 });
 let data = await res.json().catch(()=>null);
@@ -492,16 +511,21 @@ let actionPlan = data.action_agent_plan && typeof data.action_agent_plan === "ob
 let actions = Array.isArray(data.actions) ? data.actions : [];
 if(!actionPlan) actionPlan = buildLocalActionPlan(intent, mergedEntities, data);
 if(!actions.length && Array.isArray(actionPlan?.actions)) actions = actionPlan.actions;
+let localConversation = localResult?.response_type === "conversation";
 let clarificationNeeded = Boolean(data.clarification_needed || data.requires_clarification);
 if((data.intent === "unknown" || data.intent === "clarify_workflow") && !intent) clarificationNeeded = true;
 if(intent && localResult?.confidence >= 0.55 && (data.intent === "unknown" || data.intent === "clarify_workflow" || !WORKFLOWS[backendIntent])){
 clarificationNeeded = false;
 }
 return {
-response_type: ["conversation","workflow","clarification"].includes(data.response_type)
+response_type: localConversation
+? "conversation"
+: (["conversation","workflow","clarification"].includes(data.response_type)
 ? data.response_type
-: (intent ? "workflow" : "clarification"),
-assistant_reply: data.assistant_reply || data.reply || localResult?.assistant_reply || null,
+: (intent ? "workflow" : "clarification")),
+assistant_reply: localConversation
+? (data.response_type === "conversation" ? (data.assistant_reply || data.reply || localResult?.assistant_reply) : localResult?.assistant_reply)
+: (data.assistant_reply || data.reply || localResult?.assistant_reply || null),
 intent,
 entities: {
 job_id: mergedEntities.job_id || null,
