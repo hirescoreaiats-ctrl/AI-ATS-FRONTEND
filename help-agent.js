@@ -341,11 +341,14 @@ clarification_needed:false
 }
 let intent = null;
 let confidence = 0.25;
+let allCandidates = /\b(?:all|every|saare|sare|sabhi|sabi)\s+(?:candidate|candidates|resume|resumes|profile|profiles)\b/.test(text);
 let candidateSelection = /\b(?:top\s+)?\d{1,3}\s+(?:top\s+)?(?:candidate|candidates|resume|resumes|profile|profiles)\b/.test(text) || includesAny(text, ["top candidate", "top candidates", "best candidate", "best candidates", "candidate of", "candidates of"]);
 let wantsShortlistAction = includesAny(text, ["shortlist candidate", "shortlist candidates", "shortlist resume", "shortlist resumes", "select candidate", "select candidates"]) || /\b(?:candidate|candidates|resume|resumes)\s+shortlist\b/.test(text);
 let wantsViewShortlisted = text.includes("shortlisted") || includesAny(text, ["view shortlist", "show shortlist", "list shortlist", "shortlist list", "shortlisted candidate", "shortlisted candidates"]);
 
-if((candidateSelection || wantsShortlistAction) && includesAny(text, ["communication", "outreach"])){
+if(allCandidates){
+intent = "view_candidates_by_stage"; confidence = 0.94;
+}else if((candidateSelection || wantsShortlistAction) && includesAny(text, ["communication", "outreach"])){
 intent = "candidate_workflow"; confidence = 0.9;
 }else if(wantsShortlistAction){
 intent = "candidate_workflow"; confidence = 0.9;
@@ -378,7 +381,7 @@ intent = "view_plan_usage_limits"; confidence = 0.86;
 let entities = {
 job_title: extractJobTitle(raw),
 candidate_name: extractCandidateName(raw),
- candidate_group: candidateSelection ? "top_candidates" : (wantsViewShortlisted ? "shortlisted" : null),
+ candidate_group: allCandidates ? "all" : (candidateSelection ? "top_candidates" : (wantsViewShortlisted ? "shortlisted" : null)),
  stage: wantsViewShortlisted ? "shortlisted" : null,
 target_stage: text.includes("communication") ? "communication" : (text.includes("interview") ? "interview_scheduling" : null),
 date_time: null,

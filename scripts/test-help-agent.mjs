@@ -5,8 +5,8 @@ const html = readFileSync("index.html", "utf8");
 const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 
-assert.match(html, /help-agent\.css\?v=guide-agent-20260714-08/, "help css should be loaded");
-assert.match(html, /help-agent\.js\?v=guide-agent-20260714-08/, "help js should be loaded");
+assert.match(html, /help-agent\.css\?v=guide-agent-20260714-09/, "help css should be loaded");
+assert.match(html, /help-agent\.js\?v=guide-agent-20260714-09/, "help js should be loaded");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
 assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
 
