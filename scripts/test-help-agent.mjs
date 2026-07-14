@@ -5,8 +5,8 @@ const html = readFileSync("index.html", "utf8");
 const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 
-assert.match(html, /help-agent\.css\?v=guide-agent-20260714-11/, "help css should be loaded");
-assert.match(html, /help-agent\.js\?v=guide-agent-20260714-11/, "help js should be loaded");
+assert.match(html, /help-agent\.css\?v=guide-agent-20260714-12/, "help css should be loaded");
+assert.match(html, /help-agent\.js\?v=guide-agent-20260714-12/, "help js should be loaded");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
 assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
 
@@ -52,12 +52,13 @@ assert.match(help, /target === "editJob"[\s\S]*window\.openEditJob\(job\.id\)/, 
 
 const pageIds = new Set([...html.matchAll(/id="([A-Za-z0-9]+)Page"/g)].map(match => match[1]));
 const workflowRoutes = [...help.matchAll(/\bid:"([a-z_]+)"[\s\S]*?route:"([A-Za-z0-9]+)"/g)];
-assert.equal(workflowRoutes.length, 22, "every registered workflow should expose a route");
+assert.equal(workflowRoutes.length, 23, "every registered workflow should expose a route");
 for (const [, workflowId, route] of workflowRoutes) {
   assert.ok(pageIds.has(route), `${workflowId} should route to an existing ${route}Page container`);
 }
 
 for (const workflow of [
+  "search_talent",
   "create_job",
   "edit_job",
   "share_public_apply_link",
@@ -92,6 +93,7 @@ assert.match(help, /mergeEntities/, "backend entities should not overwrite local
 assert.match(help, /wantsShortlistAction/, "shortlist action should be distinguished from shortlisted list view");
 assert.match(help, /candidateSelection \? "top_candidates"/, "top candidate group extraction should exist");
 assert.match(help, /extractLimit/, "top candidate limit extraction should exist");
+assert.match(help, /discoveryQuery/, "role and skill candidate discovery should be supported across jobs");
 assert.match(help, /Which workflow do you mean\?/, "clarification should ask a focused follow-up question");
 assert.match(help, /clarificationActions/, "clarification should show workflow choices");
 assert.match(help, /data-help-id/, "tour should use data-help-id selectors");

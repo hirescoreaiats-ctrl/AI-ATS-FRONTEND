@@ -23,6 +23,12 @@ const SENSITIVE_INTENTS = new Set([
 ]);
 
 const WORKFLOWS = {
+search_talent: {
+id:"search_talent", title:"Talent Search", category:"Candidates", requiredContext:[], route:"results", tourId:"review_ai_ranked_candidates",
+description:"Search candidates across all jobs using role, skills, and resume evidence.",
+steps:["Describe the role or skills you need.","Review semantic and ATS-ranked matches.","Open a candidate profile to validate evidence."],
+allowedModes:["guide"], isSensitiveAction:false
+},
 candidate_workflow: {
 id:"candidate_workflow", title:"Candidate Workflow", category:"Action Agent", requiredContext:["job"], route:"results", tourId:"review_ai_ranked_candidates",
 description:"Guide or execute a multi-step candidate workflow such as selecting top candidates and moving them to Communication.",
@@ -352,11 +358,15 @@ clarification_needed:false
 let intent = null;
 let confidence = 0.25;
 let allCandidates = /\b(?:all|every|saare|sare|sabhi|sabi)\s+(?:candidate|candidates|resume|resumes|profile|profiles)\b/.test(text);
+let discoveryMatch = text.match(/^(?:i want|show me|find|search|get|give me|mujhe)?\s*(.+?)\s+(?:candidate|candidates|profiles|resumes)$/);
+let discoveryQuery = discoveryMatch ? normalizeJobTitle(discoveryMatch[1]) : null;
 let candidateSelection = /\b(?:top\s+)?\d{1,3}\s+(?:top\s+)?(?:candidate|candidates|resume|resumes|profile|profiles)\b/.test(text) || includesAny(text, ["top candidate", "top candidates", "best candidate", "best candidates", "candidate of", "candidates of"]);
 let wantsShortlistAction = includesAny(text, ["shortlist candidate", "shortlist candidates", "shortlist resume", "shortlist resumes", "select candidate", "select candidates"]) || /\b(?:candidate|candidates|resume|resumes)\s+shortlist\b/.test(text);
 let wantsViewShortlisted = text.includes("shortlisted") || includesAny(text, ["view shortlist", "show shortlist", "list shortlist", "shortlist list", "shortlisted candidate", "shortlisted candidates"]);
 
-if(allCandidates){
+if(discoveryQuery && !includesAny(text, ["top ", "shortlist", "reject", " job", " of ", " for "])){
+intent = "search_talent"; confidence = 0.9;
+}else if(allCandidates){
 intent = "view_candidates_by_stage"; confidence = 0.94;
 }else if((candidateSelection || wantsShortlistAction) && includesAny(text, ["communication", "outreach"])){
 intent = "candidate_workflow"; confidence = 0.9;
@@ -389,6 +399,7 @@ intent = "view_plan_usage_limits"; confidence = 0.86;
 }
 
 let entities = {
+search_query: intent === "search_talent" ? discoveryQuery : null,
 job_title: extractJobTitle(raw),
 candidate_name: extractCandidateName(raw),
  candidate_group: allCandidates ? "all" : (candidateSelection ? "top_candidates" : (wantsViewShortlisted ? "shortlisted" : null)),
@@ -528,6 +539,7 @@ assistant_reply: localConversation
 : (data.assistant_reply || data.reply || localResult?.assistant_reply || null),
 intent,
 entities: {
+search_query: mergedEntities.search_query || null,
 job_id: mergedEntities.job_id || null,
 job_title: mergedEntities.job_title || null,
 candidate_name: mergedEntities.candidate_name || null,
