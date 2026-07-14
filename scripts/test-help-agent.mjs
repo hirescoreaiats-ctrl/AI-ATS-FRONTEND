@@ -5,8 +5,8 @@ const html = readFileSync("index.html", "utf8");
 const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 
-assert.match(html, /help-agent\.css\?v=guide-agent-20260714-06/, "help css should be loaded");
-assert.match(html, /help-agent\.js\?v=guide-agent-20260714-06/, "help js should be loaded");
+assert.match(html, /help-agent\.css\?v=guide-agent-20260714-07/, "help css should be loaded");
+assert.match(html, /help-agent\.js\?v=guide-agent-20260714-07/, "help js should be loaded");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
 assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
 
@@ -28,6 +28,18 @@ assert.match(help, /Understanding your request\.\.\./, "loading state should be 
 assert.match(help, /function\s+shouldRequireCandidate/, "candidate requirement helper should exist");
 assert.match(help, /view_shortlisted_candidates/, "shortlisted candidate list intent should exist");
 assert.match(help, /Open Shortlisted Candidates/, "shortlisted candidates action should exist");
+assert.match(help, /function\s+selectedJobIdentity/, "job-scoped navigation context should exist");
+assert.match(help, /target === "results"[\s\S]*window\.openJobResult\(job\.id, job\.title\)/, "candidate workflows should open the selected job result page");
+assert.match(help, /window\.currentJobId/, "agent should recover job context from an already-open job workspace");
+assert.match(help, /target === "communication"[\s\S]*window\.openCommunicationPage\(job\.id, job\.title\)/, "communication workflows should open the selected job queue");
+assert.match(help, /target === "editJob"[\s\S]*window\.openEditJob\(job\.id\)/, "edit workflow should open the selected job form");
+
+const pageIds = new Set([...html.matchAll(/id="([A-Za-z0-9]+)Page"/g)].map(match => match[1]));
+const workflowRoutes = [...help.matchAll(/\bid:"([a-z_]+)"[\s\S]*?route:"([A-Za-z0-9]+)"/g)];
+assert.equal(workflowRoutes.length, 22, "every registered workflow should expose a route");
+for (const [, workflowId, route] of workflowRoutes) {
+  assert.ok(pageIds.has(route), `${workflowId} should route to an existing ${route}Page container`);
+}
 
 for (const workflow of [
   "create_job",

@@ -861,10 +861,42 @@ state.lastClarificationText = "";
 return handleWorkflow(result);
 }
 
-function openPage(page){
-if(typeof window.showPage === "function"){
-window.showPage(page || "dashboard");
+function selectedJobIdentity(){
+let job = state.selectedJob || {};
+let id = job.id || job.job_id || state.conversationContext?.job_id || state.lastParsedPlan?.entities?.job_id || window.currentJobId || null;
+let title = job.job_title || state.conversationContext?.job_title || state.lastParsedPlan?.entities?.job_title || window.currentJobTitle || "Selected job";
+return id ? {id, title} : null;
 }
+
+function openPage(page){
+let target = page || "dashboard";
+let job = selectedJobIdentity();
+// Generic workspace pages and job-scoped detail pages are different views.
+// Always preserve resolved context instead of silently dropping the user on
+// a landing page where they must choose the same job again.
+if(target === "results"){
+if(job && typeof window.openJobResult === "function"){
+window.openJobResult(job.id, job.title);
+return true;
+}
+}
+if(target === "communication"){
+if(job && typeof window.openCommunicationPage === "function"){
+window.openCommunicationPage(job.id, job.title);
+return true;
+}
+}
+if(target === "editJob"){
+if(job && typeof window.openEditJob === "function"){
+window.openEditJob(job.id);
+return true;
+}
+}
+if(typeof window.showPage === "function"){
+window.showPage(target);
+return true;
+}
+return false;
 }
 
 function readGuide(workflowId){
