@@ -212,6 +212,8 @@ lastCandidateOptions: [],
 selectedJob: null,
 selectedCandidate: null,
 lastParsedPlan: null,
+lastUserText: "",
+conversationContext: {},
 jobsCache: null,
 clarificationAttempts: 0,
 lastClarificationText: "",
@@ -281,6 +283,7 @@ let text = normalizeText(raw);
 let patterns = [
 /(?:top\s*)?(?:candidate|candidates|resume|resumes|profile|profiles)\s+(?:of|for|in)\s+(.+?)(?:\s+(?:job|role|opening)\b|$)/i,
 /(?:shortlist|select|review|show|find|list|get|give)\s+(?:me\s+)?(?:top\s*)?(?:candidate|candidates|resume|resumes|profile|profiles)?\s*(?:of|for|in)\s+(.+?)(?:\s+(?:job|role|opening)\b|$)/i,
+/(.+?)(?:\s+job)?\s+(?:ke|ka|ki|kai|kay)\s+(?:top\s*)?(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)?\s*(?:candidate|candidates|resume|resumes|profile|profiles)/i,
 /(.+?)\s+wali\s+job/i,
 /(.+?)\s+job\s+me/i,
 /(?:of|for|in)\s+(.+?)\s+(?:job|role|opening)\b/i
@@ -298,7 +301,7 @@ return found ? clean(found.job_title) : null;
 
 function normalizeJobTitle(value){
 return normalizeText(value)
-.replace(/\b(the|this|that|want|need|please|you|to|give|get|show|find|list|top|candidate|candidates|resume|resumes|profile|profiles|of|for|in|job|role|opening|shortlist|select|review)\b/g," ")
+.replace(/\b(the|this|that|want|need|please|you|to|give|get|show|find|list|top|candidate|candidates|resume|resumes|profile|profiles|of|for|in|job|role|opening|shortlist|select|review|ke|ka|ki|kai|kay)\b/g," ")
 .replace(/\s+/g," ")
 .trim();
 }
@@ -310,6 +313,7 @@ let match = text.match(/\btop\s+(\d{1,3})\b/) || text.match(/\b(\d{1,3})\s+top\s
 if(match) return Math.max(1, Math.min(Number(match[1]), 100));
 match = text.match(new RegExp("\\b(?:" + Object.keys(words).join("|") + ")\\s+(?:top\\s+)?(?:candidate|candidates|resume|resumes|profile|profiles)\\b"));
 if(match) return words[match[0].split(/\s+/)[0]];
+if(/\btop\s+(?:candidate|resume|profile)\b/.test(text)) return 1;
 return null;
 }
 
@@ -319,7 +323,8 @@ if(/\b(?:top\s*)?(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)?\s*(?:
 let match = text.match(/\b([A-Z][a-z]{2,})\s+(?:ka|ke|ki)?\s*(?:interview|mail|email|test|profile|score|shortlist)/);
 if(match) return match[1];
 match = text.match(/\b(?:candidate|profile)\s+([A-Za-z]{2,})\b/i);
-return match ? match[1] : null;
+if(!match) return null;
+return ["shortlist","select","reject","show","find","list","upload"].includes(match[1].toLowerCase()) ? null : match[1];
 }
 
 function resolveIntent(raw){
@@ -327,7 +332,7 @@ let text = normalizeText(raw);
 let intent = null;
 let confidence = 0.25;
 let candidateSelection = /\b(?:top\s+)?\d{1,3}\s+(?:top\s+)?(?:candidate|candidates|resume|resumes|profile|profiles)\b/.test(text) || includesAny(text, ["top candidate", "top candidates", "best candidate", "best candidates", "candidate of", "candidates of"]);
-let wantsShortlistAction = includesAny(text, ["shortlist candidate", "shortlist candidates", "shortlist resume", "shortlist resumes", "select candidate", "select candidates"]);
+let wantsShortlistAction = includesAny(text, ["shortlist candidate", "shortlist candidates", "shortlist resume", "shortlist resumes", "select candidate", "select candidates"]) || /\b(?:candidate|candidates|resume|resumes)\s+shortlist\b/.test(text);
 let wantsViewShortlisted = text.includes("shortlisted") || includesAny(text, ["view shortlist", "show shortlist", "list shortlist", "shortlist list", "shortlisted candidate", "shortlisted candidates"]);
 
 if((candidateSelection || wantsShortlistAction) && includesAny(text, ["communication", "outreach"])){
@@ -403,23 +408,27 @@ return window.location?.pathname || "dashboard";
 }
 
 function currentHelpContext(){
-return {
+let contextCandidateIds = state.conversationContext?.job_id && state.selectedJob?.id && state.conversationContext.job_id !== state.selectedJob.id
+? []
+: (state.conversationContext?.candidate_ids || []);
+return Object.assign({}, state.conversationContext || {}, {
 job_id: state.selectedJob?.id || null,
 job_title: state.selectedJob?.job_title || null,
 candidate_id: state.selectedCandidate?.id || null,
-candidate_ids: state.selectedCandidate?.id ? [state.selectedCandidate.id] : []
-};
+candidate_ids: state.selectedCandidate?.id ? [state.selectedCandidate.id] : contextCandidateIds,
+previous_intent: state.lastParsedPlan?.intent || null
+});
 }
 
 async function parseIntentWithBackend(message){
 let base = (window.API_BASE_URL || window.__HIRESCORE_API_BASE__ || "").replace(/\/$/, "");
 if(!base) throw new Error("API base unavailable");
 let localResult = resolveIntent(message);
-let endpoints = ["/parse-intent", "/api/v1/parse-intent", "/api/v1/help/parse-intent"];
+let endpoints = ["/api/v1/help/chat", "/api/v1/help/parse-intent", "/parse-intent", "/api/v1/parse-intent"];
 let lastError = null;
 for(let endpoint of endpoints){
 let controller = new AbortController();
-let timeout = setTimeout(()=>controller.abort(), 4500);
+let timeout = setTimeout(()=>controller.abort(), 15000);
 try{
 let headers = typeof authHeaders === "function" ? authHeaders() : {"Content-Type":"application/json","Authorization":"Bearer " + localStorage.getItem("token")};
 if(!headers["Content-Type"] && !(headers instanceof Headers)) headers["Content-Type"] = "application/json";
@@ -498,6 +507,9 @@ action_agent_plan: actionPlan,
 missing_fields: Array.isArray(data.missing_fields) ? data.missing_fields : [],
 ready_for_action_agent: Boolean(data.ready_for_action_agent || actions.length),
 requires_confirmation: Boolean(data.requires_confirmation),
+candidate_preview: Array.isArray(data.candidate_preview) ? data.candidate_preview : [],
+job_options: Array.isArray(data.job_options) ? data.job_options : [],
+confirmation: data.confirmation && typeof data.confirmation === "object" ? data.confirmation : null,
 guidance: data.guidance || data.message || null,
 confidence: Number(data.confidence || 0),
 clarification_needed: clarificationNeeded || !intent,
@@ -662,7 +674,10 @@ let missing = Array.isArray(intentResult.missing_fields) && intentResult.missing
 ? `<p><strong>Need before action:</strong> ${esc(intentResult.missing_fields.join(", "))}</p>`
 : "";
 let contextLine = context && context.job ? `<p><strong>Job:</strong> ${esc(context.job.job_title || "Selected job")}</p>` : "";
-return `<strong>${esc(title)}</strong><p>${esc(guidance)}</p>${contextLine}${taskHtml}${missing}<p>Helping Agent will show the visual tour. Action Agent will act only after permission and confirmation.</p>`;
+let previewRows = Array.isArray(intentResult.candidate_preview) ? intentResult.candidate_preview.slice(0, 10) : [];
+let preview = previewRows.length ? `<div class="hs-help-agent-preview"><strong>Candidate preview (${intentResult.candidate_preview.length})</strong><ol>${previewRows.map(candidate => `<li><span>${esc(candidate.full_name || "Candidate")}</span><small>Score ${esc(candidate.rank_score ?? candidate.final_score ?? "N/A")} | ${esc(candidate.status || candidate.stage || "Review")}</small></li>`).join("")}</ol></div>` : "";
+let confirmation = intentResult.confirmation?.summary ? `<p><strong>Confirmation:</strong> ${esc(intentResult.confirmation.summary)}</p>` : "";
+return `<strong>${esc(title)}</strong><p>${esc(guidance)}</p>${contextLine}${taskHtml}${preview}${confirmation}${missing}<p>Helping Agent will show the visual tour. Action Agent will act only after permission and confirmation.</p>`;
 }
 
 async function handleWorkflow(intentResult, contextOverride){
@@ -675,6 +690,14 @@ state.lastIntent = intentResult.intent;
 state.lastParsedPlan = intentResult;
 
 if(workflow.requiredContext.includes("job") && !contextOverride?.job){
+if(intentResult.entities?.job_id){
+let resolvedJob = {
+id:intentResult.entities.job_id,
+job_title:intentResult.entities.job_title || "Selected job"
+};
+state.selectedJob = resolvedJob;
+return handleWorkflow(intentResult, {job:resolvedJob});
+}
 let jobs = await getJobs();
 let matches = matchJobs(jobs, intentResult.entities.job_title);
 if(intentResult.entities.job_title && matches.length === 1){
@@ -710,7 +733,7 @@ actionButton("Start Visual Tour", intentResult.visual_tour ? "planTour" : "tour"
 actionButton(workflow.id === "view_shortlisted_candidates" ? "Open Shortlisted Candidates" : "Open Page","openPage",{page:workflow.route}),
 actionButton("Read Guide","readGuide",{workflowId:workflow.id})
 ];
-if(intentResult.action_agent_plan && intentResult.actions?.length){
+if(intentResult.action_agent_plan && intentResult.actions?.length && (intentResult.requires_confirmation || !intentResult.candidate_preview?.length)){
 actions.push(actionButton(mode() === "action" && actionEnabled() ? "Run Action Agent" : "Enable Action Agent","actionAgent",{}));
 }
 if(workflow.id === "view_shortlisted_candidates" && contextOverride?.job){
@@ -783,6 +806,13 @@ return true;
 }
 
 function showClarification(intentResult, raw){
+if(Array.isArray(intentResult?.job_options) && intentResult.job_options.length){
+state.pendingContextType = "job";
+state.lastJobOptions = intentResult.job_options;
+state.lastParsedPlan = intentResult;
+addMessage("agent", `<strong>${esc(intentResult.clarification_question || "Which exact job should I use?")}</strong><p>Select one job and I will rebuild the action preview in that context.</p>${renderJobCards(state.lastJobOptions)}`);
+return;
+}
 let normalized = normalizeText(raw || "");
 state.clarificationAttempts = state.lastClarificationText === normalized ? state.clarificationAttempts + 1 : 1;
 state.lastClarificationText = normalized;
@@ -798,6 +828,7 @@ addMessage("agent", `<strong>${title}</strong>${question}<p>${esc(body)}</p>`, a
 async function handleUserText(text){
 let value = clean(text);
 if(!value) return;
+state.lastUserText = value;
 addMessage("user", esc(value));
 
 let normalized = normalizeText(value);
@@ -820,6 +851,9 @@ result = await parseIntentWithBackend(value);
 result = resolveIntent(value);
 }finally{
 removeMessage(loadingMessage);
+}
+if(result?.entities){
+state.conversationContext = mergeEntities(state.conversationContext, result.entities);
 }
 if(result.clarification_needed) return showClarification(result, value);
 state.clarificationAttempts = 0;
@@ -931,6 +965,21 @@ state.messages.push(loadingMessage);
 renderMessages();
 
 try{
+if(plan?.confirmation?.token){
+let data = await fetchJson(`${base}/api/v1/help/execute`, {
+method:"POST",
+headers:requestHeaders(),
+body:JSON.stringify({confirmation_token:plan.confirmation.token})
+});
+removeMessage(loadingMessage);
+let receipts = Array.isArray(data?.receipts) ? data.receipts.map(item => `<li>${esc(item.action_id || "action")}: ${esc(item.status || "completed")} (${esc(item.count ?? 0)})</li>`).join("") : "";
+state.jobsCache = null;
+addMessage("agent", `<strong>Action Agent completed.</strong><p>${esc(data?.candidate_count || 0)} candidate${Number(data?.candidate_count || 0) === 1 ? "" : "s"} processed for ${esc(data?.job?.job_title || plan?.entities?.job_title || "the selected job")}.</p>${receipts ? `<ul>${receipts}</ul>` : ""}`, [
+actionButton("Open Recruiter","openPage",{page:"results"}),
+actionButton("Open Communication","openPage",{page:"communication"})
+]);
+return;
+}
 let job = await resolvePlanJob(plan);
 let context = {job_id: job.id, candidate_ids: Array.isArray(plan.entities?.candidate_ids) ? [...plan.entities.candidate_ids] : [], candidates: []};
 let limit = Number(plan.entities?.limit || 10);
@@ -1250,14 +1299,27 @@ if(item.action === "actionAgent") executeActionAgent();
 if(item.action === "readGuide") readGuide(item.data.workflowId);
 if(item.action === "workflow") handleWorkflow({intent:item.data.workflowId, entities:{}, confidence:1, clarification_needed:false});
 },
-selectJob:function(index){
+selectJob:async function(index){
 let job = state.lastJobOptions[index];
 if(!job) return;
 state.selectedJob = job;
+state.selectedCandidate = null;
+state.conversationContext = Object.assign({}, state.conversationContext, {job_id:job.id, job_title:job.job_title, candidate_ids:[]});
 state.pendingContextType = null;
 addMessage("user", esc(job.job_title || "Selected job"));
 let plan = state.lastParsedPlan || {intent:state.lastIntent || "upload_resumes", entities:{}, confidence:1, clarification_needed:false};
 plan.entities = Object.assign({}, plan.entities || {}, {job_id:job.id, job_title:job.job_title || plan.entities?.job_title});
+if(state.lastUserText && plan.requires_confirmation && !plan.confirmation?.token){
+try{
+let refreshed = await parseIntentWithBackend(state.lastUserText);
+state.conversationContext = mergeEntities(state.conversationContext, refreshed.entities || {});
+if(refreshed.clarification_needed) return showClarification(refreshed, state.lastUserText);
+return handleWorkflow(refreshed, {job});
+}catch(error){
+addMessage("agent", `<strong>I could not rebuild the action preview.</strong><p>${esc(error.message || "Please try again.")}</p>`);
+return;
+}
+}
 handleWorkflow(plan, {job});
 },
 nextTour, prevTour, endTour,

@@ -476,3 +476,8 @@ max-height:38dvh;
 grid-template-columns:1fr;
 }
 }
+.hs-help-agent-preview{margin:10px 0;padding:10px;border:1px solid #dbe4f2;background:#f8fbff}
+.hs-help-agent-preview ol{margin:8px 0 0;padding-left:20px}
+.hs-help-agent-preview li{margin:7px 0;padding-left:2px}
+.hs-help-agent-preview li span,.hs-help-agent-preview li small{display:block}
+.hs-help-agent-preview li small{color:#64748b;margin-top:2px}
