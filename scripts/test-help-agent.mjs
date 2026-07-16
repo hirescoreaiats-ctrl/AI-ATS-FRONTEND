@@ -5,8 +5,8 @@ const html = readFileSync("index.html", "utf8");
 const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 
-assert.match(html, /help-agent\.css\?v=guide-agent-20260714-20/, "help css should be loaded");
-assert.match(html, /help-agent\.js\?v=guide-agent-20260714-20/, "help js should be loaded");
+assert.match(html, /help-agent\.css\?v=guide-agent-20260714-21/, "help css should be loaded");
+assert.match(html, /help-agent\.js\?v=guide-agent-20260714-21/, "help js should be loaded");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
 assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
 
@@ -73,6 +73,11 @@ assert.match(help, /Mail is <strong>not sent yet<\/strong>/, "group email workfl
 assert.match(help, /Open Outreach Queue/, "group email workflow should route to the real outreach queue");
 assert.match(help, /Email was not sent yet/, "unavailable send_mail plans should show a safe not-sent guard");
 assert.match(help, /pendingGroupEmailRequest/, "job selection should preserve pending group email workflows");
+assert.match(help, /Use HireScore Sender/, "group email workflow should ask whether to use the HireScore sender");
+assert.match(help, /Use Own Domain \/ DNS/, "group email workflow should offer own-domain DNS setup");
+assert.match(help, /openOwnDomainSenderModal/, "own-domain sender choice should open DNS setup");
+assert.match(help, /Candidate confirmation list/, "group email workflow should preview candidates before send confirmation");
+assert.match(help, /Mail cannot be sent from your own email\/domain until DNS is verified/, "own-domain path should explain DNS verification before sending");
 
 const pageIds = new Set([...html.matchAll(/id="([A-Za-z0-9]+)Page"/g)].map(match => match[1]));
 const workflowBlock = help.slice(help.indexOf("const WORKFLOWS"), help.indexOf("const QUICK_ACTIONS"));

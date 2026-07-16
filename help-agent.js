@@ -1043,28 +1043,120 @@ if(group === "shortlisted") return limit ? `top ${limit} shortlisted candidates`
 return `top ${limit || 10} candidates`;
 }
 
-function groupEmailHtml(plan, job){
+function senderStatusForHelp(){
+let fallback = {mode:"hirescore", from_email:"info@hirescoreai.com", reply_to:"", active:true};
+try{
+let parsed = JSON.parse(localStorage.getItem("outreachSenderConfig:v2") || "null");
+if(parsed && typeof parsed === "object") return Object.assign({}, fallback, parsed);
+}catch(error){}
+let replyTo = clean(localStorage.getItem("outreachSenderEmail"));
+return Object.assign({}, fallback, {reply_to:replyTo});
+}
+
+function senderStatusHtml(){
+let config = senderStatusForHelp();
+if(config.mode === "own_domain"){
+let status = config.verification_status || "pending";
+return status === "verified"
+? `<p><strong>Current sender:</strong> ${esc(config.sender_name || config.from_name || "Recruiting Team")} &lt;${esc(config.from_email || "your domain email")}&gt; verified.</p>`
+: `<p><strong>Current sender:</strong> Own domain is selected but DNS verification is ${esc(status)}. Use HireScore sender for now, or complete DNS before sending from ${esc(config.from_email || "your own domain")}.</p>`;
+}
+let reply = config.reply_to || localStorage.getItem("username") || "";
+return `<p><strong>Current sender option:</strong> HireScore AI &lt;info@hirescoreai.com&gt;${reply ? `, replies go to ${esc(reply)}` : ". Add a Reply-To email before sending."}</p>`;
+}
+
+async function groupEmailCandidatePreview(plan, job){
+let jobId = job?.id || job?.job_id;
+if(!jobId) return [];
+try{
+let data = await fetchJson(`${apiBase()}/results/${encodeURIComponent(jobId)}`, {headers:requestHeaders()});
+let rows = Array.isArray(data?.results) ? data.results : [];
+let group = plan?.entities?.candidate_group;
+let limit = Number(plan?.entities?.limit || 10);
+if(group === "shortlisted"){
+rows = rows.filter(row => normalizeText(row.status || row.stage || "").includes("shortlist"));
+}
+if(group === "all"){
+limit = Math.min(rows.length || 10, 25);
+}
+return rows
+.filter(row => !["rejected","dropped"].includes(normalizeText(row.status || row.stage || "")))
+.slice(0, limit || 10)
+.map(row => ({
+name: row.full_name || row.name || "Candidate",
+email: row.email || "",
+score: row.final_score ?? row.score ?? row.rank_score ?? row.recruiter_rank_score ?? "N/A"
+}));
+}catch(error){
+return [];
+}
+}
+
+function groupEmailHtml(plan, job, candidates){
 let groupLabel = groupEmailLabel(plan);
 let jobTitle = job?.job_title || job?.title || plan?.entities?.job_title || "selected job";
 let company = job?.company_name ? ` at ${job.company_name}` : "";
+let candidateRows = Array.isArray(candidates) && candidates.length
+? `<div class="hs-help-agent-preview"><strong>Candidate confirmation list</strong><ol>${candidates.map((candidate, index) => `<li><span>#${index + 1} ${esc(candidate.name)}</span><small>${esc(candidate.email || "Email missing")} | Score ${esc(candidate.score)}</small></li>`).join("")}</ol></div>`
+: `<p><strong>Candidate confirmation list:</strong> Open the Top 10 Candidate Page / Outreach Queue to confirm the exact candidates before sending.</p>`;
 return `<strong>Email workflow prepared for ${esc(groupLabel)}.</strong>
-<p>Mail is <strong>not sent yet</strong>. To send safely, I need the exact candidate queue, sender setup, email subject/body, and final confirmation.</p>
+<p>Mail is <strong>not sent yet</strong>. Before sending, choose the sender: use HireScore AI &lt;info@hirescoreai.com&gt; with your Reply-To, or verify your own domain with DNS records.</p>
 <p><strong>Job:</strong> ${esc(jobTitle)}${esc(company)}</p>
+${senderStatusHtml()}
+${candidateRows}
 <ol>
-<li>Open Top 10 / candidate results and confirm the right candidates.</li>
-<li>Open Outreach Queue for this job.</li>
-<li>Use Send Mail on each candidate, generate/edit the AI draft, then send from the composer.</li>
+<li>Choose sender: HireScore AI sender or your own verified domain.</li>
+<li>If own domain: enter domain/from email, generate DNS records, add them at your DNS provider, then check verification and set active.</li>
+<li>Review the candidate list and email subject/body.</li>
+<li>Only after the final confirmation, send from the Outreach composer.</li>
 </ol>
-<p>If you want, type the email template or say “draft a short outreach email”, and I will help prepare the content first.</p>`;
+<p>Final confirmation should be: “These are the candidates. Should I send this email now?”</p>`;
 }
 
 function groupEmailActions(){
 return [
+actionButton("Use HireScore Sender","senderChoice",{choice:"hirescore"}),
+actionButton("Use Own Domain / DNS","senderChoice",{choice:"own_domain"}),
 actionButton("Open Top 10 Candidate Page","openPage",{page:"topCandidate"}),
 actionButton("Open Outreach Queue","openPage",{page:"communication"}),
-actionButton("Sender Setup","openPage",{page:"senderSetup"}),
 actionButton("Read Email Guide","readGuide",{workflowId:"send_candidate_email"})
 ];
+}
+
+async function respondWithGroupEmailPlan(plan, job){
+let candidates = await groupEmailCandidatePreview(plan, job);
+addMessage("agent", groupEmailHtml(plan, job, candidates), groupEmailActions());
+}
+
+function openSenderChoice(choice){
+if(choice === "own_domain"){
+if(typeof window.openOwnDomainSenderModal === "function") window.openOwnDomainSenderModal();
+addMessage("agent", `<strong>Own domain sender setup.</strong><p>Enter your domain and from email, generate DNS records, add them in your DNS provider, then check verification. Mail cannot be sent from your own email/domain until DNS is verified.</p>`, [
+actionButton("Open Own Domain DNS","senderChoice",{choice:"own_domain"}),
+actionButton("Use HireScore Sender Instead","senderChoice",{choice:"hirescore"})
+]);
+return;
+}
+if(typeof window.openHireScoreSenderModal === "function") window.openHireScoreSenderModal();
+addMessage("agent", `<strong>HireScore AI sender setup.</strong><p>No DNS is needed. Candidate emails are sent from HireScore AI &lt;info@hirescoreai.com&gt;, and replies go to the Reply-To email you save here.</p>`, [
+actionButton("Open Outreach Queue","openPage",{page:"communication"}),
+actionButton("Use Own Domain / DNS","senderChoice",{choice:"own_domain"})
+]);
+}
+
+function handleEmailSenderChoiceFollowUp(raw){
+let plan = state.lastParsedPlan;
+if(plan?.intent !== "send_candidate_email") return false;
+let text = normalizeText(raw || "");
+if(includesAny(text, ["own domain", "my domain", "company domain", "khud", "apni mail", "meri mail", "own mail", "own email", "client mail"])){
+openSenderChoice("own_domain");
+return true;
+}
+if(includesAny(text, ["hirescore sender", "hirescore mail", "info hirescoreai com", "info@hirescoreai.com", "default sender", "use hirescore"])){
+openSenderChoice("hirescore");
+return true;
+}
+return false;
 }
 
 async function handleGroupCandidateEmailRequest(raw){
@@ -1075,7 +1167,7 @@ if(currentJob && !plan.entities.job_title){
 let job = {id:currentJob.id, job_id:currentJob.id, job_title:currentJob.title};
 state.selectedJob = Object.assign({}, state.selectedJob || {}, job);
 state.lastParsedPlan = plan;
-addMessage("agent", groupEmailHtml(plan, state.selectedJob), groupEmailActions());
+await respondWithGroupEmailPlan(plan, state.selectedJob);
 return true;
 }
 let jobs = await getJobs();
@@ -1087,7 +1179,7 @@ state.conversationContext = Object.assign({}, state.conversationContext, {job_id
 plan.entities.job_id = matches[0].id;
 plan.entities.job_title = matches[0].job_title || plan.entities.job_title;
 state.lastParsedPlan = plan;
-addMessage("agent", groupEmailHtml(plan, matches[0]), groupEmailActions());
+await respondWithGroupEmailPlan(plan, matches[0]);
 return true;
 }
 state.pendingContextType = "job";
@@ -1370,6 +1462,7 @@ state.pendingGroupEmailRequest = null;
 }
 if(await handleAgentJDText(value)) return;
 if(await handleTalentSearchFollowUp(value)) return;
+if(handleEmailSenderChoiceFollowUp(value)) return;
 if(await handleGroupCandidateEmailRequest(value)) return;
 if(await handleProductFeatureQuery(value)) return;
 let localFeatureIntent = resolveIntent(value);
@@ -1518,6 +1611,12 @@ return true;
 if(target === "senderSetup"){
 if(typeof window.openHireScoreSenderModal === "function"){
 window.openHireScoreSenderModal();
+return true;
+}
+}
+if(target === "ownDomainSender"){
+if(typeof window.openOwnDomainSenderModal === "function"){
+window.openOwnDomainSenderModal();
 return true;
 }
 }
@@ -2165,6 +2264,7 @@ if(item.action === "tour") startTour(item.data.tourId, item.data.page);
 if(item.action === "planTour") startPlanTour();
 if(item.action === "actionAgent") executeActionAgent();
 if(item.action === "readGuide") readGuide(item.data.workflowId);
+if(item.action === "senderChoice") openSenderChoice(item.data.choice);
 if(item.action === "talentPage") handleTalentSearchFollowUp("show me on page");
 if(item.action === "talentWorkflow") handleTalentSearchFollowUp("i need workflow");
 if(item.action === "openApplyLink"){
@@ -2210,7 +2310,7 @@ let plan = state.pendingGroupEmailRequest;
 state.pendingGroupEmailRequest = null;
 plan.entities = Object.assign({}, plan.entities || {}, {job_id:job.id, job_title:job.job_title || plan.entities?.job_title});
 state.lastParsedPlan = plan;
-addMessage("agent", groupEmailHtml(plan, job), groupEmailActions());
+await respondWithGroupEmailPlan(plan, job);
 return;
 }
 let plan = state.lastParsedPlan || {intent:state.lastIntent || "upload_resumes", entities:{}, confidence:1, clarification_needed:false};
