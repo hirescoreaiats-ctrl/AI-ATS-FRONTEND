@@ -5,8 +5,8 @@ const html = readFileSync("index.html", "utf8");
 const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 
-assert.match(html, /help-agent\.css\?v=guide-agent-20260714-19/, "help css should be loaded");
-assert.match(html, /help-agent\.js\?v=guide-agent-20260714-19/, "help js should be loaded");
+assert.match(html, /help-agent\.css\?v=guide-agent-20260714-20/, "help css should be loaded");
+assert.match(html, /help-agent\.js\?v=guide-agent-20260714-20/, "help js should be loaded");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
 assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
 
@@ -68,6 +68,11 @@ assert.match(help, /client_shortlist_report/, "client shortlist report should be
 assert.match(help, /reply_sync/, "outreach reply sync should be included in the feature catalog");
 assert.match(help, /sender_setup/, "sender setup should be included in the feature catalog");
 assert.match(help, /bulk_analytics/, "bulk analytics should be included in the feature catalog");
+assert.match(help, /function\s+handleGroupCandidateEmailRequest/, "group candidate email requests should use a dedicated outreach router");
+assert.match(help, /Mail is <strong>not sent yet<\/strong>/, "group email workflow should never imply mail was sent before composer confirmation");
+assert.match(help, /Open Outreach Queue/, "group email workflow should route to the real outreach queue");
+assert.match(help, /Email was not sent yet/, "unavailable send_mail plans should show a safe not-sent guard");
+assert.match(help, /pendingGroupEmailRequest/, "job selection should preserve pending group email workflows");
 
 const pageIds = new Set([...html.matchAll(/id="([A-Za-z0-9]+)Page"/g)].map(match => match[1]));
 const workflowBlock = help.slice(help.indexOf("const WORKFLOWS"), help.indexOf("const QUICK_ACTIONS"));

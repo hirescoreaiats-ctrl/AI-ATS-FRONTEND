@@ -295,6 +295,7 @@ selectedCandidate: null,
 lastTalentSearch: null,
 jobDraft: null,
 pendingProductFeature: null,
+pendingGroupEmailRequest: null,
 lastParsedPlan: null,
 lastUserText: "",
 conversationContext: {},
@@ -333,6 +334,7 @@ return clean(text).toLowerCase()
 .replace(/\buplod\b/g,"upload")
 .replace(/\buplaod\b/g,"upload")
 .replace(/\bcandiate\b/g,"candidate")
+.replace(/\bcandiates\b/g,"candidates")
 .replace(/\bcandiadte\b/g,"candidate")
 .replace(/\bcommincation\b|\bcommuncation\b|\bcomunication\b/g,"communication")
 .replace(/\bsehdule\b|\bshedule\b/g,"schedule")
@@ -909,6 +911,14 @@ let contextLine = context && context.job ? `<p><strong>Job:</strong> ${esc(conte
 return `<strong>${title}</strong><p>${body}</p>${contextLine}<ol>${steps}</ol><p>Guide Agent shows the visual tour. Action Agent can execute supported actions only after you enable it and confirm.</p>`;
 }
 
+function friendlyMissingField(field, intent){
+let value = clean(field);
+if(intent === "send_candidate_email" && value === "email") return "email subject/body or template";
+if(value === "tool_unavailable:send_mail") return "send from Outreach composer; direct Action Agent email is not enabled for this plan";
+if(value === "job") return "job selection";
+return value.replace(/^tool_unavailable:/, "open the related product tool: ");
+}
+
 function plannerHtml(intentResult, workflow, context){
 let title = workflow?.title || "Hiring Workflow";
 let guidance = intentResult.guidance || workflow?.description || "I can guide this workflow visually.";
@@ -916,7 +926,7 @@ let taskHtml = Array.isArray(intentResult.tasks) && intentResult.tasks.length
 ? `<ol>${intentResult.tasks.map(task => `<li>${esc(task.description || task.intent)}</li>`).join("")}</ol>`
 : "";
 let missing = Array.isArray(intentResult.missing_fields) && intentResult.missing_fields.length
-? `<p><strong>Need before action:</strong> ${esc(intentResult.missing_fields.join(", "))}</p>`
+? `<p><strong>Need before action:</strong> ${esc(intentResult.missing_fields.map(field => friendlyMissingField(field, intentResult.intent)).join(", "))}</p>`
 : "";
 let contextLine = context && context.job ? `<p><strong>Job:</strong> ${esc(context.job.job_title || "Selected job")}</p>` : "";
 let previewRows = Array.isArray(intentResult.candidate_preview) ? intentResult.candidate_preview.slice(0, 10) : [];
@@ -974,6 +984,125 @@ let actions = [actionButton(`Open ${feature.title}`,"openPage",{page:feature.rou
 if(feature.workflowId) actions.push(actionButton("Read Guide","readGuide",{workflowId:feature.workflowId}));
 if(feature.tourId) actions.push(actionButton("Start Visual Tour","tour",{tourId:feature.tourId, page:feature.route}));
 return actions;
+}
+
+function isGroupCandidateEmailRequest(raw){
+let text = normalizeText(raw || "");
+if(!text) return false;
+let wantsSend = /\b(?:send|bhej|bhejna|mail|email|outreach)\b/.test(text);
+let emailWord = /\b(?:mail|email|message|outreach)\b/.test(text);
+let candidateGroup = /\b(?:candidate|candidates|shortlisted|shortlist|top|best|all|every|\d{1,3}|ten)\b/.test(text);
+if(!wantsSend || !emailWord || !candidateGroup) return false;
+if(includesAny(text, ["reply sync", "sender setup", "connect gmail", "email dashboard", "mail dashboard"])) return false;
+return true;
+}
+
+function extractGroupEmailJobQuery(raw){
+let title = extractJobTitle(raw);
+let text = normalizeText(raw || "");
+let company = null;
+let companyMatch = text.match(/\b(?:job|role|opening)\s+at\s+([a-z0-9+# ]+)$/) || text.match(/\bat\s+([a-z0-9+# ]+)$/);
+if(companyMatch){
+company = normalizeJobTitle(companyMatch[1]);
+}
+return [title, company].filter(Boolean).join(" ").trim() || title || null;
+}
+
+function groupEmailPlanFromText(raw){
+let text = normalizeText(raw || "");
+let limit = extractLimit(raw);
+let group = "top_candidates";
+if(/\b(?:all|every|saare|sare|sabhi|sabi)\b/.test(text)){
+group = "all";
+limit = null;
+}else if(/\bshortlist(?:ed)?\b/.test(text)){
+group = "shortlisted";
+limit = limit || null;
+}else{
+limit = limit || 10;
+}
+return {
+intent:"send_candidate_email",
+entities:{
+job_title: extractJobTitle(raw),
+candidate_group: group,
+limit,
+target_stage:"communication"
+},
+job_query: extractGroupEmailJobQuery(raw),
+confidence:0.98,
+clarification_needed:false
+};
+}
+
+function groupEmailLabel(plan){
+let group = plan?.entities?.candidate_group;
+let limit = plan?.entities?.limit;
+if(group === "all") return "all candidates";
+if(group === "shortlisted") return limit ? `top ${limit} shortlisted candidates` : "shortlisted candidates";
+return `top ${limit || 10} candidates`;
+}
+
+function groupEmailHtml(plan, job){
+let groupLabel = groupEmailLabel(plan);
+let jobTitle = job?.job_title || job?.title || plan?.entities?.job_title || "selected job";
+let company = job?.company_name ? ` at ${job.company_name}` : "";
+return `<strong>Email workflow prepared for ${esc(groupLabel)}.</strong>
+<p>Mail is <strong>not sent yet</strong>. To send safely, I need the exact candidate queue, sender setup, email subject/body, and final confirmation.</p>
+<p><strong>Job:</strong> ${esc(jobTitle)}${esc(company)}</p>
+<ol>
+<li>Open Top 10 / candidate results and confirm the right candidates.</li>
+<li>Open Outreach Queue for this job.</li>
+<li>Use Send Mail on each candidate, generate/edit the AI draft, then send from the composer.</li>
+</ol>
+<p>If you want, type the email template or say “draft a short outreach email”, and I will help prepare the content first.</p>`;
+}
+
+function groupEmailActions(){
+return [
+actionButton("Open Top 10 Candidate Page","openPage",{page:"topCandidate"}),
+actionButton("Open Outreach Queue","openPage",{page:"communication"}),
+actionButton("Sender Setup","openPage",{page:"senderSetup"}),
+actionButton("Read Email Guide","readGuide",{workflowId:"send_candidate_email"})
+];
+}
+
+async function handleGroupCandidateEmailRequest(raw){
+if(!isGroupCandidateEmailRequest(raw)) return false;
+let plan = groupEmailPlanFromText(raw);
+let currentJob = selectedJobIdentity();
+if(currentJob && !plan.entities.job_title){
+let job = {id:currentJob.id, job_id:currentJob.id, job_title:currentJob.title};
+state.selectedJob = Object.assign({}, state.selectedJob || {}, job);
+state.lastParsedPlan = plan;
+addMessage("agent", groupEmailHtml(plan, state.selectedJob), groupEmailActions());
+return true;
+}
+let jobs = await getJobs();
+let matches = matchJobs(jobs, plan.job_query || plan.entities.job_title).slice(0, 8);
+if(matches.length === 1){
+state.selectedJob = matches[0];
+state.selectedCandidate = null;
+state.conversationContext = Object.assign({}, state.conversationContext, {job_id:matches[0].id, job_title:matches[0].job_title, candidate_ids:[]});
+plan.entities.job_id = matches[0].id;
+plan.entities.job_title = matches[0].job_title || plan.entities.job_title;
+state.lastParsedPlan = plan;
+addMessage("agent", groupEmailHtml(plan, matches[0]), groupEmailActions());
+return true;
+}
+state.pendingContextType = "job";
+state.pendingGroupEmailRequest = plan;
+state.lastParsedPlan = plan;
+state.lastJobOptions = matches.length ? matches : (jobs || []).filter(job => job.is_active !== false).slice(0, 8);
+if(state.lastJobOptions.length){
+addMessage("agent", `<strong>Which job should I use for this email workflow?</strong><p>I will prepare outreach for ${esc(groupEmailLabel(plan))}. Select the job first; client does not need to know any backend job ID.</p>${renderJobCards(state.lastJobOptions)}`);
+return true;
+}
+addMessage("agent", `<strong>I could not find a matching job for this email workflow.</strong><p>Create the job first, then I can help prepare candidate outreach.</p>`, [
+actionButton("Create Job","openPage",{page:"job"}),
+actionButton("View Jobs","openPage",{page:"dashboard"})
+]);
+return true;
 }
 
 async function handleProductFeatureQuery(raw){
@@ -1237,9 +1366,11 @@ if(state.pendingContextType){
 state.pendingContextType = null;
 state.lastJobOptions = [];
 state.lastCandidateOptions = [];
+state.pendingGroupEmailRequest = null;
 }
 if(await handleAgentJDText(value)) return;
 if(await handleTalentSearchFollowUp(value)) return;
+if(await handleGroupCandidateEmailRequest(value)) return;
 if(await handleProductFeatureQuery(value)) return;
 let localFeatureIntent = resolveIntent(value);
 if(FEATURE_PAGE_INTENTS.has(localFeatureIntent?.intent) && localFeatureIntent.confidence >= 0.9){
@@ -1667,6 +1798,15 @@ if(missingFields.length){
 addMessage("agent", `<strong>I need a little more detail before taking action.</strong><p>Missing: ${esc(missingFields.join(", "))}</p>`);
 return;
 }
+if(mutations.some(action => action.action_id === "send_mail") && !plan?.confirmation?.token){
+addMessage("agent", `<strong>Email was not sent yet.</strong><p>This plan does not include a signed send-mail action, so I will not pretend the mail went out. Open the Outreach Queue, select the candidate, preview or generate the email draft, and send it from the composer after sender setup is valid.</p>`, [
+actionButton("Open Outreach Queue","openPage",{page:"communication"}),
+actionButton("Sender Setup","openPage",{page:"senderSetup"}),
+actionButton("Open Top 10 Candidate Page","openPage",{page:"topCandidate"}),
+actionButton("Read Email Guide","readGuide",{workflowId:"send_candidate_email"})
+]);
+return;
+}
 let ok = window.confirm("Action Agent will perform the planned workflow. Continue?");
 if(!ok) return;
 
@@ -2063,6 +2203,14 @@ let feature = state.pendingProductFeature;
 state.pendingProductFeature = null;
 let opened = openPage(feature.route);
 addMessage("agent", `<strong>${opened ? "Opening" : "I can open"} ${esc(feature.title)}.</strong><p><strong>Job:</strong> ${esc(job.job_title || "Selected job")}</p>`, productFeatureActions(feature));
+return;
+}
+if(state.pendingGroupEmailRequest){
+let plan = state.pendingGroupEmailRequest;
+state.pendingGroupEmailRequest = null;
+plan.entities = Object.assign({}, plan.entities || {}, {job_id:job.id, job_title:job.job_title || plan.entities?.job_title});
+state.lastParsedPlan = plan;
+addMessage("agent", groupEmailHtml(plan, job), groupEmailActions());
 return;
 }
 let plan = state.lastParsedPlan || {intent:state.lastIntent || "upload_resumes", entities:{}, confidence:1, clarification_needed:false};
