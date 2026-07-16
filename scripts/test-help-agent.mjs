@@ -5,8 +5,8 @@ const html = readFileSync("index.html", "utf8");
 const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 
-assert.match(html, /help-agent\.css\?v=guide-agent-20260714-14/, "help css should be loaded");
-assert.match(html, /help-agent\.js\?v=guide-agent-20260714-14/, "help js should be loaded");
+assert.match(html, /help-agent\.css\?v=guide-agent-20260714-15/, "help css should be loaded");
+assert.match(html, /help-agent\.js\?v=guide-agent-20260714-15/, "help js should be loaded");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
 assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
 
@@ -97,6 +97,11 @@ assert.match(help, /discoveryQuery/, "role and skill candidate discovery should 
 assert.match(help, /function\s+handleTalentSearch/, "talent search should use a dedicated read-only result flow");
 assert.match(help, /workflow\.id === "search_talent"[\s\S]*handleTalentSearch/, "talent search should bypass generic workflow actions");
 assert.match(help, /\/api\/v1\/talent\/search\?q=/, "talent search should fetch actual cross-job candidate matches");
+assert.match(help, /lastTalentSearch/, "talent search results should be remembered for follow-up commands");
+assert.match(help, /function\s+handleTalentSearchFollowUp/, "talent search follow-ups should be routed without losing context");
+assert.match(help, /isTalentPageFollowUp/, "show-on-page follow-ups should be detected");
+assert.match(help, /Show On Page/, "talent search cards should expose a page action");
+assert.match(help, /Show Workflow/, "talent search cards should expose a workflow action");
 assert.match(help, /AGENT_CONTRACT_VERSION/, "frontend should enforce a versioned backend agent contract");
 assert.match(help, /authoritative \? entities : mergeEntities/, "current backend contract should be the single intent authority");
 assert.match(help, /MUTATING_ACTION_IDS/, "read-only tools should be separated from mutation execution");

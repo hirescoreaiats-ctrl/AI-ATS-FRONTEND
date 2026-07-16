@@ -222,6 +222,7 @@ lastJobOptions: [],
 lastCandidateOptions: [],
 selectedJob: null,
 selectedCandidate: null,
+lastTalentSearch: null,
 lastParsedPlan: null,
 lastUserText: "",
 conversationContext: {},
@@ -672,6 +673,71 @@ return [ranked[0].job];
 return ranked.map(item => item.job);
 }
 
+async function resolveTalentSearchJobs(search){
+let query = search?.query || "";
+if(!query) return [];
+let jobs = await getJobs();
+return matchJobs(jobs, query).slice(0, 8);
+}
+
+async function handleTalentSearchFollowUp(raw){
+let search = state.lastTalentSearch;
+if(!search?.query) return false;
+let text = normalizeText(raw);
+if(!isTalentPageFollowUp(text) && !isTalentWorkflowFollowUp(text)) return false;
+let matches = await resolveTalentSearchJobs(search);
+if(matches.length === 1){
+let job = matches[0];
+state.selectedJob = job;
+state.selectedCandidate = null;
+state.conversationContext = Object.assign({}, state.conversationContext, {job_id:job.id, job_title:job.job_title, candidate_ids:[]});
+if(isTalentPageFollowUp(text)){
+openPage("results");
+addMessage("agent", `<strong>Opened ${esc(job.job_title || search.query)} candidate results.</strong><p>You can now review AI score, resume evidence, matched skills, gaps, and shortlist from the page.</p>`, [
+actionButton("Review AI Scores","workflow",{workflowId:"review_ai_ranked_candidates"}),
+actionButton("Shortlist Candidates","workflow",{workflowId:"candidate_workflow"}),
+actionButton("Start Visual Tour","tour",{tourId:"review_ai_ranked_candidates", page:"results"})
+]);
+return true;
+}
+return handleWorkflow({
+response_type:"workflow",
+intent:"candidate_workflow",
+entities:{job_id:job.id, job_title:job.job_title || search.query, candidate_group:"top_candidates", limit:10},
+guidance:`Use this workflow for the ${job.job_title || search.query} candidates I just found.`,
+confidence:1,
+clarification_needed:false
+}, {job});
+}
+if(matches.length > 1){
+state.pendingContextType = "job";
+state.lastJobOptions = matches;
+state.lastParsedPlan = {
+response_type:"workflow",
+intent:isTalentWorkflowFollowUp(text) ? "candidate_workflow" : "review_ai_ranked_candidates",
+entities:{job_title:search.query, candidate_group:"top_candidates", limit:10},
+confidence:1,
+clarification_needed:false
+};
+addMessage("agent", `<strong>Which ${esc(search.query)} job should I open?</strong><p>I found more than one matching job. Select the exact job and I will continue from there.</p>${renderJobCards(state.lastJobOptions)}`);
+return true;
+}
+if(isTalentPageFollowUp(text)){
+openPage("results");
+addMessage("agent", `<strong>I opened the recruiter results area.</strong><p>I found ${esc(search.total || search.candidates.length)} ${esc(search.query)} matches across the talent pool, but I could not map that search to one exact active job page. Create or select a job if you want job-specific shortlist actions.</p>`, [
+actionButton("Create Job","workflow",{workflowId:"create_job"}),
+actionButton("Review AI Scores","workflow",{workflowId:"review_ai_ranked_candidates"})
+]);
+return true;
+}
+addMessage("agent", talentSearchWorkflowHtml(search), [
+actionButton("Open Recruiter","openPage",{page:"results"}),
+actionButton("Create Matching Job","workflow",{workflowId:"create_job"}),
+actionButton("Upload Resumes","workflow",{workflowId:"upload_resumes"})
+]);
+return true;
+}
+
 function addMessage(role, html, actions){
 state.messages.push({role, html, actions: actions || []});
 renderMessages();
@@ -687,6 +753,28 @@ renderMessages();
 
 function actionButton(label, action, data){
 return {label, action, data:data || {}};
+}
+
+function isTalentPageFollowUp(text){
+return includesAny(text, ["show me on page", "show on page", "open page", "view page", "open result", "open results", "candidate page", "results page", "on page", "page pe", "page par"]);
+}
+
+function isTalentWorkflowFollowUp(text){
+return /\bwork\s*flow\b/.test(text) || includesAny(text, ["workflow", "next step", "what next", "process", "kaise proceed", "kya karna"]);
+}
+
+function rememberTalentSearch(query, candidates, total){
+state.lastTalentSearch = {
+query: clean(query),
+candidates: Array.isArray(candidates) ? candidates.slice(0, 10) : [],
+total: Number(total || 0),
+createdAt: Date.now()
+};
+}
+
+function talentSearchWorkflowHtml(search){
+let query = search?.query || "these candidates";
+return `<strong>Workflow for ${esc(query)} candidates</strong><p>Here is the clean recruiter flow:</p><ol><li>Open the matching job's candidate results page.</li><li>Review AI score, resume evidence, matched skills, and gaps for the top candidates.</li><li>Open the strongest profiles and compare them against the job requirement.</li><li>Shortlist the candidates you approve.</li><li>Move shortlisted candidates to Communication for outreach, then schedule interviews after they respond.</li></ol><p>I can open the right page and guide the next step without changing candidate status.</p>`;
 }
 
 function renderMessages(){
@@ -792,7 +880,12 @@ addMessage("agent", `<strong>I could not search the talent pool.</strong><p>${es
 return;
 }
 }
-addMessage("agent", talentSearchHtml(query, candidates, total));
+rememberTalentSearch(query, candidates, total);
+addMessage("agent", talentSearchHtml(query, candidates, total), [
+actionButton("Show On Page","talentPage",{}),
+actionButton("Show Workflow","talentWorkflow",{}),
+actionButton("Search Again","workflow",{workflowId:"search_talent"})
+]);
 }
 
 async function handleWorkflow(intentResult, contextOverride){
@@ -965,6 +1058,7 @@ state.pendingContextType = null;
 state.lastJobOptions = [];
 state.lastCandidateOptions = [];
 }
+if(await handleTalentSearchFollowUp(value)) return;
 
 let loadingMessage = {role:"agent", html:"<em>Understanding your request...</em>", actions:[]};
 state.messages.push(loadingMessage);
@@ -1468,6 +1562,8 @@ if(item.action === "tour") startTour(item.data.tourId, item.data.page);
 if(item.action === "planTour") startPlanTour();
 if(item.action === "actionAgent") executeActionAgent();
 if(item.action === "readGuide") readGuide(item.data.workflowId);
+if(item.action === "talentPage") handleTalentSearchFollowUp("show me on page");
+if(item.action === "talentWorkflow") handleTalentSearchFollowUp("i need workflow");
 if(item.action === "workflow"){
 let previousPlan = state.lastParsedPlan || {};
 let preservedEntities = mergeEntities(previousPlan.entities || {}, state.conversationContext || {});
