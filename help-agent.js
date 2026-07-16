@@ -408,11 +408,13 @@ let confidence = 0.25;
 let allCandidates = /\b(?:all|every|saare|sare|sabhi|sabi)\s+(?:candidate|candidates|resume|resumes|profile|profiles)\b/.test(text);
 let discoveryMatch = text.match(/^(?:i want|show me|find|search|get|give me|mujhe)?\s*(.+?)\s+(?:candidate|candidates|profiles|resumes)$/);
 let discoveryQuery = discoveryMatch ? normalizeJobTitle(discoveryMatch[1]) : null;
-let candidateSelection = /\b(?:top\s+)?\d{1,3}\s+(?:top\s+)?(?:candidate|candidates|resume|resumes|profile|profiles)\b/.test(text) || includesAny(text, ["top candidate", "top candidates", "best candidate", "best candidates", "candidate of", "candidates of"]);
+let numberedCandidateRequest = /\b(?:top\s+)?\d{1,3}\s+(?:top\s+)?(?:candidate|candidates|candiate|candiates|resume|resumes|profile|profiles)\b/.test(text);
+let candidateSelection = numberedCandidateRequest || includesAny(text, ["top candidate", "top candidates", "best candidate", "best candidates", "candidate of", "candidates of", "candidate page", "candidates page"]);
 let wantsShortlistAction = includesAny(text, ["shortlist candidate", "shortlist candidates", "shortlist resume", "shortlist resumes", "select candidate", "select candidates"]) || /\b(?:candidate|candidates|resume|resumes)\s+shortlist\b/.test(text);
 let wantsViewShortlisted = text.includes("shortlisted") || includesAny(text, ["view shortlist", "show shortlist", "list shortlist", "shortlist list", "shortlisted candidate", "shortlisted candidates"]);
 let wantsOpenFeature = includesAny(text, ["open", "show", "view", "dekh", "dikha", "kholo"]);
 let wantsTopPage = wantsOpenFeature && candidateSelection && !wantsShortlistAction;
+let wantsTenCandidatePage = wantsOpenFeature && numberedCandidateRequest && includesAny(text, ["this job", "current job", "is job", "ye job", "job"]);
 let wantsAiAnalytics = includesAny(text, ["ai analytics", "ai insight", "ai insights", "hiring insight", "hiring insights", "candidate analytics", "pool analytics"]);
 let wantsShortlistExplanation = includesAny(text, ["shortlist explanation", "shortlisted explanation", "ai shortlist explanation", "shortlist ai explanation"]);
 let wantsShortlistAnalytics = includesAny(text, ["shortlist analytics", "shortlisted analytics", "shortlist insight", "shortlisted insight"]);
@@ -423,7 +425,7 @@ intent = "view_shortlist_ai_explanation"; confidence = 0.95;
 intent = "view_shortlist_analytics"; confidence = 0.95;
 }else if(wantsAiAnalytics){
 intent = "view_ai_hiring_insights"; confidence = 0.94;
-}else if(wantsTopPage || (candidateSelection && text.includes("explain"))){
+}else if(wantsTopPage || wantsTenCandidatePage || (candidateSelection && text.includes("explain"))){
 intent = "view_top_candidates"; confidence = 0.94;
 }else if(discoveryQuery && !includesAny(text, ["top ", "shortlist", "reject", " job", " of ", " for "])){
 intent = "search_talent"; confidence = 0.9;
@@ -901,7 +903,7 @@ return `<strong>${esc(title)}</strong><p>${esc(guidance)}</p>${contextLine}${tas
 
 function openPageLabel(workflow){
 let labels = {
-view_top_candidates:"Open Top 10",
+view_top_candidates:"Open Top 10 Candidate Page",
 view_ai_hiring_insights:"Open AI Analytics",
 view_shortlist_ai_explanation:"Open AI Explanation",
 view_shortlist_analytics:"Open Shortlist Analytics",

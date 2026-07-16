@@ -5,8 +5,8 @@ const html = readFileSync("index.html", "utf8");
 const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 
-assert.match(html, /help-agent\.css\?v=guide-agent-20260714-17/, "help css should be loaded");
-assert.match(html, /help-agent\.js\?v=guide-agent-20260714-17/, "help js should be loaded");
+assert.match(html, /help-agent\.css\?v=guide-agent-20260714-18/, "help css should be loaded");
+assert.match(html, /help-agent\.js\?v=guide-agent-20260714-18/, "help js should be loaded");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
 assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
 
@@ -56,6 +56,8 @@ assert.match(help, /window\.currentJobId/, "agent should recover job context fro
 assert.match(help, /target === "communication"[\s\S]*window\.openCommunicationPage\(job\.id, job\.title\)/, "communication workflows should open the selected job queue");
 assert.match(help, /target === "editJob"[\s\S]*window\.openEditJob\(job\.id\)/, "edit workflow should open the selected job form");
 assert.match(help, /target === "topCandidate"[\s\S]*openJobResultThen\("openTopCandidates"\)/, "top candidate workflow should open the real Top 10 page");
+assert.match(help, /wantsTenCandidatePage/, "plain '10 candidates of this job' queries should route to the Top 10 page");
+assert.match(help, /Open Top 10 Candidate Page/, "Top 10 workflow should show a clear page action");
 assert.match(help, /target === "insight"[\s\S]*openJobResultThen\("openInsights"\)/, "AI analytics workflow should open the real insights page");
 assert.match(help, /target === "shortlistExplanation"[\s\S]*openShortlistFeature\("openShortlistExplanation"\)/, "shortlist explanation workflow should open the real explanation page");
 assert.match(help, /target === "shortlistAnalytics"[\s\S]*openShortlistFeature\("openShortlistAnalytics"\)/, "shortlist analytics workflow should open the real analytics page");
