@@ -5,8 +5,8 @@ const html = readFileSync("index.html", "utf8");
 const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 
-assert.match(html, /help-agent\.css\?v=guide-agent-20260714-18/, "help css should be loaded");
-assert.match(html, /help-agent\.js\?v=guide-agent-20260714-18/, "help js should be loaded");
+assert.match(html, /help-agent\.css\?v=guide-agent-20260714-19/, "help css should be loaded");
+assert.match(html, /help-agent\.js\?v=guide-agent-20260714-19/, "help js should be loaded");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
 assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
 
@@ -62,9 +62,16 @@ assert.match(help, /target === "insight"[\s\S]*openJobResultThen\("openInsights"
 assert.match(help, /target === "shortlistExplanation"[\s\S]*openShortlistFeature\("openShortlistExplanation"\)/, "shortlist explanation workflow should open the real explanation page");
 assert.match(help, /target === "shortlistAnalytics"[\s\S]*openShortlistFeature\("openShortlistAnalytics"\)/, "shortlist analytics workflow should open the real analytics page");
 assert.match(help, /FEATURE_PAGE_INTENTS/, "feature page requests should bypass stale backend intent routing");
+assert.match(help, /PRODUCT_FEATURES/, "Help Agent should maintain a central product feature catalog");
+assert.match(help, /function\s+handleProductFeatureQuery/, "page reference queries should route through the product feature router");
+assert.match(help, /client_shortlist_report/, "client shortlist report should be included in the feature catalog");
+assert.match(help, /reply_sync/, "outreach reply sync should be included in the feature catalog");
+assert.match(help, /sender_setup/, "sender setup should be included in the feature catalog");
+assert.match(help, /bulk_analytics/, "bulk analytics should be included in the feature catalog");
 
 const pageIds = new Set([...html.matchAll(/id="([A-Za-z0-9]+)Page"/g)].map(match => match[1]));
-const workflowRoutes = [...help.matchAll(/\bid:"([a-z_]+)"[\s\S]*?route:"([A-Za-z0-9]+)"/g)];
+const workflowBlock = help.slice(help.indexOf("const WORKFLOWS"), help.indexOf("const QUICK_ACTIONS"));
+const workflowRoutes = [...workflowBlock.matchAll(/\bid:"([a-z_]+)"[\s\S]*?route:"([A-Za-z0-9]+)"/g)];
 assert.equal(workflowRoutes.length, 27, "every registered workflow should expose a route");
 for (const [, workflowId, route] of workflowRoutes) {
   assert.ok(pageIds.has(route), `${workflowId} should route to an existing ${route}Page container`);

@@ -205,6 +205,35 @@ const FEATURE_PAGE_INTENTS = new Set([
 "view_shortlist_analytics"
 ]);
 
+const PRODUCT_FEATURES = [
+{id:"top10", title:"Top 10 Candidate Page", route:"topCandidate", workflowId:"view_top_candidates", requiresJob:true, tourId:"top_candidates", phrases:["top 10", "top ten", "10 candidate", "10 candidates", "10 candidate page", "10 candidates page", "best 10", "best candidates", "top candidate page", "top candidates page"]},
+{id:"candidate_results", title:"Candidate Results Page", route:"results", workflowId:"review_ai_ranked_candidates", requiresJob:true, tourId:"review_ai_ranked_candidates", phrases:["candidate result", "candidate results", "result page", "results page", "ai score", "ai scores", "ranked candidates", "score page"]},
+{id:"ai_insights", title:"AI Hiring Analytics", route:"insight", workflowId:"view_ai_hiring_insights", requiresJob:true, tourId:"ai_hiring_insights", phrases:["ai analytics", "ai insight", "ai insights", "hiring analytics", "hiring insight", "hiring insights", "pool analytics", "candidate analytics"]},
+{id:"shortlist", title:"Shortlisted Candidates", route:"results", workflowId:"view_shortlisted_candidates", requiresJob:true, tourId:"review_ai_ranked_candidates", phrases:["shortlisted candidates", "shortlist page", "shortlist list", "show shortlist", "view shortlist"]},
+{id:"shortlist_explanation", title:"Shortlist AI Explanation", route:"shortlistExplanation", workflowId:"view_shortlist_ai_explanation", requiresJob:true, tourId:"shortlist_ai_explanation", phrases:["shortlist explanation", "shortlisted explanation", "ai shortlist explanation", "shortlist ai explanation"]},
+{id:"shortlist_analytics", title:"Shortlist Analytics", route:"shortlistAnalytics", workflowId:"view_shortlist_analytics", requiresJob:true, tourId:"shortlist_analytics", phrases:["shortlist analytics", "shortlisted analytics", "shortlist insight", "shortlisted insight"]},
+{id:"client_shortlist_report", title:"Client Shortlist Report", route:"clientShortlistReport", requiresJob:true, tourId:"shortlist_ai_explanation", phrases:["client shortlist report", "client report", "shortlist report", "client shortlist"]},
+{id:"candidate_profile", title:"Candidate Profile", route:"candidateProfile", requiresCandidate:true, tourId:"review_ai_ranked_candidates", phrases:["candidate profile", "profile page", "candidate detail", "candidate details"]},
+{id:"ai_explain", title:"Candidate AI Explanation", route:"topCandidate", workflowId:"view_top_candidates", requiresJob:true, tourId:"top_candidates", phrases:["ai explain", "ai explanation", "candidate explanation", "score explanation", "explain candidate", "explain score"]},
+{id:"create_job", title:"Create Job", route:"job", workflowId:"create_job", tourId:"create_job", phrases:["create job", "new job", "add job", "jd upload", "upload jd", "job create"]},
+{id:"edit_job", title:"Edit Job", route:"editJob", workflowId:"edit_job", requiresJob:true, tourId:"create_job", phrases:["edit job", "update job", "change job", "modify job"]},
+{id:"apply_pages", title:"Apply Pages", route:"applyJob", workflowId:"share_public_apply_link", tourId:"share_public_apply_link", phrases:["apply page", "apply pages", "apply link", "application link", "public link"]},
+{id:"job_posts", title:"Job Sourcing Posts", route:"jobPosts", requiresJob:true, tourId:"share_public_apply_link", phrases:["job post", "job posts", "sourcing post", "linkedin post", "whatsapp post", "naukri post", "platform post"]},
+{id:"delete_jobs", title:"Delete Jobs", route:"deleteJobs", tourId:"dashboard_overview", phrases:["delete job", "remove job", "closed job", "inactive job"]},
+{id:"jobs_dashboard", title:"Jobs Dashboard", route:"dashboard", tourId:"dashboard_overview", phrases:["jobs dashboard", "dashboard", "all jobs", "job list", "active jobs"]},
+{id:"bulk_analyzer", title:"Bulk Resume Analyzer", route:"bulk", tourId:"dashboard_overview", phrases:["bulk analyzer", "bulk resume", "bulk resumes", "bulk upload", "bulk analysis"]},
+{id:"bulk_top10", title:"Bulk Top 10", route:"bulkTop10", tourId:"dashboard_overview", phrases:["bulk top 10", "bulk top candidates", "bulk 10 candidates"]},
+{id:"bulk_analytics", title:"Bulk Analytics", route:"bulkAnalytics", tourId:"dashboard_overview", phrases:["bulk analytics", "bulk insights", "bulk candidate insights"]},
+{id:"outreach", title:"Outreach Dashboard", route:"communication", workflowId:"send_candidate_email", tourId:"send_candidate_email", phrases:["outreach", "communication dashboard", "mail dashboard", "email dashboard"]},
+{id:"communication_queue", title:"Communication Queue", route:"communication", workflowId:"send_candidate_email", requiresJob:false, tourId:"send_candidate_email", phrases:["communication queue", "candidate outreach", "send email", "send mail", "email candidate", "mail candidate"]},
+{id:"reply_sync", title:"Reply Sync", route:"replySync", tourId:"send_candidate_email", phrases:["sync replies", "reply sync", "gmail sync", "email replies"]},
+{id:"sender_setup", title:"Sender Setup", route:"senderSetup", tourId:"send_candidate_email", phrases:["sender setup", "connect gmail", "hire score sender", "own domain sender", "domain sender"]},
+{id:"screening_test", title:"Screening Test", route:"communication", workflowId:"send_screening_test", requiresCandidate:false, tourId:"send_screening_test", phrases:["screening test", "assessment test", "send test", "test result", "assessment result"]},
+{id:"interviews", title:"Interview Dashboard", route:"interviewDashboard", workflowId:"schedule_interview", tourId:"schedule_interview", phrases:["interview dashboard", "interview page", "schedule interview", "interview schedule", "interview pipeline"]},
+{id:"pilot_access", title:"Pilot Access", route:"pilotUsers", workflowId:"invite_pilot_user", tourId:"invite_pilot_user", phrases:["pilot access", "pilot user", "invite user", "client access", "admin access"]},
+{id:"support", title:"Support", route:"support", workflowId:"view_plan_usage_limits", tourId:"view_plan_usage_limits", phrases:["support", "help ticket", "plan limit", "usage limit", "billing", "plan usage"]}
+];
+
 const INTENT_ALIASES = {
 review_ai_scores: "review_ai_ranked_candidates",
 top_candidates: "view_top_candidates",
@@ -265,6 +294,7 @@ selectedJob: null,
 selectedCandidate: null,
 lastTalentSearch: null,
 jobDraft: null,
+pendingProductFeature: null,
 lastParsedPlan: null,
 lastUserText: "",
 conversationContext: {},
@@ -912,6 +942,74 @@ view_shortlisted_candidates:"Open Shortlisted Candidates"
 return labels[workflow?.id] || "Open Page";
 }
 
+function isNavigationRequest(text){
+return includesAny(text, ["open", "show", "view", "dekh", "dikha", "kholo", "go", "page", "dashboard"]);
+}
+
+function matchProductFeature(raw){
+let text = normalizeText(raw || "");
+if(!text || !isNavigationRequest(text)) return null;
+let best = null;
+for(let feature of PRODUCT_FEATURES){
+let score = 0;
+for(let phrase of feature.phrases || []){
+let normalizedPhrase = normalizeText(phrase);
+if(normalizedPhrase && text.includes(normalizedPhrase)){
+score += normalizedPhrase.length + 20;
+}
+}
+if(feature.requiresJob && /\b(?:this|current|is|ye|selected)\s+job\b/.test(text)) score += 12;
+if(feature.id === "top10" && /\b(?:10|ten)\s+(?:candidate|candidates)\b/.test(text)) score += 30;
+if(feature.id === "candidate_results" && /\bresult\s+page\b/.test(text)) score += 20;
+if(feature.id === "outreach" && /\boutreach\b/.test(text)) score += 20;
+if(score > 0 && (!best || score > best.score)){
+best = {feature, score};
+}
+}
+return best?.feature || null;
+}
+
+function productFeatureActions(feature){
+let actions = [actionButton(`Open ${feature.title}`,"openPage",{page:feature.route})];
+if(feature.workflowId) actions.push(actionButton("Read Guide","readGuide",{workflowId:feature.workflowId}));
+if(feature.tourId) actions.push(actionButton("Start Visual Tour","tour",{tourId:feature.tourId, page:feature.route}));
+return actions;
+}
+
+async function handleProductFeatureQuery(raw){
+let feature = matchProductFeature(raw);
+if(!feature) return false;
+let currentJob = selectedJobIdentity();
+if(feature.requiresJob && !currentJob){
+let jobs = await getJobs();
+let matches = matchJobs(jobs, extractJobTitle(raw)).slice(0, 8);
+state.pendingContextType = "job";
+state.pendingProductFeature = feature;
+state.lastJobOptions = matches.length ? matches : (jobs || []).filter(job => job.is_active !== false).slice(0, 8);
+if(state.lastJobOptions.length){
+addMessage("agent", `<strong>Which job should I use for ${esc(feature.title)}?</strong><p>Select the job once and I will open the exact feature page.</p>${renderJobCards(state.lastJobOptions)}`);
+return true;
+}
+}
+if(feature.workflowId && WORKFLOWS[feature.workflowId]){
+let workflow = WORKFLOWS[feature.workflowId];
+if(workflow.requiredContext.includes("job") && !currentJob){
+return handleWorkflow({intent:feature.workflowId, entities:{}, confidence:1, clarification_needed:false});
+}
+if(workflow.requiredContext.includes("candidate")){
+return handleWorkflow({intent:feature.workflowId, entities:{}, confidence:1, clarification_needed:false});
+}
+state.lastIntent = feature.workflowId;
+state.lastParsedPlan = {intent:feature.workflowId, entities:{job_id:currentJob?.id || null, job_title:currentJob?.title || null}, confidence:1, clarification_needed:false};
+}
+let opened = openPage(feature.route);
+let job = selectedJobIdentity();
+let jobLine = job ? `<p><strong>Job:</strong> ${esc(job.title)}</p>` : "";
+let status = opened ? "Opening" : "I can open";
+addMessage("agent", `<strong>${status} ${esc(feature.title)}.</strong>${jobLine}<p>This is the exact product area for that request. Use the action below if the page did not switch automatically.</p>`, productFeatureActions(feature));
+return true;
+}
+
 function talentSearchHtml(query, candidates, total){
 let rows = (candidates || []).slice(0, 10);
 if(!rows.length){
@@ -1142,6 +1240,7 @@ state.lastCandidateOptions = [];
 }
 if(await handleAgentJDText(value)) return;
 if(await handleTalentSearchFollowUp(value)) return;
+if(await handleProductFeatureQuery(value)) return;
 let localFeatureIntent = resolveIntent(value);
 if(FEATURE_PAGE_INTENTS.has(localFeatureIntent?.intent) && localFeatureIntent.confidence >= 0.9){
 state.conversationContext = mergeEntities(state.conversationContext, localFeatureIntent.entities || {});
@@ -1259,6 +1358,37 @@ return openShortlistFeature("openShortlistExplanation");
 }
 if(target === "shortlistAnalytics"){
 return openShortlistFeature("openShortlistAnalytics");
+}
+if(target === "clientShortlistReport"){
+return openShortlistFeature("openClientShortlistReport");
+}
+if(target === "jobPosts"){
+if(job && typeof window.openJobPostKit === "function"){
+window.openJobPostKit(job.id);
+return true;
+}
+}
+if(target === "bulkTop10"){
+if(typeof window.showPage === "function") window.showPage("bulk");
+setTimeout(()=>typeof window.showBulkSection === "function" && window.showBulkSection("top10"), 300);
+return true;
+}
+if(target === "bulkAnalytics"){
+if(typeof window.showPage === "function") window.showPage("bulk");
+setTimeout(()=>typeof window.showBulkSection === "function" && window.showBulkSection("analytics"), 300);
+return true;
+}
+if(target === "replySync"){
+if(typeof window.openReplySyncModal === "function"){
+window.openReplySyncModal();
+return true;
+}
+}
+if(target === "senderSetup"){
+if(typeof window.openHireScoreSenderModal === "function"){
+window.openHireScoreSenderModal();
+return true;
+}
 }
 if(typeof window.showPage === "function"){
 window.showPage(target);
@@ -1928,6 +2058,13 @@ state.conversationContext = Object.assign({}, state.conversationContext, {job_id
 state.pendingContextType = null;
 let selectedJobLabel = [job.job_title, job.company_name ? `at ${job.company_name}` : "", job.location ? `(${job.location})` : ""].filter(Boolean).join(" ");
 addMessage("user", esc(selectedJobLabel || "Selected job"));
+if(state.pendingProductFeature){
+let feature = state.pendingProductFeature;
+state.pendingProductFeature = null;
+let opened = openPage(feature.route);
+addMessage("agent", `<strong>${opened ? "Opening" : "I can open"} ${esc(feature.title)}.</strong><p><strong>Job:</strong> ${esc(job.job_title || "Selected job")}</p>`, productFeatureActions(feature));
+return;
+}
 let plan = state.lastParsedPlan || {intent:state.lastIntent || "upload_resumes", entities:{}, confidence:1, clarification_needed:false};
 plan.entities = Object.assign({}, plan.entities || {}, {job_id:job.id, job_title:job.job_title || plan.entities?.job_title});
 if(state.lastUserText){
