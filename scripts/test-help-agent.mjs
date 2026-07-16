@@ -5,8 +5,8 @@ const html = readFileSync("index.html", "utf8");
 const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 
-assert.match(html, /help-agent\.css\?v=guide-agent-20260714-15/, "help css should be loaded");
-assert.match(html, /help-agent\.js\?v=guide-agent-20260714-15/, "help js should be loaded");
+assert.match(html, /help-agent\.css\?v=guide-agent-20260714-16/, "help css should be loaded");
+assert.match(html, /help-agent\.js\?v=guide-agent-20260714-16/, "help js should be loaded");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
 assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
 
@@ -23,6 +23,12 @@ assert.match(help, /I will not perform sensitive actions|I will never perform se
 assert.match(help, /\/api\/v1\/help\/parse-intent/, "frontend should call backend intent parser");
 assert.match(help, /\/api\/v1\/help\/chat/, "frontend should call the server-side action agent planner");
 assert.match(help, /\/api\/v1\/help\/execute/, "frontend should execute signed action plans on the backend");
+assert.match(help, /\/parse-jd-file/, "Help Agent should parse uploaded JD files");
+assert.match(help, /\/parse-jd-text/, "Help Agent should parse pasted JD text");
+assert.match(help, /\/create-job/, "Help Agent should create jobs from completed JD drafts");
+assert.match(help, /hsHelpJDFile/, "Help Agent should expose direct JD upload");
+assert.match(help, /job_create_missing/, "Help Agent should ask for missing job fields before creating");
+assert.match(help, /Open Apply Page/, "Help Agent should offer the apply page after job creation");
 assert.match(help, /candidate_preview/, "action plans should render an exact candidate preview");
 assert.match(help, /Understanding your request\.\.\./, "loading state should be shown while parsing intent");
 assert.match(help, /response_type:\s*"conversation"/, "local conversational fallback should exist");
@@ -122,6 +128,7 @@ assert.match(css, /grid-template-rows:auto auto minmax\(0,1fr\) auto auto/, "com
 assert.match(css, /\.hs-help-drawer\{[\s\S]*?overflow:hidden/, "the drawer itself should never scroll the composer away");
 assert.match(css, /\.hs-help-messages\{[\s\S]*?overflow-y:auto/, "only the conversation should scroll independently");
 assert.match(help, /<\/div>\s*<form id="hsHelpForm" class="hs-help-form">/, "query form should remain outside the scrollable mode panel");
+assert.match(css, /\.hs-help-attach/, "JD upload control should be styled inside the composer");
 assert.match(css, /\.hs-tour-target/, "tour target highlight styles should exist");
 assert.match(css, /@media \(max-width: 720px\)/, "mobile drawer styles should exist");
 

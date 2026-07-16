@@ -223,6 +223,7 @@ lastCandidateOptions: [],
 selectedJob: null,
 selectedCandidate: null,
 lastTalentSearch: null,
+jobDraft: null,
 lastParsedPlan: null,
 lastUserText: "",
 conversationContext: {},
@@ -1053,11 +1054,16 @@ let key = ordinal[1];
 if(state.lastJobOptions[map[key]]) return selectJob(map[key]);
 }
 }
+if(state.pendingContextType === "job_create_missing" && state.jobDraft){
+let draft = applyJobDraftAnswer(state.jobDraft, value);
+return finishAgentJobDraft(draft);
+}
 if(state.pendingContextType){
 state.pendingContextType = null;
 state.lastJobOptions = [];
 state.lastCandidateOptions = [];
 }
+if(await handleAgentJDText(value)) return;
 if(await handleTalentSearchFollowUp(value)) return;
 
 let loadingMessage = {role:"agent", html:"<em>Understanding your request...</em>", actions:[]};
@@ -1184,6 +1190,191 @@ let res = await fetch(url, options || {});
 let data = await res.json().catch(()=>null);
 if(!res.ok) throw new Error((data && (data.detail || data.error || data.message)) || "Request failed");
 return data;
+}
+
+function labelValueFromText(text, labels){
+let source = String(text || "");
+let pattern = labels.map(label => label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+let lineMatch = source.match(new RegExp(`(?:^|\\n)\\s*(?:${pattern})\\s*[:\\-]\\s*([^\\n\\r]{2,120})`, "i"));
+if(lineMatch) return clean(lineMatch[1]).replace(/[|;]+$/g, "").trim();
+return "";
+}
+
+function looksLikeJDText(text){
+let value = String(text || "");
+return value.length > 180 && /\b(responsibilities|requirements|skills|experience|qualification|job description|about the role|role)\b/i.test(value);
+}
+
+function agentJobDraftFromParsed(jdText, fields){
+let parsed = fields && typeof fields === "object" ? fields : {};
+return {
+job_title: clean(parsed.job_title || labelValueFromText(jdText, ["Job Title", "Role", "Position"])),
+company_name: clean(parsed.company_name || labelValueFromText(jdText, ["Company", "Company Name", "Client"])),
+department: clean(parsed.department),
+location: clean(parsed.location || labelValueFromText(jdText, ["Location", "Job Location"])),
+work_mode: clean(parsed.work_mode),
+job_type: clean(parsed.job_type) || "Full Time",
+salary_range: clean(parsed.salary_range) || "Not specified",
+experience_required: clean(parsed.experience_required),
+application_deadline: clean(parsed.application_deadline || labelValueFromText(jdText, ["Application Deadline", "Deadline"])),
+hiring_manager: clean(parsed.hiring_manager || labelValueFromText(jdText, ["Hiring Manager", "Recruiter"])),
+jd_text: clean(jdText)
+};
+}
+
+function agentJobMissingFields(draft){
+let missing = [];
+if(!clean(draft?.job_title)) missing.push({key:"job_title", label:"Job title"});
+if(!clean(draft?.company_name)) missing.push({key:"company_name", label:"Company/client name"});
+if(!clean(draft?.location)) missing.push({key:"location", label:"Location"});
+if(!clean(draft?.jd_text)) missing.push({key:"jd_text", label:"Job description"});
+return missing;
+}
+
+function applyJobDraftAnswer(draft, raw){
+let text = String(raw || "");
+let next = Object.assign({}, draft || {});
+let mappings = [
+["job_title", ["Job Title", "Role", "Position"]],
+["company_name", ["Company", "Company Name", "Client"]],
+["location", ["Location", "Job Location"]],
+["work_mode", ["Work Mode"]],
+["job_type", ["Job Type", "Employment Type"]],
+["salary_range", ["Salary", "Salary Range", "CTC", "Package", "Compensation"]],
+["experience_required", ["Experience", "Experience Required"]],
+["hiring_manager", ["Hiring Manager", "Recruiter"]],
+["application_deadline", ["Application Deadline", "Deadline"]]
+];
+for(let [key, labels] of mappings){
+let value = labelValueFromText(text, labels);
+if(value) next[key] = value;
+}
+let missing = agentJobMissingFields(next);
+if(missing.length === 1 && !labelValueFromText(text, mappings.flatMap(item => item[1]))){
+next[missing[0].key] = clean(text);
+}
+return next;
+}
+
+function jobDraftPreviewHtml(draft){
+return `<p><strong>Job:</strong> ${esc(draft.job_title || "Missing")}</p><p><strong>Company:</strong> ${esc(draft.company_name || "Missing")}</p><p><strong>Location:</strong> ${esc(draft.location || "Missing")}${draft.work_mode ? " / " + esc(draft.work_mode) : ""}</p><p><strong>Type:</strong> ${esc(draft.job_type || "Full Time")} | <strong>Salary:</strong> ${esc(draft.salary_range || "Not specified")}</p>`;
+}
+
+function askForJobDraftMissing(draft){
+state.jobDraft = draft;
+state.pendingContextType = "job_create_missing";
+let missing = agentJobMissingFields(draft);
+let names = missing.map(item => item.label).join(", ");
+addMessage("agent", `<strong>JD read ho gayi. Bas ${esc(names)} missing hai.</strong>${jobDraftPreviewHtml(draft)}<p>Reply in simple format, for example: Company: Techindia, Location: Noida / Remote.</p>`);
+}
+
+async function createJobFromAgentDraft(draft){
+let payload = {
+job_title: clean(draft.job_title),
+company_name: clean(draft.company_name),
+department: clean(draft.department),
+location: clean(draft.location),
+work_mode: clean(draft.work_mode),
+job_type: clean(draft.job_type) || "Full Time",
+salary_range: clean(draft.salary_range) || "Not specified",
+experience_required: clean(draft.experience_required),
+application_deadline: clean(draft.application_deadline),
+hiring_manager: clean(draft.hiring_manager),
+jd_text: clean(draft.jd_text),
+public_apply_enabled:true,
+source_tracking_enabled:true
+};
+let data = await fetchJson(`${apiBase()}/create-job`, {
+method:"POST",
+headers:requestHeaders(),
+body:JSON.stringify(payload)
+});
+state.jobsCache = null;
+let createdJob = Object.assign({}, payload, {id:data.job_id, job_id:data.job_id, apply_link:data.apply_link, apply_links:data.apply_links || {}});
+state.selectedJob = createdJob;
+state.conversationContext = Object.assign({}, state.conversationContext, {job_id:data.job_id, job_title:payload.job_title, candidate_ids:[]});
+state.jobDraft = null;
+state.pendingContextType = null;
+let applyLink = data.apply_link || data.apply_links?.main || "";
+addMessage("agent", `<strong>Job created: ${esc(payload.job_title)}</strong>${jobDraftPreviewHtml(payload)}<p>Apply page bhi ready hai. Chahiye to main abhi open kar deta hoon, ya link copy kar sakte ho.</p>${applyLink ? `<p><small>${esc(applyLink)}</small></p>` : ""}`, [
+actionButton("Open Apply Page","openApplyLink",{url:applyLink}),
+actionButton("Copy Apply Link","copyApplyLink",{url:applyLink}),
+actionButton("Upload Resumes","workflow",{workflowId:"upload_resumes"}),
+actionButton("View Jobs","openPage",{page:"dashboard"})
+]);
+}
+
+async function finishAgentJobDraft(draft){
+let missing = agentJobMissingFields(draft);
+if(missing.length){
+askForJobDraftMissing(draft);
+return true;
+}
+let loadingMessage = {role:"agent", html:"<em>Creating job from JD...</em>", actions:[]};
+state.messages.push(loadingMessage);
+renderMessages();
+try{
+await createJobFromAgentDraft(draft);
+}catch(error){
+addMessage("agent", `<strong>I could not create the job.</strong><p>${esc(error.message || "Please try again.")}</p>`, [
+actionButton("Open Create Job","openPage",{page:"job"})
+]);
+}finally{
+removeMessage(loadingMessage);
+}
+return true;
+}
+
+async function parseAgentJDText(text){
+let data = await fetchJson(`${apiBase()}/parse-jd-text`, {
+method:"POST",
+headers:requestHeaders(),
+body:JSON.stringify({jd_text:text})
+});
+return agentJobDraftFromParsed(text, data.fields || {});
+}
+
+async function handleAgentJDText(raw){
+if(!looksLikeJDText(raw)) return false;
+let loadingMessage = {role:"agent", html:"<em>Reading JD and preparing job...</em>", actions:[]};
+state.messages.push(loadingMessage);
+renderMessages();
+try{
+let draft = await parseAgentJDText(raw);
+removeMessage(loadingMessage);
+return finishAgentJobDraft(draft);
+}catch(error){
+removeMessage(loadingMessage);
+addMessage("agent", `<strong>I could not read this JD.</strong><p>${esc(error.message || "Please upload PDF, DOCX, TXT, or paste a longer JD.")}</p>`, [
+actionButton("Open Create Job","openPage",{page:"job"})
+]);
+return true;
+}
+}
+
+async function handleAgentJDFile(file){
+if(!file) return;
+openDrawer();
+addMessage("user", esc(`Upload JD: ${file.name || "job description"}`));
+let formData = new FormData();
+formData.append("file", file);
+let loadingMessage = {role:"agent", html:"<em>Reading JD file and preparing job...</em>", actions:[]};
+state.messages.push(loadingMessage);
+renderMessages();
+try{
+let headers = requestHeaders();
+if(headers instanceof Headers) headers.delete("Content-Type");
+else delete headers["Content-Type"];
+let data = await fetchJson(`${apiBase()}/parse-jd-file`, {method:"POST", headers, body:formData});
+let draft = agentJobDraftFromParsed(data.jd_text || "", data.fields || {});
+removeMessage(loadingMessage);
+await finishAgentJobDraft(draft);
+}catch(error){
+removeMessage(loadingMessage);
+addMessage("agent", `<strong>I could not read this JD file.</strong><p>${esc(error.message || "Upload PDF, DOCX, or TXT JD only.")}</p>`, [
+actionButton("Open Create Job","openPage",{page:"job"})
+]);
+}
 }
 
 async function resolvePlanJob(plan){
@@ -1389,7 +1580,7 @@ function openDrawer(){
 ensureShell();
 document.getElementById("hsHelpRoot")?.classList.add("is-open");
 if(!state.messages.length){
-addMessage("agent", `<strong>Hi, I am your HireScore guide.</strong><p>Ask me about jobs, resume upload, AI scores, shortlisting, emails, interviews, tests, pilot access, or plan limits.</p>`);
+addMessage("agent", `<strong>Hi, I am your HireScore guide.</strong><p>Ask me about jobs, JD upload, resume upload, AI scores, shortlisting, emails, interviews, tests, pilot access, or plan limits.</p>`);
 }
 renderModeInfo();
 }
@@ -1465,7 +1656,8 @@ ${QUICK_ACTIONS.map(item => `<button type="button" onclick="window.HireScoreHelp
 <div id="hsHelpModeInfo" class="hs-help-mode-info"></div>
 </div>
 <form id="hsHelpForm" class="hs-help-form">
-<input id="hsHelpInput" type="text" placeholder="Ask me anything, like 'upload resumes for Data Analyst job'" autocomplete="off">
+<label class="hs-help-attach" title="Upload JD file"><input id="hsHelpJDFile" type="file" accept=".pdf,.docx,.txt">JD</label>
+<input id="hsHelpInput" type="text" placeholder="Ask me anything, or attach a JD to create a job" autocomplete="off">
 <button type="submit">Send</button>
 </form>
 </aside>
@@ -1495,6 +1687,11 @@ let input = document.getElementById("hsHelpInput");
 let text = input.value;
 input.value = "";
 handleUserText(text);
+});
+document.getElementById("hsHelpJDFile")?.addEventListener("change", event => {
+let file = event.target.files && event.target.files[0];
+event.target.value = "";
+if(file) handleAgentJDFile(file);
 });
 renderModeInfo();
 }
@@ -1564,6 +1761,14 @@ if(item.action === "actionAgent") executeActionAgent();
 if(item.action === "readGuide") readGuide(item.data.workflowId);
 if(item.action === "talentPage") handleTalentSearchFollowUp("show me on page");
 if(item.action === "talentWorkflow") handleTalentSearchFollowUp("i need workflow");
+if(item.action === "openApplyLink"){
+if(item.data.url) window.open(item.data.url, "_blank");
+else openPage("applyJob");
+}
+if(item.action === "copyApplyLink" && item.data.url){
+navigator.clipboard?.writeText(item.data.url);
+addMessage("agent", "<strong>Apply link copied.</strong><p>You can share it with candidates now.</p>");
+}
 if(item.action === "workflow"){
 let previousPlan = state.lastParsedPlan || {};
 let preservedEntities = mergeEntities(previousPlan.entities || {}, state.conversationContext || {});

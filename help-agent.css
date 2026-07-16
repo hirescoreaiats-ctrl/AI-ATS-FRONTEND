@@ -306,7 +306,7 @@ display:none;
 
 .hs-help-form{
 display:grid;
-grid-template-columns:minmax(0,1fr) 74px;
+grid-template-columns:44px minmax(0,1fr) 74px;
 gap:8px;
 position:relative;
 z-index:2;
@@ -315,6 +315,28 @@ padding:10px 12px max(10px,env(safe-area-inset-bottom));
 background:#fff;
 border-top:1px solid #e2e8f0;
 box-shadow:0 -8px 22px rgba(15,23,42,.05);
+}
+
+.hs-help-attach{
+height:38px;
+display:flex;
+align-items:center;
+justify-content:center;
+border:1px solid #c7d2fe;
+border-radius:8px;
+background:#eef2ff;
+color:#4f46e5;
+font-size:12px;
+font-weight:950;
+cursor:pointer;
+}
+
+.hs-help-attach input{
+position:absolute;
+inline-size:1px;
+block-size:1px;
+opacity:0;
+pointer-events:none;
 }
 
 .hs-help-form button,
