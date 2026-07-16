@@ -1754,6 +1754,44 @@ writeOutreachSenderConfig({ ...config, active: true, reply_to: config.from_email
 removeSenderSetupModal()
 }
 
+function importOwnDomainDnsFromHelpAgent(payload = {}){
+let fromEmail = safeText(payload.from_email || payload.email).trim().toLowerCase()
+let domain = normalizeSenderDomain(payload.domain || domainFromEmail(fromEmail))
+let senderName = safeText(payload.sender_name || payload.from_name).trim() || (fromEmail ? fromEmail.split("@")[0] : "Recruiting Team")
+let records = Array.isArray(payload.records) ? payload.records.filter(Boolean).map(record => ({
+    type: safeText(record.type).trim().toUpperCase(),
+    host: safeText(record.host || record.name || record.hostname).trim(),
+    value: safeText(record.value || record.content || record.record_value).trim(),
+    ttl: safeText(record.ttl || "3600").trim() || "3600",
+    status: safeText(record.status || "pending").trim() || "pending",
+    label: safeText(record.label).trim()
+})).filter(record => record.type && record.host && record.value) : []
+let status = payload.verification_status || payload.status || "pending"
+if(!domain && fromEmail) domain = domainFromEmail(fromEmail)
+ownDomainDraft = {
+    mode: "own_domain",
+    active: false,
+    domain,
+    from_email: fromEmail,
+    sender_name: senderName,
+    from_name: senderName,
+    reply_to: fromEmail,
+    records,
+    verification_status: status
+}
+writeOutreachSenderConfig(ownDomainDraft)
+openOwnDomainSenderModal()
+let domainInput = document.getElementById("ownDomainInput")
+let fromInput = document.getElementById("ownDomainFromInput")
+let nameInput = document.getElementById("ownDomainNameInput")
+if(domainInput && domain) domainInput.value = domain
+if(fromInput && fromEmail) fromInput.value = fromEmail
+if(nameInput && senderName) nameInput.value = senderName
+let panel = document.getElementById("ownDomainDnsPanel")
+if(panel && records.length) panel.innerHTML = ownDomainDnsTableHtml(records, status)
+return { domain, from_email: fromEmail, records_count: records.length, verification_status: status }
+}
+
 function openReplySyncModal(){
 let email = getReplySyncEmail()
 senderModalShell(

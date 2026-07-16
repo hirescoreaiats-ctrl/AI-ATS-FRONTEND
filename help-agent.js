@@ -1144,6 +1144,103 @@ actionButton("Use Own Domain / DNS","senderChoice",{choice:"own_domain"})
 ]);
 }
 
+function extractDomainFromEmailValue(email){
+let parts = clean(email).toLowerCase().split("@");
+return parts.length === 2 ? parts[1].replace(/^www\./,"").trim() : "";
+}
+
+function normalizeDnsType(value){
+let type = clean(value).toUpperCase();
+if(type === "SPF" || type === "DMARC") return "TXT";
+if(type === "DKIM") return "CNAME";
+return type;
+}
+
+function parseDnsRecordLine(line){
+let raw = clean(line).replace(/^[\s>*-]+/,"").replace(/^`|`$/g,"");
+if(!raw || /\b(type|host|name|value|content|ttl)\b/i.test(raw) && /\b(header|example)\b/i.test(raw)) return null;
+let cells = raw.split("|").map(cell => clean(cell)).filter(Boolean);
+if(cells.length >= 3 && /^(TXT|CNAME|MX|SPF|DKIM|DMARC)$/i.test(cells[0])){
+return {
+type: normalizeDnsType(cells[0]),
+host: cells[1],
+value: cells[2],
+ttl: cells[3] && /^\d+$/.test(cells[3]) ? cells[3] : "3600",
+status:"pending"
+};
+}
+let typeMatch = raw.match(/\b(TXT|CNAME|MX|SPF|DKIM|DMARC)\b/i);
+if(!typeMatch) return null;
+let type = normalizeDnsType(typeMatch[1]);
+let hostMatch = raw.match(/\b(?:host|name|hostname)\s*[:=]\s*([^,|]+?)(?=\s+\b(?:value|content|target|points|ttl|status)\b\s*[:=]?|$)/i);
+let valueMatch = raw.match(/\b(?:value|content|target|points\s+to)\s*[:=]?\s*(.+?)(?=\s+\b(?:ttl|status)\b\s*[:=]?|$)/i);
+let ttlMatch = raw.match(/\bttl\s*[:=]\s*(\d{2,6})\b/i);
+if(!hostMatch || !valueMatch){
+let compact = raw.replace(typeMatch[0]," ").replace(/\s+/g," ").trim();
+let parts = compact.split(/\s+/);
+if(parts.length >= 2){
+let host = parts.shift();
+let value = parts.join(" ");
+return {type, host, value, ttl:ttlMatch?.[1] || "3600", status:"pending"};
+}
+return null;
+}
+return {
+type,
+host: clean(hostMatch[1]),
+value: clean(valueMatch[1]),
+ttl: ttlMatch?.[1] || "3600",
+status:"pending"
+};
+}
+
+function parseDnsSetupFromChat(raw){
+let text = String(raw || "");
+let email = (text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i) || [null])[0];
+let domainMatch = text.match(/\b(?:domain|sending domain)\s*[:=-]?\s*([a-z0-9.-]+\.[a-z]{2,})\b/i);
+let fromMatch = text.match(/\b(?:from email|sender email|from)\s*[:=-]?\s*([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i);
+let senderMatch = text.match(/\b(?:sender name|from name|display name)\s*[:=-]\s*([^\n|,]+)/i);
+let records = text.split(/\r?\n/).map(parseDnsRecordLine).filter(Boolean);
+return {
+domain: domainMatch?.[1] || extractDomainFromEmailValue(fromMatch?.[1] || email || ""),
+from_email: fromMatch?.[1] || email || "",
+sender_name: senderMatch?.[1] ? clean(senderMatch[1]) : "",
+records
+};
+}
+
+function looksLikeDnsSetupText(raw){
+let text = String(raw || "");
+let normalized = normalizeText(text);
+let hasDnsWord = includesAny(normalized, ["dns", "txt", "cname", "dkim", "dmarc", "spf", "domain", "from email", "sender email"]);
+let hasRecord = /\b(TXT|CNAME|MX|SPF|DKIM|DMARC)\b/i.test(text) && /\b(?:host|name|value|content|target|points\s+to|@|_domainkey|_dmarc)\b/i.test(text);
+let hasSenderContext = state.lastParsedPlan?.intent === "send_candidate_email" || senderStatusForHelp().mode === "own_domain";
+return hasSenderContext && hasDnsWord && (hasRecord || /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(text));
+}
+
+function handleDnsSetupFromChat(raw){
+if(!looksLikeDnsSetupText(raw)) return false;
+let parsed = parseDnsSetupFromChat(raw);
+if(!parsed.from_email && !parsed.domain && !parsed.records.length){
+addMessage("agent", `<strong>I need the sending email or DNS records.</strong><p>Paste the from email/domain and DNS rows like: <code>TXT @ value</code> or <code>CNAME brevo1._domainkey value</code>.</p>`, [
+actionButton("Open Own Domain DNS","senderChoice",{choice:"own_domain"})
+]);
+return true;
+}
+if(typeof window.importOwnDomainDnsFromHelpAgent === "function"){
+let result = window.importOwnDomainDnsFromHelpAgent(parsed);
+addMessage("agent", `<strong>DNS setup imported.</strong><p>I added ${esc(result.records_count || 0)} DNS record${Number(result.records_count || 0) === 1 ? "" : "s"} to the own-domain sender setup for ${esc(result.from_email || result.domain || "your domain")}.</p><p>I still cannot change your external DNS provider without provider access. Add these records in Cloudflare/GoDaddy/Namecheap/Hostinger/etc., then click Check Verification Status.</p>`, [
+actionButton("Open Own Domain DNS","senderChoice",{choice:"own_domain"}),
+actionButton("Use HireScore Sender Instead","senderChoice",{choice:"hirescore"})
+]);
+return true;
+}
+addMessage("agent", `<strong>I read the DNS setup, but the sender setup tool is not loaded.</strong><p>Open Own Domain DNS and paste the records there.</p>`, [
+actionButton("Open Own Domain DNS","senderChoice",{choice:"own_domain"})
+]);
+return true;
+}
+
 function handleEmailSenderChoiceFollowUp(raw){
 let plan = state.lastParsedPlan;
 if(plan?.intent !== "send_candidate_email") return false;
@@ -1462,6 +1559,7 @@ state.pendingGroupEmailRequest = null;
 }
 if(await handleAgentJDText(value)) return;
 if(await handleTalentSearchFollowUp(value)) return;
+if(handleDnsSetupFromChat(value)) return;
 if(handleEmailSenderChoiceFollowUp(value)) return;
 if(await handleGroupCandidateEmailRequest(value)) return;
 if(await handleProductFeatureQuery(value)) return;

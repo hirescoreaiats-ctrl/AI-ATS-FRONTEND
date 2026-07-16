@@ -4,9 +4,11 @@ import { readFileSync } from "node:fs";
 const html = readFileSync("index.html", "utf8");
 const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
+const app = readFileSync("app.js", "utf8");
 
-assert.match(html, /help-agent\.css\?v=guide-agent-20260714-21/, "help css should be loaded");
-assert.match(html, /help-agent\.js\?v=guide-agent-20260714-21/, "help js should be loaded");
+assert.match(html, /help-agent\.css\?v=guide-agent-20260714-22/, "help css should be loaded");
+assert.match(html, /help-agent\.js\?v=guide-agent-20260714-22/, "help js should be loaded");
+assert.match(html, /app\.js\?v=dashboard-company-filter-20260628-03/, "app js cache should be bumped when sender setup changes");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
 assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
 
@@ -78,6 +80,11 @@ assert.match(help, /Use Own Domain \/ DNS/, "group email workflow should offer o
 assert.match(help, /openOwnDomainSenderModal/, "own-domain sender choice should open DNS setup");
 assert.match(help, /Candidate confirmation list/, "group email workflow should preview candidates before send confirmation");
 assert.match(help, /Mail cannot be sent from your own email\/domain until DNS is verified/, "own-domain path should explain DNS verification before sending");
+assert.match(help, /function\s+handleDnsSetupFromChat/, "Help Agent should import DNS setup pasted in chat");
+assert.match(help, /parseDnsRecordLine/, "Help Agent should parse DNS record rows from chat");
+assert.match(help, /importOwnDomainDnsFromHelpAgent/, "Help Agent should send parsed DNS setup into the sender setup UI");
+assert.match(app, /function\s+importOwnDomainDnsFromHelpAgent/, "sender setup should accept DNS records imported by Help Agent");
+assert.match(app, /ownDomainDnsTableHtml\(records, status\)/, "imported DNS records should render in the own-domain DNS table");
 
 const pageIds = new Set([...html.matchAll(/id="([A-Za-z0-9]+)Page"/g)].map(match => match[1]));
 const workflowBlock = help.slice(help.indexOf("const WORKFLOWS"), help.indexOf("const QUICK_ACTIONS"));
