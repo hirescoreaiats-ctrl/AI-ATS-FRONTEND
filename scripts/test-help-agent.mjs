@@ -5,8 +5,8 @@ const html = readFileSync("index.html", "utf8");
 const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 
-assert.match(html, /help-agent\.css\?v=guide-agent-20260714-16/, "help css should be loaded");
-assert.match(html, /help-agent\.js\?v=guide-agent-20260714-16/, "help js should be loaded");
+assert.match(html, /help-agent\.css\?v=guide-agent-20260714-17/, "help css should be loaded");
+assert.match(html, /help-agent\.js\?v=guide-agent-20260714-17/, "help js should be loaded");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
 assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
 
@@ -55,10 +55,15 @@ assert.match(help, /target === "results"[\s\S]*window\.openJobResult\(job\.id, j
 assert.match(help, /window\.currentJobId/, "agent should recover job context from an already-open job workspace");
 assert.match(help, /target === "communication"[\s\S]*window\.openCommunicationPage\(job\.id, job\.title\)/, "communication workflows should open the selected job queue");
 assert.match(help, /target === "editJob"[\s\S]*window\.openEditJob\(job\.id\)/, "edit workflow should open the selected job form");
+assert.match(help, /target === "topCandidate"[\s\S]*openJobResultThen\("openTopCandidates"\)/, "top candidate workflow should open the real Top 10 page");
+assert.match(help, /target === "insight"[\s\S]*openJobResultThen\("openInsights"\)/, "AI analytics workflow should open the real insights page");
+assert.match(help, /target === "shortlistExplanation"[\s\S]*openShortlistFeature\("openShortlistExplanation"\)/, "shortlist explanation workflow should open the real explanation page");
+assert.match(help, /target === "shortlistAnalytics"[\s\S]*openShortlistFeature\("openShortlistAnalytics"\)/, "shortlist analytics workflow should open the real analytics page");
+assert.match(help, /FEATURE_PAGE_INTENTS/, "feature page requests should bypass stale backend intent routing");
 
 const pageIds = new Set([...html.matchAll(/id="([A-Za-z0-9]+)Page"/g)].map(match => match[1]));
 const workflowRoutes = [...help.matchAll(/\bid:"([a-z_]+)"[\s\S]*?route:"([A-Za-z0-9]+)"/g)];
-assert.equal(workflowRoutes.length, 23, "every registered workflow should expose a route");
+assert.equal(workflowRoutes.length, 27, "every registered workflow should expose a route");
 for (const [, workflowId, route] of workflowRoutes) {
   assert.ok(pageIds.has(route), `${workflowId} should route to an existing ${route}Page container`);
 }
@@ -71,6 +76,10 @@ for (const workflow of [
   "upload_resumes",
   "candidate_workflow",
   "select_top_candidates",
+  "view_top_candidates",
+  "view_ai_hiring_insights",
+  "view_shortlist_ai_explanation",
+  "view_shortlist_analytics",
   "review_ai_ranked_candidates",
   "view_candidate_profile",
   "explain_candidate_score",
@@ -117,6 +126,9 @@ assert.match(help, /state\.selectedJob = null;[\s\S]*job_id:null/, "cross-job ta
 assert.match(help, /Which workflow do you mean\?/, "clarification should ask a focused follow-up question");
 assert.match(help, /clarificationActions/, "clarification should show workflow choices");
 assert.match(help, /data-help-id/, "tour should use data-help-id selectors");
+assert.match(help, /top-candidates-page/, "Top 10 page should have Help Agent tour target mapping");
+assert.match(help, /ai-insights-page/, "AI analytics page should have Help Agent tour target mapping");
+assert.match(help, /shortlist-explanation-page/, "shortlist explanation page should have Help Agent tour target mapping");
 assert.match(help, /dashboard_overview/, "dashboard overview tour should exist");
 assert.match(help, /showTourStep/, "visual tour runner should exist");
 

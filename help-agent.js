@@ -46,6 +46,30 @@ description:"Find the highest-ranked candidates for a selected job.",
 steps:["Open candidate results.","Sort by AI score/rank.","Review evidence for the top candidates.","Select the candidates you want to move forward."],
 allowedModes:["guide","action"], isSensitiveAction:false
 },
+view_top_candidates: {
+id:"view_top_candidates", title:"Top 10 Candidates", category:"Candidates", requiredContext:["job"], route:"topCandidate", tourId:"top_candidates",
+description:"Open the Top 10 page for a job, including rank, score, fit signals, and AI Explain actions.",
+steps:["Open the selected job results.","Open the Top 10 candidates page.","Review the AI-ranked list.","Use AI Explain on a candidate when you need detailed evidence."],
+allowedModes:["guide"], isSensitiveAction:false
+},
+view_ai_hiring_insights: {
+id:"view_ai_hiring_insights", title:"AI Hiring Analytics", category:"AI Scoring", requiredContext:["job"], route:"insight", tourId:"ai_hiring_insights",
+description:"Open AI hiring insights and analytics for the selected candidate pool.",
+steps:["Open the selected job results.","Open AI Hiring Insights.","Review total candidates, average score, top talent, experience mix, skill signals, and score bands."],
+allowedModes:["guide"], isSensitiveAction:false
+},
+view_shortlist_ai_explanation: {
+id:"view_shortlist_ai_explanation", title:"Shortlist AI Explanation", category:"AI Scoring", requiredContext:["job"], route:"shortlistExplanation", tourId:"shortlist_ai_explanation",
+description:"Generate recruiter-ready AI explanation for the shortlisted candidates of a job.",
+steps:["Open the shortlist for the selected job.","Generate the AI shortlist explanation.","Review summary, priorities, risks, skill observations, and next steps."],
+allowedModes:["guide"], isSensitiveAction:false
+},
+view_shortlist_analytics: {
+id:"view_shortlist_analytics", title:"Shortlist Analytics", category:"AI Scoring", requiredContext:["job"], route:"shortlistAnalytics", tourId:"shortlist_analytics",
+description:"Open analytics for shortlisted candidates, including score, experience, location, skills, and shortlist insights.",
+steps:["Open the shortlist for the selected job.","Open shortlist analytics.","Review score distribution, experience mix, location spread, skills, and candidate insights."],
+allowedModes:["guide"], isSensitiveAction:false
+},
 create_job: {
 id:"create_job", title:"Create Job", category:"Jobs", requiredContext:[], route:"job", tourId:"create_job",
 description:"Create a new job, add JD details, and start a screening pipeline.",
@@ -174,8 +198,21 @@ const QUICK_ACTIONS = [
 ["send_screening_test","Screening Test"],["invite_pilot_user","Admin / Pilot Access"],["view_plan_usage_limits","Plan / Usage Limits"]
 ];
 
+const FEATURE_PAGE_INTENTS = new Set([
+"view_top_candidates",
+"view_ai_hiring_insights",
+"view_shortlist_ai_explanation",
+"view_shortlist_analytics"
+]);
+
 const INTENT_ALIASES = {
 review_ai_scores: "review_ai_ranked_candidates",
+top_candidates: "view_top_candidates",
+top_10_candidates: "view_top_candidates",
+ai_hiring_insights: "view_ai_hiring_insights",
+ai_analytics: "view_ai_hiring_insights",
+shortlist_ai_explanation: "view_shortlist_ai_explanation",
+shortlist_analytics: "view_shortlist_analytics",
 shortlist_candidates: "candidate_workflow",
 send_email: "send_candidate_email",
 screening_test: "send_screening_test",
@@ -205,6 +242,10 @@ create_job: [["create-job-button","Create Job","Click Create Job, fill role deta
 share_public_apply_link: [["public-apply-link-button","Apply Pages","Open Apply Pages from the Jobs dashboard."],["apply-page-list","Job apply links","Choose the job and copy the public application link."],["jobs-menu","Jobs menu","Return to Jobs when you need to manage openings."]],
 upload_resumes: [["job-card","Choose the job","Find the job row where resumes should be uploaded."],["job-upload-button","Upload resumes","Use the Folder/Upload action on that job row to add resumes."],["ai-score-column","Wait for scoring","After upload, parsing and AI scoring will update candidate results."]],
 review_ai_ranked_candidates: [["recruiter-menu","Open Recruiter","Use the Recruiter workspace to review AI-ranked candidates."],["recruiter-job-list","Choose a job","Open candidate results for the role you want to inspect."],["candidate-results-table","AI-ranked results","Review score, matched skills, missing skills, and evidence before acting."]],
+top_candidates: [["candidate-results-table","Open job results","Load the selected job's ranked candidate pool."],["top-candidates-page","Top 10 candidates","Review the best ranked candidates, scores, signals, and AI Explain actions."],["ai-explain-button","AI Explain","Open candidate-level explanation from the Top 10 page."]],
+ai_hiring_insights: [["candidate-results-table","Open job results","Load the selected job candidate pool first."],["ai-insights-page","AI analytics","Review score bands, skill coverage, experience mix, education signals, and top talent."],["candidate-results-table","Act on insights","Return to results to shortlist or contact candidates."]],
+shortlist_ai_explanation: [["shortlist-table","Open shortlist","Load shortlisted candidates for the selected job."],["shortlist-explanation-page","AI shortlist explanation","Generate recruiter-ready explanation from shortlist data and JD context."]],
+shortlist_analytics: [["shortlist-table","Open shortlist","Load shortlisted candidates for the selected job."],["shortlist-analytics-page","Shortlist analytics","Review shortlisted candidate score, skill, experience, and location analytics."]],
 explain_candidate_score: [["candidate-results-table","Score explanation","Open a candidate profile to inspect matched skills, gaps, caps, strengths, and concerns."]],
 shortlist_candidate: [["candidate-results-table","Review candidates","Open job results first and validate evidence."],["shortlist-button","Shortlist action","Use shortlist only after checking the profile and score explanation."]],
 send_candidate_email: [["outreach-menu","Open Outreach","Go to Outreach for role-specific communication queues."],["communication-job-list","Choose outreach job","Open the job queue and preview candidates."],["communication-email-button","Preview email","Check the message before sending."]],
@@ -370,8 +411,21 @@ let discoveryQuery = discoveryMatch ? normalizeJobTitle(discoveryMatch[1]) : nul
 let candidateSelection = /\b(?:top\s+)?\d{1,3}\s+(?:top\s+)?(?:candidate|candidates|resume|resumes|profile|profiles)\b/.test(text) || includesAny(text, ["top candidate", "top candidates", "best candidate", "best candidates", "candidate of", "candidates of"]);
 let wantsShortlistAction = includesAny(text, ["shortlist candidate", "shortlist candidates", "shortlist resume", "shortlist resumes", "select candidate", "select candidates"]) || /\b(?:candidate|candidates|resume|resumes)\s+shortlist\b/.test(text);
 let wantsViewShortlisted = text.includes("shortlisted") || includesAny(text, ["view shortlist", "show shortlist", "list shortlist", "shortlist list", "shortlisted candidate", "shortlisted candidates"]);
+let wantsOpenFeature = includesAny(text, ["open", "show", "view", "dekh", "dikha", "kholo"]);
+let wantsTopPage = wantsOpenFeature && candidateSelection && !wantsShortlistAction;
+let wantsAiAnalytics = includesAny(text, ["ai analytics", "ai insight", "ai insights", "hiring insight", "hiring insights", "candidate analytics", "pool analytics"]);
+let wantsShortlistExplanation = includesAny(text, ["shortlist explanation", "shortlisted explanation", "ai shortlist explanation", "shortlist ai explanation"]);
+let wantsShortlistAnalytics = includesAny(text, ["shortlist analytics", "shortlisted analytics", "shortlist insight", "shortlisted insight"]);
 
-if(discoveryQuery && !includesAny(text, ["top ", "shortlist", "reject", " job", " of ", " for "])){
+if(wantsShortlistExplanation){
+intent = "view_shortlist_ai_explanation"; confidence = 0.95;
+}else if(wantsShortlistAnalytics){
+intent = "view_shortlist_analytics"; confidence = 0.95;
+}else if(wantsAiAnalytics){
+intent = "view_ai_hiring_insights"; confidence = 0.94;
+}else if(wantsTopPage || (candidateSelection && text.includes("explain"))){
+intent = "view_top_candidates"; confidence = 0.94;
+}else if(discoveryQuery && !includesAny(text, ["top ", "shortlist", "reject", " job", " of ", " for "])){
 intent = "search_talent"; confidence = 0.9;
 }else if(allCandidates){
 intent = "view_candidates_by_stage"; confidence = 0.94;
@@ -845,6 +899,17 @@ let confirmation = intentResult.confirmation?.summary ? `<p><strong>Confirmation
 return `<strong>${esc(title)}</strong><p>${esc(guidance)}</p>${contextLine}${taskHtml}${preview}${confirmation}${missing}<p>Helping Agent will show the visual tour. Action Agent will act only after permission and confirmation.</p>`;
 }
 
+function openPageLabel(workflow){
+let labels = {
+view_top_candidates:"Open Top 10",
+view_ai_hiring_insights:"Open AI Analytics",
+view_shortlist_ai_explanation:"Open AI Explanation",
+view_shortlist_analytics:"Open Shortlist Analytics",
+view_shortlisted_candidates:"Open Shortlisted Candidates"
+};
+return labels[workflow?.id] || "Open Page";
+}
+
 function talentSearchHtml(query, candidates, total){
 let rows = (candidates || []).slice(0, 10);
 if(!rows.length){
@@ -903,6 +968,16 @@ return handleTalentSearch(intentResult);
 }
 
 if(workflow.requiredContext.includes("job") && !contextOverride?.job){
+let currentJob = selectedJobIdentity();
+if(currentJob && !intentResult.entities?.job_id && !intentResult.entities?.job_title){
+let resolvedJob = {
+id:currentJob.id,
+job_id:currentJob.id,
+job_title:currentJob.title
+};
+state.selectedJob = resolvedJob;
+return handleWorkflow(intentResult, {job:resolvedJob});
+}
 if(intentResult.entities?.job_id){
 let resolvedJob = {
 id:intentResult.entities.job_id,
@@ -943,7 +1018,7 @@ return;
 
 let actions = [
 actionButton("Start Visual Tour", intentResult.visual_tour ? "planTour" : "tour", {tourId:workflow.tourId, page:workflow.route}),
-actionButton(workflow.id === "view_shortlisted_candidates" ? "Open Shortlisted Candidates" : "Open Page","openPage",{page:workflow.route}),
+actionButton(openPageLabel(workflow),"openPage",{page:workflow.route}),
 actionButton("Read Guide","readGuide",{workflowId:workflow.id})
 ];
 if(intentResult.requires_confirmation && mutationActions(intentResult).length){
@@ -1065,6 +1140,13 @@ state.lastCandidateOptions = [];
 }
 if(await handleAgentJDText(value)) return;
 if(await handleTalentSearchFollowUp(value)) return;
+let localFeatureIntent = resolveIntent(value);
+if(FEATURE_PAGE_INTENTS.has(localFeatureIntent?.intent) && localFeatureIntent.confidence >= 0.9){
+state.conversationContext = mergeEntities(state.conversationContext, localFeatureIntent.entities || {});
+state.clarificationAttempts = 0;
+state.lastClarificationText = "";
+return handleWorkflow(localFeatureIntent);
+}
 
 let loadingMessage = {role:"agent", html:"<em>Understanding your request...</em>", actions:[]};
 state.messages.push(loadingMessage);
@@ -1106,6 +1188,40 @@ let title = job.job_title || state.conversationContext?.job_title || state.lastP
 return id ? {id, title} : null;
 }
 
+function openJobResultThen(callbackName){
+let job = selectedJobIdentity();
+if(job && typeof window.openJobResult === "function"){
+window.openJobResult(job.id, job.title);
+}
+let run = () => {
+let fn = window[callbackName];
+if(typeof fn === "function") fn();
+};
+setTimeout(run, 900);
+setTimeout(run, 1900);
+return Boolean(job);
+}
+
+function openShortlistFeature(callbackName){
+let job = selectedJobIdentity();
+if(typeof window.showPage === "function") window.showPage("results");
+let select = document.getElementById("shortlistJobSelect");
+if(job && select){
+select.value = String(job.id);
+}
+let load = window.loadShortlistedCandidates;
+let run = () => {
+let fn = window[callbackName];
+if(typeof fn === "function") fn();
+};
+if(typeof load === "function"){
+Promise.resolve(load()).finally(() => setTimeout(run, 250));
+}else{
+setTimeout(run, 700);
+}
+return Boolean(job);
+}
+
 function openPage(page){
 let target = page || "dashboard";
 let job = selectedJobIdentity();
@@ -1129,6 +1245,18 @@ if(job && typeof window.openEditJob === "function"){
 window.openEditJob(job.id);
 return true;
 }
+}
+if(target === "topCandidate"){
+return openJobResultThen("openTopCandidates");
+}
+if(target === "insight"){
+return openJobResultThen("openInsights");
+}
+if(target === "shortlistExplanation"){
+return openShortlistFeature("openShortlistExplanation");
+}
+if(target === "shortlistAnalytics"){
+return openShortlistFeature("openShortlistAnalytics");
 }
 if(typeof window.showPage === "function"){
 window.showPage(target);
@@ -1710,6 +1838,12 @@ let mappings = [
 ["#dashboardJobTable button[onclick*='upload'], #dashboardJobTable button[onclick*='Folder'], input[type='file']","job-upload-button"],
 ["#resultsPage .ats-recruiter-job-card, #resultsPage button[onclick*='viewResults'], #resultsPage","recruiter-job-list"],
 ["#resultsTable, #shortlistTable","candidate-results-table"],
+["#topCandidatePage, #topCandidateTable","top-candidates-page"],
+["#topCandidatePage button[onclick*='openAIExplanation'], .ats-top10-action.is-ai","ai-explain-button"],
+["#insightPage, #insightSkillChart, #insightScoreChart","ai-insights-page"],
+["#shortlistTable, #shortlistTableMain","shortlist-table"],
+["#shortlistExplanationPage, #shortlistExplainBody","shortlist-explanation-page"],
+["#shortlistAnalyticsPage, #shortlistAnalyticsCandidates","shortlist-analytics-page"],
 ["#jobResultPage, #resultsPage","job-details-section"],
 ["#resumeUpload, input[type='file']","resume-file-dropzone"],
 ["button[onclick*='shortlist'], .shortlist-btn","shortlist-button"],
