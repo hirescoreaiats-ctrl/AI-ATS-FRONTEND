@@ -333,9 +333,12 @@ return clean(text).toLowerCase()
 .replace(/\bupl\s*aod\b/g,"upload")
 .replace(/\buplod\b/g,"upload")
 .replace(/\buplaod\b/g,"upload")
+.replace(/\bmil\b|\bmeil\b|\bmaiil\b|\bmal\b/g,"mail")
 .replace(/\bcandiate\b/g,"candidate")
 .replace(/\bcandiates\b/g,"candidates")
 .replace(/\bcandiadte\b/g,"candidate")
+.replace(/\banalhyst\b|\banaylst\b|\banalst\b|\banalist\b/g,"analyst")
+.replace(/\bscintiest\b|\bsciencist\b|\bscientiest\b/g,"scientist")
 .replace(/\bcommincation\b|\bcommuncation\b|\bcomunication\b/g,"communication")
 .replace(/\bsehdule\b|\bshedule\b/g,"schedule")
 .replace(/\bkrna\b/g,"karna")
@@ -367,6 +370,8 @@ return dp[a.length][b.length];
 function extractJobTitle(raw){
 let text = normalizeText(raw);
 let patterns = [
+/(?:send|mail|email|message|outreach).*?(?:of|for|to)\s+(.+?)\s+(?:candidate|candidates|resume|resumes|profile|profiles)\b/i,
+/(?:send|mail|email|message|outreach).*?\b(.+?)\s+(?:candidate|candidates|resume|resumes|profile|profiles)\b/i,
 /(?:top\s*)?(?:candidate|candidates|resume|resumes|profile|profiles)\s+(?:of|for|in)\s+(.+?)(?:\s+(?:job|role|opening)\b|$)/i,
 /(?:shortlist|select|review|show|find|list|get|give)\s+(?:me\s+)?(?:top\s*)?(?:candidate|candidates|resume|resumes|profile|profiles)?\s*(?:of|for|in)\s+(.+?)(?:\s+(?:job|role|opening)\b|$)/i,
 /(.+?)(?:\s+job)?\s+(?:ke|ka|ki|kai|kay)\s+(?:top\s*)?(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)?\s*(?:candidate|candidates|resume|resumes|profile|profiles)/i,
@@ -387,7 +392,7 @@ return found ? clean(found.job_title) : null;
 
 function normalizeJobTitle(value){
 return normalizeText(value)
-.replace(/\b(the|this|that|want|need|please|you|to|give|get|show|find|list|top|candidate|candidates|resume|resumes|profile|profiles|of|for|in|job|role|opening|shortlist|select|review|ke|ka|ki|kai|kay)\b/g," ")
+.replace(/\b(i|a|an|the|this|that|want|need|please|you|to|give|get|show|find|list|send|mail|email|message|outreach|top|candidate|candidates|resume|resumes|profile|profiles|of|for|in|job|role|opening|shortlist|select|review|ke|ka|ki|kai|kay)\b/g," ")
 .replace(/\s+/g," ")
 .trim();
 }
