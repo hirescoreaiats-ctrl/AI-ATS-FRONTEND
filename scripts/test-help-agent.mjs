@@ -6,8 +6,8 @@ const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 const app = readFileSync("app.js", "utf8");
 
-assert.match(html, /help-agent\.css\?v=guide-agent-20260714-23/, "help css should be loaded");
-assert.match(html, /help-agent\.js\?v=guide-agent-20260714-23/, "help js should be loaded");
+assert.match(html, /help-agent\.css\?v=guide-agent-20260714-24/, "help css should be loaded");
+assert.match(html, /help-agent\.js\?v=guide-agent-20260714-24/, "help js should be loaded");
 assert.match(html, /app\.js\?v=dashboard-company-filter-20260628-03/, "app js cache should be bumped when sender setup changes");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
 assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
@@ -83,6 +83,10 @@ assert.match(help, /Mail cannot be sent from your own email\/domain until DNS is
 assert.match(help, /\\bmil\\b\|\\bmeil\\b/, "Help Agent should normalize common mail typos");
 assert.match(help, /analhyst/, "Help Agent should normalize common analyst typos");
 assert.match(help, /\(\?:send\|mail\|email\|message\|outreach\)\.\*\?\(\?:of\|for\|to\)/, "send-mail candidate requests should extract the job title before candidate wording");
+assert.match(help, /function\s+handleEmailSendConfirmationGuard/, "Help Agent should guard against fake email-sent confirmations");
+assert.match(help, /Mail is not sent yet/, "Help Agent should not claim chat-selected sender means mail was sent");
+assert.match(help, /hirescore ai mail/, "Help Agent should understand HireScore AI mail sender wording");
+assert.match(help, /workflowId === "send_candidate_email"[\s\S]*respondWithGroupEmailPlan/, "Send Email quick/workflow actions should reuse the protected group email plan");
 assert.match(help, /function\s+handleDnsSetupFromChat/, "Help Agent should import DNS setup pasted in chat");
 assert.match(help, /parseDnsRecordLine/, "Help Agent should parse DNS record rows from chat");
 assert.match(help, /importOwnDomainDnsFromHelpAgent/, "Help Agent should send parsed DNS setup into the sender setup UI");

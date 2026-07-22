@@ -1143,10 +1143,17 @@ actionButton("Use HireScore Sender Instead","senderChoice",{choice:"hirescore"})
 return;
 }
 if(typeof window.openHireScoreSenderModal === "function") window.openHireScoreSenderModal();
-addMessage("agent", `<strong>HireScore AI sender setup.</strong><p>No DNS is needed. Candidate emails are sent from HireScore AI &lt;info@hirescoreai.com&gt;, and replies go to the Reply-To email you save here.</p>`, [
+addMessage("agent", `<strong>HireScore AI sender selected.</strong><p>No DNS is needed. Mail is <strong>not sent yet</strong>. When you send from the Outreach composer, it will use HireScore AI &lt;info@hirescoreai.com&gt; and replies will go to the Reply-To email you save here.</p>`, [
 actionButton("Open Outreach Queue","openPage",{page:"communication"}),
 actionButton("Use Own Domain / DNS","senderChoice",{choice:"own_domain"})
 ]);
+}
+
+function currentEmailWorkflowJob(){
+let job = selectedJobIdentity();
+if(job) return {id:job.id, job_id:job.id, job_title:job.title, title:job.title};
+if(state.selectedJob?.id) return state.selectedJob;
+return null;
 }
 
 function extractDomainFromEmailValue(email){
@@ -1254,11 +1261,25 @@ if(includesAny(text, ["own domain", "my domain", "company domain", "khud", "apni
 openSenderChoice("own_domain");
 return true;
 }
-if(includesAny(text, ["hirescore sender", "hirescore mail", "info hirescoreai com", "info@hirescoreai.com", "default sender", "use hirescore"])){
+if(includesAny(text, ["hirescore sender", "hirescore mail", "hirescore ai mail", "hire score ai mail", "info hirescoreai com", "info@hirescoreai.com", "default sender", "use hirescore", "from hirescore", "sent from hirescore"])){
 openSenderChoice("hirescore");
 return true;
 }
 return false;
+}
+
+function handleEmailSendConfirmationGuard(raw){
+let plan = state.lastParsedPlan;
+if(plan?.intent !== "send_candidate_email") return false;
+let text = normalizeText(raw || "");
+let looksLikeSend = /\b(?:send|sent|bhej|bhejo|deliver|confirm|yes)\b/.test(text) && /\b(?:mail|email|now|candidate|candidates|hirescore|send|sent|bhej|bhejo|confirm|yes)\b/.test(text);
+if(!looksLikeSend) return false;
+addMessage("agent", `<strong>Mail is not sent yet.</strong><p>I have the outreach workflow ready, but I cannot mark emails as sent from chat. Please open the Outreach Queue, select each candidate, review or generate the email draft, and click Send in the composer. After that real send completes, the system will show delivery status.</p>`, [
+actionButton("Open Outreach Queue","openPage",{page:"communication"}),
+actionButton("Use HireScore Sender","senderChoice",{choice:"hirescore"}),
+actionButton("Open Top 10 Candidate Page","openPage",{page:"topCandidate"})
+]);
+return true;
 }
 
 async function handleGroupCandidateEmailRequest(raw){
@@ -1566,6 +1587,7 @@ if(await handleAgentJDText(value)) return;
 if(await handleTalentSearchFollowUp(value)) return;
 if(handleDnsSetupFromChat(value)) return;
 if(handleEmailSenderChoiceFollowUp(value)) return;
+if(handleEmailSendConfirmationGuard(value)) return;
 if(await handleGroupCandidateEmailRequest(value)) return;
 if(await handleProductFeatureQuery(value)) return;
 let localFeatureIntent = resolveIntent(value);
@@ -2229,10 +2251,14 @@ setSetting(SETTINGS_KEYS.mode, value === "action" ? "action" : "guide");
 renderModeInfo();
 }
 
-function quickAction(workflowId){
+async function quickAction(workflowId){
 let workflow = WORKFLOWS[workflowId];
 if(!workflow) return;
 addMessage("user", esc(workflow.title));
+if(workflowId === "send_candidate_email" && state.lastParsedPlan?.intent === "send_candidate_email"){
+let job = currentEmailWorkflowJob();
+if(job) return respondWithGroupEmailPlan(state.lastParsedPlan, job);
+}
 handleWorkflow({intent:workflowId, entities:{}, confidence:1, clarification_needed:false});
 }
 
@@ -2381,6 +2407,10 @@ addMessage("agent", "<strong>Apply link copied.</strong><p>You can share it with
 if(item.action === "workflow"){
 let previousPlan = state.lastParsedPlan || {};
 let preservedEntities = mergeEntities(previousPlan.entities || {}, state.conversationContext || {});
+if(item.data.workflowId === "send_candidate_email" && previousPlan.intent === "send_candidate_email"){
+let job = currentEmailWorkflowJob();
+if(job) return respondWithGroupEmailPlan(previousPlan, job);
+}
 handleWorkflow({
 ...previousPlan,
 response_type:"workflow",
