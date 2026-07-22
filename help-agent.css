@@ -511,3 +511,5 @@ grid-template-columns:1fr;
 .hs-help-agent-preview li{margin:7px 0;padding-left:2px}
 .hs-help-agent-preview li span,.hs-help-agent-preview li small{display:block}
 .hs-help-agent-preview li small{color:#64748b;margin-top:2px}
+.hs-help-candidate-link{appearance:none;border:0;background:transparent;color:#4f46e5;font:inherit;font-weight:900;text-align:left;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.hs-help-candidate-link:hover{color:#312e81}

@@ -6,9 +6,9 @@ const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 const app = readFileSync("app.js", "utf8");
 
-assert.match(html, /help-agent\.css\?v=guide-agent-20260714-26/, "help css should be loaded");
-assert.match(html, /help-agent\.js\?v=guide-agent-20260714-26/, "help js should be loaded");
-assert.match(html, /app\.js\?v=dashboard-company-filter-20260628-05/, "app js cache should be bumped when sender setup changes");
+assert.match(html, /help-agent\.css\?v=guide-agent-20260714-27/, "help css should be loaded");
+assert.match(html, /help-agent\.js\?v=guide-agent-20260714-27/, "help js should be loaded");
+assert.match(html, /app\.js\?v=dashboard-company-filter-20260628-06/, "app js cache should be bumped when sender setup changes");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
 assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
 
@@ -88,6 +88,10 @@ assert.match(help, /candidate\|candidates\|resume\|resumes\|profile\|profiles/, 
 assert.match(help, /\?:send\|mail\|email\|message\|outreach/, "send-mail prefixes should still be recognized after candidate-of phrasing");
 assert.match(help, /Array\.isArray\(data\) \? data : \(Array\.isArray\(data\?\.results\)/, "candidate preview should handle direct array and object result responses");
 assert.match(app, /window\.currentResultsSnapshot = currentResults/, "candidate preview should have a current results fallback snapshot");
+assert.match(help, /function\s+candidateProfileButton/, "Help Agent should render candidate names as profile links");
+assert.match(help, /data-profile-candidate-id/, "Help Agent candidate links should use the app profile trigger");
+assert.match(app, /window\.registerCandidateProfile = registerCandidateProfile/, "candidate profile registration should be exposed for Help Agent");
+assert.match(css, /\.hs-help-candidate-link/, "Help Agent candidate profile links should be styled");
 assert.match(help, /async function\s+handleEmailSendConfirmation/, "Help Agent should execute confirmed group email sends");
 assert.match(help, /sendBulkMailFromHelpAgent/, "Help Agent should call the real bulk email send helper after confirmation");
 assert.match(app, /async function\s+sendBulkMailFromHelpAgent/, "app should expose a real bulk email sender for Help Agent");

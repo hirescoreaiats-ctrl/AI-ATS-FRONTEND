@@ -4753,6 +4753,8 @@ candidateProfileStore[key] = {
 return key
 }
 
+window.registerCandidateProfile = registerCandidateProfile
+
 function candidateProfileNameButton(candidate, className="ats-candidate-name-link"){
 let normalized = normalizeCandidateForProfile(candidate || {})
 let key = registerCandidateProfile(normalized)

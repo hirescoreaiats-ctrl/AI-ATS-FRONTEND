@@ -931,6 +931,23 @@ if(value === "job") return "job selection";
 return value.replace(/^tool_unavailable:/, "open the related product tool: ");
 }
 
+function candidateProfileButton(candidate, fallbackName){
+let name = candidate?.full_name || candidate?.name || candidate?.candidate_name || fallbackName || "Candidate";
+let key = "";
+if(typeof window.registerCandidateProfile === "function"){
+key = window.registerCandidateProfile(Object.assign({}, candidate || {}, {
+full_name:name,
+name,
+id:candidate?.id || candidate?.resume_id || candidate?.candidate_id || candidate?.email || name,
+resume_id:candidate?.resume_id || candidate?.id || candidate?.candidate_id || ""
+}));
+}else{
+key = candidate?.resume_id || candidate?.id || candidate?.candidate_id || candidate?.email || "";
+}
+if(!key) return esc(name);
+return `<button type="button" class="hs-help-candidate-link" data-profile-candidate-id="${esc(key)}" title="Open ${esc(name)} profile">${esc(name)}</button>`;
+}
+
 function plannerHtml(intentResult, workflow, context){
 let title = workflow?.title || "Hiring Workflow";
 let guidance = intentResult.guidance || workflow?.description || "I can guide this workflow visually.";
@@ -947,7 +964,7 @@ let explanation = candidate.recruiter_explanation || candidate.ranking_reason ||
 let strengths = Array.isArray(candidate.strengths) && candidate.strengths.length ? `<p><b>Strengths:</b> ${esc(candidate.strengths.join("; "))}</p>` : "";
 let concerns = Array.isArray(candidate.concerns) && candidate.concerns.length ? `<p><b>Gaps:</b> ${esc(candidate.concerns.join("; "))}</p>` : "";
 let skills = Array.isArray(candidate.matched_skills) && candidate.matched_skills.length ? `<p><b>Matched skills:</b> ${esc(candidate.matched_skills.join(", "))}</p>` : "";
-return `<li><span>#${index + 1} ${esc(candidate.full_name || "Candidate")}</span><small>Score ${esc(candidate.rank_score ?? candidate.final_score ?? "N/A")} | ${esc(candidate.recommendation || candidate.status || candidate.stage || "Review")}</small><p>${esc(explanation)}</p>${strengths}${concerns}${skills}</li>`;
+return `<li><span>#${index + 1} ${candidateProfileButton(candidate, "Candidate")}</span><small>Score ${esc(candidate.rank_score ?? candidate.final_score ?? "N/A")} | ${esc(candidate.recommendation || candidate.status || candidate.stage || "Review")}</small><p>${esc(explanation)}</p>${strengths}${concerns}${skills}</li>`;
 }).join("")}</ol></div>` : "";
 let confirmation = intentResult.confirmation?.summary ? `<p><strong>Confirmation:</strong> ${esc(intentResult.confirmation.summary)}</p>` : "";
 return `<strong>${esc(title)}</strong><p>${esc(guidance)}</p>${contextLine}${taskHtml}${preview}${confirmation}${missing}<p>Helping Agent will show the visual tour. Action Agent will act only after permission and confirmation.</p>`;
@@ -1098,6 +1115,7 @@ return rows
 .filter(row => !["rejected","dropped"].includes(normalizeText(row.status || row.stage || "")))
 .slice(0, limit || 10)
 .map(row => ({
+...row,
 id: row.id || row.candidate_id || "",
 name: row.full_name || row.name || "Candidate",
 email: row.email || "",
@@ -1113,7 +1131,7 @@ let groupLabel = groupEmailLabel(plan);
 let jobTitle = job?.job_title || job?.title || plan?.entities?.job_title || "selected job";
 let company = job?.company_name ? ` at ${job.company_name}` : "";
 let candidateRows = Array.isArray(candidates) && candidates.length
-? `<div class="hs-help-agent-preview"><strong>Candidate confirmation list</strong><ol>${candidates.map((candidate, index) => `<li><span>#${index + 1} ${esc(candidate.name)}</span><small>${esc(candidate.email || "Email missing")} | Score ${esc(candidate.score)}</small></li>`).join("")}</ol></div>`
+? `<div class="hs-help-agent-preview"><strong>Candidate confirmation list</strong><ol>${candidates.map((candidate, index) => `<li><span>#${index + 1} ${candidateProfileButton(candidate, candidate.name)}</span><small>${esc(candidate.email || "Email missing")} | Score ${esc(candidate.score)}</small></li>`).join("")}</ol></div>`
 : `<p><strong>Candidate confirmation list:</strong> Open the Top 10 Candidate Page / Outreach Queue to confirm the exact candidates before sending.</p>`;
 return `<strong>Email workflow prepared for ${esc(groupLabel)}.</strong>
 <p>Mail is <strong>not sent yet</strong>. Before sending, choose the sender: use HireScore AI &lt;info@hirescoreai.com&gt; with your Reply-To, or verify your own domain with DNS records.</p>
@@ -1445,7 +1463,7 @@ return `<strong>No strong matches found for ${esc(query)}</strong><p>Try adding 
 let cards = rows.map((candidate, index) => {
 let score = candidate.recruiter_rank_score ?? candidate.rank_score ?? candidate.final_score ?? "N/A";
 let reason = candidate.recruiter_explanation || candidate.ranking_reason || "Matched using role, skills, and resume evidence.";
-return `<li><span>#${index + 1} ${esc(candidate.full_name || "Candidate")}</span><small>${esc(candidate.designation || "Role not specified")} | ATS score ${esc(score)}</small><p>${esc(reason)}</p></li>`;
+return `<li><span>#${index + 1} ${candidateProfileButton(candidate, "Candidate")}</span><small>${esc(candidate.designation || "Role not specified")} | ATS score ${esc(score)}</small><p>${esc(reason)}</p></li>`;
 }).join("");
 return `<strong>Found ${esc(total ?? rows.length)} candidate match${Number(total ?? rows.length) === 1 ? "" : "es"} for ${esc(query)}</strong><div class="hs-help-agent-preview"><ol>${cards}</ol></div><p><small>Results are ranked across your talent pool using role, skills, resume evidence, and ATS score.</small></p>`;
 }
