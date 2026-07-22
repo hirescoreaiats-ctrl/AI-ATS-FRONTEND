@@ -1792,6 +1792,107 @@ if(panel && records.length) panel.innerHTML = ownDomainDnsTableHtml(records, sta
 return { domain, from_email: fromEmail, records_count: records.length, verification_status: status }
 }
 
+function helpAgentSenderPayload(senderChoice){
+let config = readOutreachSenderConfig()
+if(senderChoice === "hirescore"){
+    return {
+        sender_mode: "hirescore",
+        from_email: HIRE_SCORE_DEFAULT_FROM_EMAIL,
+        from_name: HIRE_SCORE_DEFAULT_FROM_NAME,
+        reply_to: safeText(config.reply_to).trim() || safeText(localStorage.getItem("outreachSenderEmail")).trim() || getRecruiterEmailFromSession(),
+        sender_display_name: safeText(config.sender_name).trim()
+    }
+}
+return getActiveSenderPayload()
+}
+
+async function sendBulkMailFromHelpAgent(payload = {}){
+let jobId = safeText(payload.job_id || payload.jobId).trim()
+let jobTitle = safeText(payload.job_title || payload.jobTitle || window.currentJobTitle || "Role").trim()
+let candidates = Array.isArray(payload.candidates) ? payload.candidates : []
+let senderPayload = helpAgentSenderPayload(payload.sender_choice)
+if(senderPayload.sender_mode === "own_domain" && senderPayload.verification_status !== "verified"){
+    throw new Error("Own-domain sender is not verified. Add DNS records or use HireScore AI sender.")
+}
+if(!senderPayload.reply_to || !senderPayload.reply_to.includes("@")){
+    throw new Error("Reply-To email is required before sending.")
+}
+let unique = []
+let seenEmails = new Set()
+candidates.forEach(candidate => {
+    let email = safeText(candidate.email).trim().toLowerCase()
+    if(!email || !email.includes("@") || seenEmails.has(email)) return
+    seenEmails.add(email)
+    unique.push({...candidate, email})
+})
+if(!jobId) throw new Error("Job is missing.")
+if(!unique.length) throw new Error("No candidates with valid email addresses were found.")
+let job = {}
+try{
+    let jobRes = await fetch(API + "/public-job/" + encodeURIComponent(jobId))
+    job = jobRes.ok ? await jobRes.json() : {}
+}catch(e){}
+let subject = safeText(payload.subject).trim() || `${jobTitle || "Role"} - Next Step`
+let successes = []
+let failures = []
+for(let candidate of unique){
+    let name = safeText(candidate.name || candidate.full_name).trim() || "Candidate"
+    let body = safeText(payload.body).trim() || defaultCandidateMailBody(name, jobTitle, job.company_name, job.hiring_manager)
+    try{
+        let res = await fetch(API + "/send-mail", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + localStorage.getItem("token")
+            },
+            body: JSON.stringify({
+                email: candidate.email,
+                candidate_id: candidate.id || candidate.candidate_id || "",
+                name,
+                job_id: jobId,
+                job_title: jobTitle,
+                recruiter_email: senderPayload.reply_to,
+                recruiter_name: localStorage.getItem("username"),
+                sender_mode: senderPayload.sender_mode || "hirescore",
+                from_email: senderPayload.from_email,
+                from_name: senderPayload.from_name,
+                reply_to: senderPayload.reply_to,
+                sender_domain: senderPayload.domain,
+                verification_status: senderPayload.verification_status,
+                hiring_manager: job.hiring_manager,
+                company_name: job.company_name,
+                subject,
+                body
+            })
+        })
+        let text = await res.text()
+        let data = {}
+        try{ data = text ? JSON.parse(text) : {} }catch(e){ data = {detail:text} }
+        if(!res.ok || data.error) throw new Error(data.detail || data.error || "Email provider failed")
+        successes.push({email:candidate.email, name})
+    }catch(error){
+        failures.push({email:candidate.email, name, error:error?.message || "Send failed"})
+    }
+}
+try{
+    if(jobId){
+        await loadCommunicationSplit(jobId)
+        await loadCommunicationJobs()
+    }
+}catch(e){}
+return {
+    attempted: unique.length,
+    sent: successes.length,
+    failed: failures.length,
+    skipped: Math.max(0, candidates.length - unique.length),
+    successes,
+    failures,
+    subject,
+    sender_mode: senderPayload.sender_mode || "hirescore",
+    reply_to: senderPayload.reply_to
+}
+}
+
 function openReplySyncModal(){
 let email = getReplySyncEmail()
 senderModalShell(

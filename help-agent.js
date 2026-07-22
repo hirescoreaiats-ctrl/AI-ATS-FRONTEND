@@ -296,6 +296,8 @@ lastTalentSearch: null,
 jobDraft: null,
 pendingProductFeature: null,
 pendingGroupEmailRequest: null,
+pendingEmailCandidates: [],
+pendingEmailSenderChoice: null,
 lastParsedPlan: null,
 lastUserText: "",
 conversationContext: {},
@@ -1088,6 +1090,7 @@ return rows
 .filter(row => !["rejected","dropped"].includes(normalizeText(row.status || row.stage || "")))
 .slice(0, limit || 10)
 .map(row => ({
+id: row.id || row.candidate_id || "",
 name: row.full_name || row.name || "Candidate",
 email: row.email || "",
 score: row.final_score ?? row.score ?? row.rank_score ?? row.recruiter_rank_score ?? "N/A"
@@ -1130,11 +1133,13 @@ actionButton("Read Email Guide","readGuide",{workflowId:"send_candidate_email"})
 
 async function respondWithGroupEmailPlan(plan, job){
 let candidates = await groupEmailCandidatePreview(plan, job);
+state.pendingEmailCandidates = candidates;
 addMessage("agent", groupEmailHtml(plan, job, candidates), groupEmailActions());
 }
 
 function openSenderChoice(choice){
 if(choice === "own_domain"){
+state.pendingEmailSenderChoice = "own_domain";
 if(typeof window.openOwnDomainSenderModal === "function") window.openOwnDomainSenderModal();
 addMessage("agent", `<strong>Own domain sender setup.</strong><p>Enter your domain and from email, generate DNS records, add them in your DNS provider, then check verification. Mail cannot be sent from your own email/domain until DNS is verified.</p>`, [
 actionButton("Open Own Domain DNS","senderChoice",{choice:"own_domain"}),
@@ -1142,6 +1147,7 @@ actionButton("Use HireScore Sender Instead","senderChoice",{choice:"hirescore"})
 ]);
 return;
 }
+state.pendingEmailSenderChoice = "hirescore";
 if(typeof window.openHireScoreSenderModal === "function") window.openHireScoreSenderModal();
 addMessage("agent", `<strong>HireScore AI sender selected.</strong><p>No DNS is needed. Mail is <strong>not sent yet</strong>. When you send from the Outreach composer, it will use HireScore AI &lt;info@hirescoreai.com&gt; and replies will go to the Reply-To email you save here.</p>`, [
 actionButton("Open Outreach Queue","openPage",{page:"communication"}),
@@ -1154,6 +1160,13 @@ let job = selectedJobIdentity();
 if(job) return {id:job.id, job_id:job.id, job_title:job.title, title:job.title};
 if(state.selectedJob?.id) return state.selectedJob;
 return null;
+}
+
+function senderChoiceFromText(raw){
+let text = normalizeText(raw || "");
+if(includesAny(text, ["hirescore", "hire score", "info hirescoreai com", "info@hirescoreai.com"])) return "hirescore";
+if(includesAny(text, ["own domain", "my domain", "company domain", "khud", "apni mail", "meri mail", "own mail", "own email", "client mail"])) return "own_domain";
+return state.pendingEmailSenderChoice || null;
 }
 
 function extractDomainFromEmailValue(email){
@@ -1268,18 +1281,79 @@ return true;
 return false;
 }
 
-function handleEmailSendConfirmationGuard(raw){
+function isEmailSendCommand(raw){
+let text = normalizeText(raw || "");
+let sendWord = /\b(?:send|sent|bhej|bhejo|bhejna|deliver|confirm|yes|ok|okay)\b/.test(text);
+let mailContext = /\b(?:mail|email|now|candidate|candidates|hirescore|send|sent|bhej|bhejo|confirm|yes|ok|okay)\b/.test(text);
+if(!sendWord || !mailContext) return false;
+if(includesAny(text, ["not send", "do not send", "mat bhej", "cancel"])) return false;
+return true;
+}
+
+async function handleEmailSendConfirmation(raw){
 let plan = state.lastParsedPlan;
 if(plan?.intent !== "send_candidate_email") return false;
-let text = normalizeText(raw || "");
-let looksLikeSend = /\b(?:send|sent|bhej|bhejo|deliver|confirm|yes)\b/.test(text) && /\b(?:mail|email|now|candidate|candidates|hirescore|send|sent|bhej|bhejo|confirm|yes)\b/.test(text);
-if(!looksLikeSend) return false;
-addMessage("agent", `<strong>Mail is not sent yet.</strong><p>I have the outreach workflow ready, but I cannot mark emails as sent from chat. Please open the Outreach Queue, select each candidate, review or generate the email draft, and click Send in the composer. After that real send completes, the system will show delivery status.</p>`, [
-actionButton("Open Outreach Queue","openPage",{page:"communication"}),
-actionButton("Use HireScore Sender","senderChoice",{choice:"hirescore"}),
+if(!isEmailSendCommand(raw)) return false;
+let job = currentEmailWorkflowJob();
+if(!job){
+addMessage("agent", `<strong>Select the job first.</strong><p>I need the exact job before sending outreach.</p>`);
+return true;
+}
+let candidates = Array.isArray(state.pendingEmailCandidates) && state.pendingEmailCandidates.length
+? state.pendingEmailCandidates
+: await groupEmailCandidatePreview(plan, job);
+state.pendingEmailCandidates = candidates;
+let valid = candidates.filter(candidate => clean(candidate.email).includes("@"));
+let skipped = candidates.length - valid.length;
+if(!valid.length){
+addMessage("agent", `<strong>No valid candidate emails found.</strong><p>I cannot send outreach because the selected candidate list has no valid email addresses.</p>`, [
 actionButton("Open Top 10 Candidate Page","openPage",{page:"topCandidate"})
 ]);
 return true;
+}
+let senderChoice = senderChoiceFromText(raw);
+let confirmMessage = `Send email to ${valid.length} candidate${valid.length === 1 ? "" : "s"} for ${job.job_title || job.title || "this job"}${senderChoice === "hirescore" ? " using HireScore AI sender" : ""}?${skipped ? `\n\n${skipped} candidate${skipped === 1 ? "" : "s"} without valid email will be skipped.` : ""}`;
+if(!window.confirm(confirmMessage)){
+addMessage("agent", `<strong>Send cancelled.</strong><p>No email was sent. You can still review candidates or adjust the sender/template.</p>`, [
+actionButton("Open Outreach Queue","openPage",{page:"communication"}),
+actionButton("Use HireScore Sender","senderChoice",{choice:"hirescore"})
+]);
+return true;
+}
+if(typeof window.sendBulkMailFromHelpAgent !== "function"){
+addMessage("agent", `<strong>Send tool is not available on this page.</strong><p>Open the Outreach Queue and send from the composer.</p>`, [
+actionButton("Open Outreach Queue","openPage",{page:"communication"}),
+]);
+return true;
+}
+let loadingMessage = {role:"agent", html:"<em>Sending outreach emails...</em>", actions:[]};
+state.messages.push(loadingMessage);
+renderMessages();
+try{
+let result = await window.sendBulkMailFromHelpAgent({
+job_id: job.id || job.job_id,
+job_title: job.job_title || job.title,
+candidates: valid,
+sender_choice: senderChoice
+});
+removeMessage(loadingMessage);
+let failures = Array.isArray(result.failures) && result.failures.length
+? `<div class="hs-help-agent-preview"><strong>Failed sends</strong><ol>${result.failures.slice(0, 5).map(item => `<li><span>${esc(item.name || item.email)}</span><small>${esc(item.error || "Failed")}</small></li>`).join("")}</ol></div>`
+: "";
+addMessage("agent", `<strong>Email send completed.</strong><p>Sent: ${esc(result.sent)} / ${esc(result.attempted)}. Failed: ${esc(result.failed)}. Skipped missing/duplicate emails: ${esc(result.skipped + skipped)}.</p><p><strong>Subject:</strong> ${esc(result.subject || "Next Step")}</p><p><strong>Reply-To:</strong> ${esc(result.reply_to || "Not set")}</p>${failures}`, [
+actionButton("Open Outreach Queue","openPage",{page:"communication"}),
+actionButton("Sync Replies","openPage",{page:"replySync"})
+]);
+return true;
+}catch(error){
+removeMessage(loadingMessage);
+addMessage("agent", `<strong>Email send failed.</strong><p>${esc(error.message || "Please check sender setup and try again.")}</p>`, [
+actionButton("Use HireScore Sender","senderChoice",{choice:"hirescore"}),
+actionButton("Use Own Domain / DNS","senderChoice",{choice:"own_domain"}),
+actionButton("Open Outreach Queue","openPage",{page:"communication"})
+]);
+return true;
+}
 }
 
 async function handleGroupCandidateEmailRequest(raw){
@@ -1586,8 +1660,8 @@ state.pendingGroupEmailRequest = null;
 if(await handleAgentJDText(value)) return;
 if(await handleTalentSearchFollowUp(value)) return;
 if(handleDnsSetupFromChat(value)) return;
+if(await handleEmailSendConfirmation(value)) return;
 if(handleEmailSenderChoiceFollowUp(value)) return;
-if(handleEmailSendConfirmationGuard(value)) return;
 if(await handleGroupCandidateEmailRequest(value)) return;
 if(await handleProductFeatureQuery(value)) return;
 let localFeatureIntent = resolveIntent(value);
