@@ -351,6 +351,10 @@ return clean(text).toLowerCase()
 
 function includesAny(text, words){ return words.some(word => text.includes(word)); }
 
+function jobRecordId(job){
+return job?.id || job?.job_id || job?._id || "";
+}
+
 function fuzzyContains(text, word){
 if(text.includes(word)) return true;
 let tokens = text.split(/\s+/);
@@ -372,9 +376,10 @@ return dp[a.length][b.length];
 function extractJobTitle(raw){
 let text = normalizeText(raw);
 let patterns = [
+/(?:top\s*)?(?:candidate|candidates|resume|resumes|profile|profiles)\s+(?:of|for|in)\s+(.+?)(?:\s+(?:job|role|opening)\b|$)/i,
+/(?:send|mail|email|message|outreach).*?(?:top\s*)?(?:candidate|candidates|resume|resumes|profile|profiles)\s+(?:of|for|in)\s+(.+?)(?:\s+(?:job|role|opening)\b|$)/i,
 /(?:send|mail|email|message|outreach).*?(?:of|for|to)\s+(.+?)\s+(?:candidate|candidates|resume|resumes|profile|profiles)\b/i,
 /(?:send|mail|email|message|outreach).*?\b(.+?)\s+(?:candidate|candidates|resume|resumes|profile|profiles)\b/i,
-/(?:top\s*)?(?:candidate|candidates|resume|resumes|profile|profiles)\s+(?:of|for|in)\s+(.+?)(?:\s+(?:job|role|opening)\b|$)/i,
 /(?:shortlist|select|review|show|find|list|get|give)\s+(?:me\s+)?(?:top\s*)?(?:candidate|candidates|resume|resumes|profile|profiles)?\s*(?:of|for|in)\s+(.+?)(?:\s+(?:job|role|opening)\b|$)/i,
 /(.+?)(?:\s+job)?\s+(?:ke|ka|ki|kai|kay)\s+(?:top\s*)?(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)?\s*(?:candidate|candidates|resume|resumes|profile|profiles)/i,
 /(.+?)\s+wali\s+job/i,
@@ -1073,11 +1078,14 @@ return `<p><strong>Current sender option:</strong> HireScore AI &lt;info@hiresco
 }
 
 async function groupEmailCandidatePreview(plan, job){
-let jobId = job?.id || job?.job_id;
+let jobId = jobRecordId(job);
 if(!jobId) return [];
 try{
 let data = await fetchJson(`${apiBase()}/results/${encodeURIComponent(jobId)}`, {headers:requestHeaders()});
-let rows = Array.isArray(data?.results) ? data.results : [];
+let rows = Array.isArray(data) ? data : (Array.isArray(data?.results) ? data.results : []);
+if(!rows.length && String(window.currentJobId || "") === String(jobId || "") && Array.isArray(window.currentResultsSnapshot)){
+rows = window.currentResultsSnapshot;
+}
 let group = plan?.entities?.candidate_group;
 let limit = Number(plan?.entities?.limit || 10);
 if(group === "shortlisted"){
@@ -1370,13 +1378,14 @@ return true;
 let jobs = await getJobs();
 let matches = matchJobs(jobs, plan.job_query || plan.entities.job_title).slice(0, 8);
 if(matches.length === 1){
-state.selectedJob = matches[0];
+let matchedJobId = jobRecordId(matches[0]);
+state.selectedJob = Object.assign({}, matches[0], {id:matchedJobId, job_id:matchedJobId});
 state.selectedCandidate = null;
-state.conversationContext = Object.assign({}, state.conversationContext, {job_id:matches[0].id, job_title:matches[0].job_title, candidate_ids:[]});
-plan.entities.job_id = matches[0].id;
+state.conversationContext = Object.assign({}, state.conversationContext, {job_id:matchedJobId, job_title:matches[0].job_title, candidate_ids:[]});
+plan.entities.job_id = matchedJobId;
 plan.entities.job_title = matches[0].job_title || plan.entities.job_title;
 state.lastParsedPlan = plan;
-await respondWithGroupEmailPlan(plan, matches[0]);
+await respondWithGroupEmailPlan(plan, state.selectedJob);
 return true;
 }
 state.pendingContextType = "job";
@@ -2499,9 +2508,10 @@ clarification_question:null
 selectJob:async function(index){
 let job = state.lastJobOptions[index];
 if(!job) return;
-state.selectedJob = job;
+let selectedId = jobRecordId(job);
+state.selectedJob = Object.assign({}, job, {id:selectedId, job_id:selectedId});
 state.selectedCandidate = null;
-state.conversationContext = Object.assign({}, state.conversationContext, {job_id:job.id, job_title:job.job_title, candidate_ids:[]});
+state.conversationContext = Object.assign({}, state.conversationContext, {job_id:selectedId, job_title:job.job_title, candidate_ids:[]});
 state.pendingContextType = null;
 let selectedJobLabel = [job.job_title, job.company_name ? `at ${job.company_name}` : "", job.location ? `(${job.location})` : ""].filter(Boolean).join(" ");
 addMessage("user", esc(selectedJobLabel || "Selected job"));
@@ -2515,13 +2525,13 @@ return;
 if(state.pendingGroupEmailRequest){
 let plan = state.pendingGroupEmailRequest;
 state.pendingGroupEmailRequest = null;
-plan.entities = Object.assign({}, plan.entities || {}, {job_id:job.id, job_title:job.job_title || plan.entities?.job_title});
+plan.entities = Object.assign({}, plan.entities || {}, {job_id:selectedId, job_title:job.job_title || plan.entities?.job_title});
 state.lastParsedPlan = plan;
-await respondWithGroupEmailPlan(plan, job);
+await respondWithGroupEmailPlan(plan, state.selectedJob);
 return;
 }
 let plan = state.lastParsedPlan || {intent:state.lastIntent || "upload_resumes", entities:{}, confidence:1, clarification_needed:false};
-plan.entities = Object.assign({}, plan.entities || {}, {job_id:job.id, job_title:job.job_title || plan.entities?.job_title});
+plan.entities = Object.assign({}, plan.entities || {}, {job_id:selectedId, job_title:job.job_title || plan.entities?.job_title});
 if(state.lastUserText){
 try{
 let refreshed = await parseIntentWithBackend(state.lastUserText);

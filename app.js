@@ -2860,6 +2860,7 @@ renderSkillDropdown()
 // * YAHI ADD KARNA HAI (END)
 
 currentResults = results
+window.currentResultsSnapshot = currentResults
 
 let totalApplicants = results.length
 
