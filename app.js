@@ -1997,6 +1997,13 @@ return text
 
 function formatAutofillExperience(value){
 let text = cleanJDAutofillValue(value).replace(/^(required|minimum|min|experience|required experience)\s*[:\-]?\s*/i, "").trim()
+if(/\b(no|not|non)\s+(freshers?|fresher|entry[-\s]?level|trainee)s?\b/i.test(text)) return ""
+if(/\b(freshers?|fresher|fresh\s+graduate|entry[-\s]?level|graduate\s+trainee|trainee|no\s+(prior\s+)?experience|without\s+experience|zero\s+years?)\b/i.test(text)){
+return /\b0\s*(?:-|to|\u2013|\u2014)\s*2\s*(?:years?|yrs?)\b/i.test(text) ? "Fresher / 0-2 Years" : "Fresher"
+}
+if(/\b0\s*(?:-|to|\u2013|\u2014)\s*1\s*(?:years?|yrs?)\b/i.test(text)) return "Fresher / 0-1 Years"
+if(/\b0\s*(?:-|to|\u2013|\u2014)\s*(?:6|12)\s*months?\b/i.test(text)) return "Fresher"
+if(/\b0\s*\+?\s*(?:years?|yrs?)\b/i.test(text)) return "Fresher"
 let range = text.match(/\b(\d+(?:\.\d+)?)\s*(?:-|to|\u2013|\u2014)\s*(\d+(?:\.\d+)?)\s*\+?\s*(?:years?|yrs?)?\b/i)
 if(range) return `${range[1]}-${range[2]} Years`
 let plus = text.match(/\b(\d+(?:\.\d+)?)\s*\+\s*(?:years?|yrs?)?\b/i)
@@ -8146,10 +8153,15 @@ let job = await res.json()
 // fill form
 document.getElementById("editJobId").value = job.job_id || job.id
 document.getElementById("editJobTitle").value = job.job_title || ""
-document.getElementById("editCompany").value = job.company_name || ""
+document.getElementById("editCompany").value = job.company_name || job.company || ""
+document.getElementById("editDepartment").value = job.department || ""
 document.getElementById("editLocation").value = job.location || ""
-document.getElementById("editSalary").value = job.salary_range || ""
+document.getElementById("editWorkMode").value = job.work_mode || ""
+document.getElementById("editSalary").value = job.salary_range || job.salary || ""
 document.getElementById("editJobType").value = job.job_type || ""
+document.getElementById("editExperience").value = job.experience_required || ""
+document.getElementById("editHiringManager").value = job.hiring_manager || ""
+document.getElementById("editDeadline").value = job.application_deadline || ""
 document.getElementById("editJD").value = job.jd_text || ""
 
 }

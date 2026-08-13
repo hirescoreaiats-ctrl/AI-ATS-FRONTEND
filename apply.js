@@ -48,6 +48,19 @@ function text(value, fallback="Not specified"){
 return String(value || "").trim() || fallback
 }
 
+function displayExperience(value){
+let raw = text(value, "")
+if(!raw) return "Role dependent"
+if(/\b(no|not|non)\s+(freshers?|fresher|entry[-\s]?level|trainee)s?\b/i.test(raw)) return raw
+if(/\b(freshers?|fresher|fresh\s+graduate|entry[-\s]?level|graduate\s+trainee|trainee|no\s+(prior\s+)?experience|without\s+experience|zero\s+years?)\b/i.test(raw)){
+return /\b0\s*(?:-|to|\u2013|\u2014)\s*2\s*(?:years?|yrs?)\b/i.test(raw) ? "Fresher / 0-2 Years" : raw
+}
+if(/\b0\s*(?:-|to|\u2013|\u2014)\s*1\s*(?:years?|yrs?)\b/i.test(raw)) return "Fresher / 0-1 Years"
+if(/\b0\s*(?:-|to|\u2013|\u2014)\s*(?:6|12)\s*months?\b/i.test(raw)) return "Fresher"
+if(/\b0\s*\+?\s*(?:years?|yrs?)\b/i.test(raw)) return "Fresher"
+return raw
+}
+
 function initials(value){
 return text(value, "AI").split(/\s+/).slice(0,2).map(part => part[0]).join("").toUpperCase()
 }
@@ -193,7 +206,7 @@ els.brandMark.textContent = initials(job.company)
 els.location.textContent = text(job.location)
 els.salary.textContent = text(job.salary, "Not disclosed")
 els.jobType.textContent = text(job.job_type)
-els.experience.textContent = text(job.experience_required, "Role dependent")
+els.experience.textContent = displayExperience(job.experience_required)
 els.workMode.textContent = text(job.work_mode, "Screening ready")
 els.description.innerHTML = formatDescription(job.description)
 }
