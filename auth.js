@@ -243,8 +243,10 @@ localStorage.setItem("token", data.token)
 localStorage.setItem("username", data.name)
 localStorage.setItem("userEmail", data.email || email)
 
-// redirect redirect
-window.location.href = "index.html"
+// Return protected Requirement Platform visits to the requested React route.
+let requestedNext = new URLSearchParams(window.location.search).get("next") || ""
+let safeNext = requestedNext.startsWith("/requirement-platform/") && !requestedNext.startsWith("//") ? requestedNext : ""
+window.location.href = safeNext ? `enterprise.html?route=${encodeURIComponent(safeNext)}` : "index.html"
 
 }else{
 if(errorBox){

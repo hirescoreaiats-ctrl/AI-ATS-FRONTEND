@@ -8,7 +8,7 @@ import { useTalentSearch } from "../hooks/useTalentSearch.js";
 import { useWorkspaceSocket } from "../hooks/useWorkspaceSocket.js";
 
 export function App() {
-  const [path, setPath] = useState(window.location.pathname === "/" ? "/pipeline" : window.location.pathname);
+  const [path, setPath] = useState(resolveInitialPath);
   const [query, setQuery] = useState("senior python backend engineer fastapi distributed systems");
   const [stage, setStage] = useState("all");
   const [commandOpen, setCommandOpen] = useState(false);
@@ -45,6 +45,8 @@ export function App() {
   }
 
   useEffect(() => {
+    const onPopState = () => setPath(window.location.pathname === "/" ? "/pipeline" : window.location.pathname);
+    window.addEventListener("popstate", onPopState);
     function onKeyDown(event) {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
@@ -52,8 +54,13 @@ export function App() {
       }
     }
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("popstate", onPopState);
+    };
   }, []);
+
+  const isRequirementPlatform = path.startsWith("/requirement-platform");
 
   return (
     <div className="flex min-h-screen bg-ats-surface">
@@ -61,12 +68,12 @@ export function App() {
       <main className="min-w-0 flex-1">
         <header className="flex items-center justify-between border-b border-ats-line bg-white px-6 py-4">
           <div>
-            <h1 className="text-xl font-semibold text-ats-ink">Enterprise Recruiting Workspace</h1>
-            <p className="mt-1 text-sm text-ats-muted">Pipeline, AI discovery, interviews, collaboration, and offers in one operating system.</p>
+            <h1 className="text-xl font-semibold text-ats-ink">{isRequirementPlatform ? "Requirement Platform" : "Enterprise Recruiting Workspace"}</h1>
+            <p className="mt-1 text-sm text-ats-muted">{isRequirementPlatform ? "Verified recruitment collaboration, independent from ATS jobs and candidates." : "Pipeline, AI discovery, interviews, collaboration, and offers in one operating system."}</p>
           </div>
           <OrganizationSwitcher />
         </header>
-        <RecruiterCommandBar
+        {!isRequirementPlatform && <RecruiterCommandBar
           query={query}
           onQuery={setQuery}
           onBulkMove={() => setStage("hiring_manager_review")}
@@ -74,7 +81,7 @@ export function App() {
           onExport={exportCandidates}
           onCandidate={() => navigate("/candidates")}
           onCopilot={() => navigate("/copilot")}
-        />
+        />}
         <Route candidates={candidates} query={query} stage={stage} setStage={setStage} />
       </main>
       <CommandMenu
@@ -90,4 +97,13 @@ export function App() {
       />
     </div>
   );
+}
+
+function resolveInitialPath() {
+  const requested = new URLSearchParams(window.location.search).get("route");
+  if (requested && requested.startsWith("/requirement-platform/") && !requested.startsWith("//")) {
+    window.history.replaceState({}, "", requested);
+    return requested;
+  }
+  return window.location.pathname === "/" || window.location.pathname.endsWith("/enterprise.html") ? "/pipeline" : window.location.pathname;
 }

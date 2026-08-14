@@ -17,7 +17,7 @@ export async function apiGet(path) {
     credentials: "include",
     headers: authHeaders()
   });
-  if (!response.ok) throw new Error(await response.text());
+  if (!response.ok) throw await apiError(response);
   return response.json();
 }
 
@@ -28,8 +28,40 @@ export async function apiPost(path, body) {
     headers: authHeaders(),
     body: JSON.stringify(body)
   });
-  if (!response.ok) throw new Error(await response.text());
+  if (!response.ok) throw await apiError(response);
   return response.json();
+}
+
+export async function apiPatch(path, body) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: authHeaders(),
+    body: JSON.stringify(body)
+  });
+  if (!response.ok) throw await apiError(response);
+  return response.json();
+}
+
+export async function apiUpload(path, formData) {
+  const headers = authHeaders();
+  delete headers["Content-Type"];
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    credentials: "include",
+    headers,
+    body: formData
+  });
+  if (!response.ok) throw await apiError(response);
+  return response.json();
+}
+
+async function apiError(response) {
+  const payload = await response.json().catch(() => ({}));
+  const error = new Error(payload.detail || payload.message || "Request failed");
+  error.status = response.status;
+  error.payload = payload;
+  return error;
 }
 
 export function authHeaders() {

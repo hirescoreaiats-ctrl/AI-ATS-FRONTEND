@@ -1,6 +1,7 @@
-import { BarChart3, BriefcaseBusiness, Building2, Inbox, KanbanSquare, Search, Settings, Sparkles, UsersRound } from "lucide-react";
+import { BarChart3, BriefcaseBusiness, Building2, Inbox, KanbanSquare, Network, Search, Settings, Sparkles, UsersRound } from "lucide-react";
 
 const items = [
+  ["Requirement Platform", Network, "/requirement-platform/requirements"],
   ["Pipeline", KanbanSquare, "/pipeline"],
   ["Candidates", UsersRound, "/candidates"],
   ["Talent Search", Search, "/talent"],
@@ -24,7 +25,7 @@ export function EnterpriseSidebar({ active = "/pipeline", onNavigate }) {
           <button
             key={href}
             onClick={() => onNavigate?.(href)}
-            className={`flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm ${active === href ? "bg-blue-50 font-semibold text-ats-brand" : "text-ats-muted hover:bg-ats-surface hover:text-ats-ink"}`}
+            className={`flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm ${active === href || (href.startsWith("/requirement-platform") && active.startsWith("/requirement-platform")) ? "bg-blue-50 font-semibold text-ats-brand" : "text-ats-muted hover:bg-ats-surface hover:text-ats-ink"}`}
           >
             <Icon size={18} />
             <span>{label}</span>

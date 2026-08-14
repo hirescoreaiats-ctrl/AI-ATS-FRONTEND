@@ -6,6 +6,7 @@ import { InterviewsRoute } from "./InterviewsRoute.jsx";
 import { OrganizationRoute } from "./OrganizationRoute.jsx";
 import { PipelineRoute } from "./PipelineRoute.jsx";
 import { TalentRoute } from "./TalentRoute.jsx";
+import { RequirementPlatformPage } from "../pages/RequirementPlatformPage.jsx";
 
 export const routes = {
   "/pipeline": PipelineRoute,
@@ -21,5 +22,6 @@ export const routes = {
 };
 
 export function resolveRoute(pathname) {
+  if (pathname.startsWith("/requirement-platform")) return RequirementPlatformPage;
   return routes[pathname] || PipelineRoute;
 }
