@@ -2450,6 +2450,15 @@ document.getElementById("jobPostModal")?.classList.add("hidden")
 }
 // ---------------- CREATE JOB ----------------
 
+function createJobApiMessage(data, fallback="Could not create job"){
+let detail = data?.detail ?? data?.error
+if(typeof detail === "string" && detail.trim()) return detail
+if(detail && typeof detail === "object"){
+return detail.message || detail.detail || fallback
+}
+return fallback
+}
+
 function setCreateJobStatus(type="", message=""){
 let status = document.getElementById("createJobStatus")
 if(!status) return
@@ -2541,7 +2550,7 @@ source_tracking_enabled:sourceTrackingEnabled
 let data=await res.json().catch(()=>({}))
 
 if(!res.ok || data.error){
-let message = data.detail || data.error || "Could not create job"
+let message = createJobApiMessage(data)
 setCreateJobStatus("error", message)
 alert(message)
 return
@@ -11039,4 +11048,3 @@ window.onload = function(){
     bindJDAutofill()
 
 }
-
