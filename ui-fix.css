@@ -13767,14 +13767,14 @@ padding:0 0 28px !important;
     .ats-recruiter-signal-grid { grid-template-columns: 1fr; }
 }
 
-/* Behavior-only overflow support for recruiter job cards; no visual dimensions change. */
-.ats-recruiter-job-card {
+/* Behavior-only overflow support for job-display cards; no visual dimensions change. */
+.job-card-horizontal-scroll {
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
     touch-action: pan-y;
 }
 
-.ats-recruiter-job-card::-webkit-scrollbar {
+.job-card-horizontal-scroll::-webkit-scrollbar {
     display: none;
 }

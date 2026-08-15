@@ -2584,7 +2584,7 @@ let topScore = job.top_score || 0
 
 return `
 
-<article class="ats-recruiter-job-card">
+<article class="ats-recruiter-job-card job-card-horizontal-scroll">
 <div class="ats-recruiter-job-top">
 <span class="ats-recruiter-job-icon">JD</span>
 <span class="ats-recruiter-job-status">Active</span>
@@ -3084,7 +3084,7 @@ container.innerHTML=""
 jobs.forEach(job=>{
 
 container.innerHTML+=`
-<div class="job-card">
+<div class="job-card job-card-horizontal-scroll">
 
 <h3>${job.job_title}</h3>
 
@@ -4383,7 +4383,7 @@ jobs.forEach(job=>{
 
 container.innerHTML+=`
 
-<div class="job-card">
+<div class="job-card job-card-horizontal-scroll">
 
 <div>
 
@@ -7583,7 +7583,7 @@ action = `<button onclick="deleteJob('${safeJs(jobId)}')" class="ats-manage-btn 
 
 return `
 
-<article class="ats-management-card ${cardState}">
+<article class="ats-management-card job-card-horizontal-scroll ${cardState}">
 <div class="ats-management-card-top">
 <span class="ats-management-icon">JD</span>
 <span class="ats-management-status">${statusLabel}</span>
@@ -8252,7 +8252,7 @@ jobs
 
 container.innerHTML += `
 
-<div class="job-card">
+<div class="job-card job-card-horizontal-scroll">
 
 <div>
 
@@ -10977,7 +10977,7 @@ async function loadCommunicationJobs(){
     }
 
     container.innerHTML = activeJobs.map(job => `
-    <article class="ats-outreach-role-card">
+    <article class="ats-outreach-role-card job-card-horizontal-scroll">
         <div class="ats-outreach-card-top">
             <span class="ats-outreach-role-icon">CM</span>
             <span class="ats-outreach-status">Active</span>
@@ -11038,6 +11038,5 @@ window.onload = function(){
     bindJDAutofill()
 
 }
-
 
 

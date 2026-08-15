@@ -1,6 +1,16 @@
 (() => {
-    const CARD_SELECTOR = ".ats-recruiter-job-card"
-    const OVERFLOW_VALUE_SELECTOR = ".ats-recruiter-job-body p, .ats-recruiter-job-meta span"
+    const CARD_SELECTOR = ".job-card-horizontal-scroll"
+    const OVERFLOW_VALUE_SELECTOR = [
+        ".ats-recruiter-job-body p",
+        ".ats-recruiter-job-meta span",
+        ".ats-management-card-body p",
+        ".ats-management-meta span",
+        ".ats-outreach-role-title p",
+        ".ats-outreach-meta-grid span",
+        ".job-title",
+        ".company-name",
+        ".job-info > div"
+    ].join(",")
     const INTERACTIVE_SELECTOR = "button, a, input, select, textarea, label, [role='button']"
     const DRAG_THRESHOLD = 5
     let drag = null
