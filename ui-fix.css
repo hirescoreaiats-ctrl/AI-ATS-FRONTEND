@@ -13766,3 +13766,15 @@ padding:0 0 28px !important;
     .ats-rescore-banner button { width: 100%; }
     .ats-recruiter-signal-grid { grid-template-columns: 1fr; }
 }
+
+/* Behavior-only overflow support for recruiter job cards; no visual dimensions change. */
+.ats-recruiter-job-card {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    touch-action: pan-y;
+}
+
+.ats-recruiter-job-card::-webkit-scrollbar {
+    display: none;
+}
