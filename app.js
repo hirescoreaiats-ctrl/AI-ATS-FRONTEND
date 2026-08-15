@@ -11044,10 +11044,9 @@ window.onload = function(){
 
 
 
-// Reveal long recruiter-card values by dragging, without changing card layout or showing scrollbars.
+// Reveal an oversized recruiter-card interior by dragging, without changing layout or showing scrollbars.
 (() => {
     const cardSelector = ".ats-recruiter-job-card"
-    const valueSelector = ".ats-recruiter-job-body p, .ats-recruiter-job-meta span"
     const controlSelector = "button, a, input, select, textarea, [role='button']"
     let cardDrag = null
 
@@ -11056,13 +11055,15 @@ window.onload = function(){
 
         const card = event.target.closest(cardSelector)
         if(!card) return
+        if(card.scrollWidth <= card.clientWidth + 1) return
 
-        const values = [...card.querySelectorAll(valueSelector)]
-            .filter(value => value.scrollWidth > value.clientWidth + 1)
-            .map(value => ({ value, start: value.scrollLeft }))
-
-        if(!values.length) return
-        cardDrag = { card, pointerId: event.pointerId, startX: event.clientX, values, moved: false }
+        cardDrag = {
+            card,
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startScrollLeft: card.scrollLeft,
+            moved: false
+        }
         card.setPointerCapture?.(event.pointerId)
     })
 
@@ -11072,9 +11073,7 @@ window.onload = function(){
         if(!cardDrag.moved && Math.abs(distance) < 4) return
 
         cardDrag.moved = true
-        cardDrag.values.forEach(({ value, start }) => {
-            value.scrollLeft = start - distance
-        })
+        cardDrag.card.scrollLeft = cardDrag.startScrollLeft - distance
         event.preventDefault()
     }, { passive: false })
 
