@@ -1009,6 +1009,7 @@ target.classList.remove("hidden")
 
 document.body.classList.toggle("ats-candidate-profile-mode", page === "candidateProfile")
 document.body.classList.toggle("ats-support-mode", page === "support")
+document.body.classList.toggle("ats-pilot-mode", page === "pilotUsers")
 if(page === "candidateProfile"){
 let dashboardPage = document.getElementById("dashboardPage")
 if(dashboardPage) dashboardPage.classList.remove("hidden")
