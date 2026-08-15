@@ -20,7 +20,7 @@
 <link rel="stylesheet" href="sidebar.css">
 <link rel="stylesheet" href="createjob.css">
 <link rel="stylesheet" href="Dashbord.css">
-<link rel="stylesheet" href="ui-fix.css?v=job-card-drag-20260815-03">
+    <link rel="stylesheet" href="ui-fix.css?v=pilot-management-20260815-06">
 <link rel="stylesheet" href="help-agent.css?v=guide-agent-20260714-27">
 
 </head>
@@ -2852,9 +2852,22 @@ Message
 <form class="ats-pilot-create-card" onsubmit="createPilotUser(event)">
 <div class="ats-pilot-card-head">
 <div><span>01</span><h3>Create Pilot Invite</h3></div>
-<p>The invited recruiter creates their own password. The invite bypasses payment and expires after 7 days.</p>
+<p>Create controlled access with explicit usage and membership limits. The signup invite expires after 7 days.</p>
 </div>
-<label><span>Pilot user email</span><input id="pilotUserEmail" type="email" required placeholder="recruiter@company.com"></label>
+<div class="ats-pilot-form-grid">
+<label><span>Name</span><input id="pilotUserName" required placeholder="Recruiter name"></label>
+<label><span>Email</span><input id="pilotUserEmail" type="email" required placeholder="recruiter@company.com"></label>
+<label class="is-wide"><span>Company / Organization</span><input id="pilotCompanyName" placeholder="Company name"></label>
+<label><span>Total Jobs Allowed</span><input id="pilotMaxTotalJobs" type="number" min="1" value="10" placeholder="Blank = Unlimited"></label>
+<label><span>Max Active Jobs</span><input id="pilotMaxActiveJobs" type="number" min="1" value="3" placeholder="Blank = Unlimited"></label>
+<label><span>Resume Limit / Job</span><input id="pilotMaxResumesPerJob" type="number" min="1" value="500" placeholder="Blank = Unlimited"></label>
+<label><span>Total Resume Limit</span><input id="pilotMaxTotalResumes" type="number" min="1" placeholder="Blank = Unlimited"></label>
+<label><span>Pilot Duration</span><select id="pilotDuration" onchange="updatePilotExpiryPreview()"><option value="7">7 Days</option><option value="14" selected>14 Days</option><option value="30">30 Days</option><option value="custom">Custom</option></select></label>
+<label><span>Start Date</span><input id="pilotStartDate" type="datetime-local" onchange="updatePilotExpiryPreview()"></label>
+<label class="is-wide"><span>Expiry Date</span><input id="pilotExpiryDate" type="datetime-local" required></label>
+<label><span>Pilot Source</span><select id="pilotSource"><option value="manual">Manual</option><option value="linkedin">LinkedIn</option><option value="referral">Referral</option><option value="cold_outreach">Cold Outreach</option><option value="website">Website</option><option value="partner">Partner</option><option value="other">Other</option></select></label>
+<label class="is-wide"><span>Internal Admin Notes</span><textarea id="pilotNotes" rows="3" placeholder="Admin only notes"></textarea></label>
+</div>
 <button id="pilotCreateButton" type="submit">Create Pilot Access</button>
 <div id="pilotInviteResult" class="ats-pilot-result hidden">
 <strong id="pilotInviteMessage">Pilot invitation created</strong>
@@ -2869,14 +2882,32 @@ Message
 <div><h3>Pilot Access Registry</h3><p>Active users and pending invitations.</p></div>
 <button onclick="loadPilotUsers()">Refresh</button>
 </div>
+<div class="ats-pilot-toolbar"><input id="pilotSearch" placeholder="Search name, email, company" oninput="renderPilotRegistry()"><select id="pilotStatusFilter" onchange="renderPilotRegistry()"><option value="all">All statuses</option><option value="active">Active</option><option value="expiring_soon">Expiring Soon</option><option value="expired">Expired</option><option value="deactivated">Deactivated</option><option value="suspended">Suspended</option><option value="pending">Pending Invite</option></select><select id="pilotSort" onchange="renderPilotRegistry()"><option value="newest">Newest</option><option value="oldest">Oldest</option><option value="expiry">Expiry Soonest</option><option value="usage">Highest Usage</option></select></div>
 <div class="ats-pilot-table-scroll">
 <table class="ats-pilot-table">
-<thead><tr><th>User</th><th>Access</th><th>Status</th><th>Action</th></tr></thead>
-<tbody id="pilotUsersTable"><tr><td colspan="4">Loading pilot access...</td></tr></tbody>
+<thead><tr><th>User</th><th>Status</th><th>Jobs</th><th>Active</th><th>Resumes</th><th>Expires</th><th>Action</th></tr></thead>
+<tbody id="pilotUsersTable"><tr><td colspan="7">Loading pilot access...</td></tr></tbody>
 </table>
 </div>
 </section>
 </section>
+
+<div id="pilotManageOverlay" class="ats-pilot-manage-overlay hidden" onclick="closePilotManage(event)">
+<section class="ats-pilot-manage" role="dialog" aria-modal="true" aria-labelledby="pilotManageTitle">
+<div class="ats-pilot-manage-head"><div><span>Manage Pilot User</span><h3 id="pilotManageTitle">Pilot User</h3><p id="pilotManageIdentity"></p></div><button type="button" onclick="closePilotManage()">×</button></div>
+<div id="pilotManageLoading" class="ats-pilot-manage-loading">Loading pilot account…</div>
+<div id="pilotManageContent" class="hidden">
+<section><h4>Account</h4><div id="pilotManageAccount" class="ats-pilot-detail-grid"></div></section>
+<section><h4>Usage</h4><div id="pilotManageUsage" class="ats-pilot-usage-grid"></div><div id="pilotPerJobUsage" class="ats-pilot-per-job"></div></section>
+<section><h4>Limits</h4><div class="ats-pilot-form-grid"><label><span>Total Jobs</span><input id="managePilotTotalJobs" type="number" min="1" placeholder="Blank = Unlimited"></label><label><span>Max Active Jobs</span><input id="managePilotActiveJobs" type="number" min="1" placeholder="Blank = Unlimited"></label><label><span>Resume / Job</span><input id="managePilotResumePerJob" type="number" min="1" placeholder="Blank = Unlimited"></label><label><span>Total Resumes</span><input id="managePilotTotalResumes" type="number" min="1" placeholder="Blank = Unlimited"></label></div></section>
+<section><h4>Membership</h4><div class="ats-pilot-form-grid"><label class="is-wide"><span>Expiry Date</span><input id="managePilotExpiry" type="datetime-local"></label></div><div class="ats-pilot-quick-actions"><button onclick="extendPilotAccess(7)">+7 Days</button><button onclick="extendPilotAccess(14)">+14 Days</button><button onclick="extendPilotAccess(30)">+30 Days</button></div></section>
+<section><h4>Admin</h4><div class="ats-pilot-form-grid"><label><span>Company / Organization</span><input id="managePilotCompany" type="text"></label><label><span>Pilot Source</span><select id="managePilotSource"><option value="manual">Manual</option><option value="sales">Sales</option><option value="partnership">Partnership</option><option value="campaign">Campaign</option><option value="other">Other</option></select></label></div><label><span>Internal Notes</span><textarea id="managePilotNotes" rows="3"></textarea></label></section>
+<button class="ats-pilot-save" onclick="savePilotUser()">Save Changes</button>
+<section><h4>Access Control</h4><div class="ats-pilot-access-actions"><button class="is-warning" onclick="suspendManagedPilot()">Suspend</button><button class="is-success" onclick="reactivateManagedPilot()">Reactivate</button><button class="is-danger" onclick="deactivateManagedPilot()">Deactivate</button></div></section>
+<section><h4>Activity / Audit</h4><div id="pilotManageHistory" class="ats-pilot-history"></div></section>
+</div>
+</section>
+</div>
 </div>
 
 <div id="supportPage" class="hidden ats-support-page">
@@ -2990,7 +3021,8 @@ Message / Issue Description
 <script src="runtime-config.js"></script>
 <script src="config.js"></script>
 <script src="auth.js"></script>
-<script src="app.js?v=dashboard-company-filter-20260628-06"></script>
+<script src="app.js?v=pilot-layout-20260815-02"></script>
+<script src="pilot-admin.js?v=pilot-management-20260815-02"></script>
 <script src="job-card-drag.js?v=20260815-03"></script>
 <script src="help-agent.js?v=guide-agent-20260714-27"></script>
 

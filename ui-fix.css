@@ -13529,6 +13529,23 @@ padding:0 0 28px !important;
     display: none !important;
 }
 
+/* Keep the Pilot workspace beside the fixed desktop sidebar. */
+body.ats-pilot-mode > .w-full > .flex-1 {
+    display: none !important;
+    min-height: 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+
+body.ats-pilot-mode #pilotUsersPage {
+    width: calc(100% - 18rem);
+    min-width: 0;
+    min-height: 100vh;
+    margin: 0 0 0 18rem;
+}
+
 .ats-pilot-page {
     width: 100%;
     max-width: 1260px;
@@ -13575,9 +13592,14 @@ padding:0 0 28px !important;
 .ats-pilot-card-head > div > span { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 9px; background: #eef2ff; color: #4f46e5; font-size: 11px; font-weight: 850; }
 .ats-pilot-card-head h3, .ats-pilot-list-head h3 { margin: 0; color: #172033; font-size: 17px; }
 .ats-pilot-card-head p, .ats-pilot-list-head p { margin: 8px 0 0; color: #748096; font-size: 12px; line-height: 1.55; }
-.ats-pilot-create-card > label, .ats-pilot-result label { display: grid; gap: 7px; margin-top: 18px; }
+.ats-pilot-create-card > label, .ats-pilot-result label, .ats-pilot-form-grid label, .ats-pilot-manage label { display: grid; gap: 7px; margin-top: 18px; }
 .ats-pilot-create-card label > span, .ats-pilot-result label > span { color: #4f5d73; font-size: 11px; font-weight: 800; }
-.ats-pilot-create-card input {
+.ats-pilot-create-card input,
+.ats-pilot-create-card select,
+.ats-pilot-create-card textarea,
+.ats-pilot-manage input,
+.ats-pilot-manage select,
+.ats-pilot-manage textarea {
     width: 100%;
     min-height: 44px;
     padding: 0 13px;
@@ -13588,7 +13610,10 @@ padding:0 0 28px !important;
     font-size: 13px;
     outline: none;
 }
-.ats-pilot-create-card input:focus { border-color: #818cf8; box-shadow: 0 0 0 3px rgba(99, 102, 241, .11); }
+.ats-pilot-create-card textarea, .ats-pilot-manage textarea { padding: 11px 13px; resize: vertical; }
+.ats-pilot-create-card input:focus, .ats-pilot-create-card select:focus, .ats-pilot-create-card textarea:focus, .ats-pilot-manage input:focus, .ats-pilot-manage select:focus, .ats-pilot-manage textarea:focus { border-color: #818cf8; box-shadow: 0 0 0 3px rgba(99, 102, 241, .11); }
+.ats-pilot-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 10px; }
+.ats-pilot-form-grid .is-wide { grid-column: 1 / -1; }
 .ats-pilot-create-card > button, .ats-pilot-result button {
     width: 100%;
     min-height: 43px;
@@ -13613,6 +13638,8 @@ padding:0 0 28px !important;
 .ats-pilot-list-card { min-width: 0; overflow: hidden; }
 .ats-pilot-list-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 22px; border-bottom: 1px solid #e8ecf2; }
 .ats-pilot-list-head p { margin-top: 3px; }
+.ats-pilot-toolbar { display: grid; grid-template-columns: minmax(180px, 1fr) 160px 150px; gap: 9px; padding: 12px 16px; border-bottom: 1px solid #e8ecf2; background: #fbfcfe; }
+.ats-pilot-toolbar input, .ats-pilot-toolbar select { min-height: 38px; padding: 0 11px; border: 1px solid #d8deea; border-radius: 9px; background: #fff; color: #334155; font-size: 11px; }
 .ats-pilot-list-head button, .ats-pilot-row-action {
     min-height: 34px;
     padding: 0 13px;
@@ -13625,7 +13652,7 @@ padding:0 0 28px !important;
     cursor: pointer;
 }
 .ats-pilot-table-scroll { overflow-x: auto; }
-.ats-pilot-table { width: 100%; min-width: 610px; border-collapse: collapse; }
+.ats-pilot-table { width: 100%; min-width: 820px; border-collapse: collapse; }
 .ats-pilot-table th { padding: 12px 18px; border-bottom: 1px solid #e4e9f1; background: #f7f9fc; color: #66748b; font-size: 10px; font-weight: 850; letter-spacing: .07em; text-align: left; text-transform: uppercase; }
 .ats-pilot-table td { padding: 15px 18px; border-bottom: 1px solid #edf0f5; color: #334155; font-size: 12px; vertical-align: middle; }
 .ats-pilot-table tbody tr:last-child td { border-bottom: 0; }
@@ -13637,19 +13664,65 @@ padding:0 0 28px !important;
 .ats-pilot-status::before { width: 6px; height: 6px; border-radius: 50%; background: currentColor; content: ""; }
 .ats-pilot-status.is-active { background: #eafaf1; color: #168653; }
 .ats-pilot-status.is-pending { background: #fff7e5; color: #b66a05; }
+.ats-pilot-status.is-warning { background: #fff7e5; color: #b45309; }
+.ats-pilot-status.is-danger { background: #fef2f2; color: #c24141; }
 .ats-pilot-status.is-inactive { background: #f2f4f7; color: #7a8699; }
 .ats-pilot-row-action.is-danger { border-color: #fecaca; color: #c24141; }
+.ats-pilot-row-actions { display: flex; flex-wrap: wrap; gap: 5px; }
 .ats-pilot-empty { height: 160px; color: #7b879a !important; text-align: center; }
+
+.ats-pilot-manage-overlay { position: fixed; z-index: 80; inset: 0; display: flex; justify-content: flex-end; background: rgba(15,23,42,.45); backdrop-filter: blur(2px); }
+.ats-pilot-manage-overlay.hidden { display: none !important; }
+.ats-pilot-manage { width: min(620px, 100vw); height: 100vh; padding: 0 24px 40px; overflow-y: auto; background: #fff; box-shadow: -20px 0 60px rgba(15,23,42,.18); }
+.ats-pilot-manage-head { position: sticky; z-index: 2; top: 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 22px 0 18px; border-bottom: 1px solid #e5eaf1; background: #fff; }
+.ats-pilot-manage-head > div > span { color: #4f46e5; font-size: 10px; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+.ats-pilot-manage-head h3 { margin: 5px 0 2px; color: #172033; font-size: 22px; }
+.ats-pilot-manage-head p { margin: 0; color: #718096; font-size: 11px; }
+.ats-pilot-manage-head button { width: 36px; height: 36px; border: 1px solid #d8deea; border-radius: 9px; background: #fff; color: #475569; font-size: 22px; cursor: pointer; }
+.ats-pilot-manage-loading { padding: 50px 0; color: #718096; text-align: center; }
+.ats-pilot-manage section { padding: 20px 0; border-bottom: 1px solid #edf0f5; }
+.ats-pilot-manage h4 { margin: 0 0 12px; color: #172033; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+.ats-pilot-detail-grid, .ats-pilot-usage-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.ats-pilot-detail-grid > div, .ats-pilot-usage-grid > div { padding: 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
+.ats-pilot-detail-grid span, .ats-pilot-usage-grid span { display: block; color: #718096; font-size: 10px; font-weight: 750; }
+.ats-pilot-detail-grid strong, .ats-pilot-usage-grid strong { display: block; margin-top: 4px; color: #1f2937; font-size: 12px; }
+.ats-pilot-per-job { display: grid; gap: 7px; margin-top: 10px; }
+.ats-pilot-per-job > div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid #edf0f5; border-radius: 9px; font-size: 11px; }
+.ats-pilot-per-job span { color: #64748b; }
+.ats-pilot-quick-actions, .ats-pilot-access-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.ats-pilot-quick-actions button, .ats-pilot-access-actions button, .ats-pilot-save { min-height: 38px; padding: 0 13px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #334155; font-size: 11px; font-weight: 800; cursor: pointer; }
+.ats-pilot-save { width: 100%; margin-top: 16px; border-color: #4f46e5; background: #4f46e5; color: #fff; }
+.ats-pilot-access-actions .is-warning { border-color: #fbbf24; color: #a16207; }
+.ats-pilot-access-actions .is-success { border-color: #86efac; color: #15803d; }
+.ats-pilot-access-actions .is-danger { border-color: #fecaca; color: #b91c1c; }
+.ats-pilot-history { display: grid; gap: 8px; }
+.ats-pilot-history > div { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid #edf0f5; font-size: 11px; }
+.ats-pilot-history span { color: #718096; }
 
 @media (max-width: 920px) {
     .ats-pilot-grid { grid-template-columns: 1fr; }
     .ats-pilot-create-card { width: 100%; }
+    .ats-pilot-toolbar { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 1440px) and (min-width: 921px) {
+    .ats-pilot-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+    body.ats-pilot-mode #pilotUsersPage {
+        width: 100%;
+        margin-left: 0;
+    }
 }
 
 @media (max-width: 620px) {
     .ats-pilot-page { padding: 16px; }
     .ats-pilot-hero { flex-direction: column; padding: 21px; }
     .ats-pilot-hero h2 { font-size: 26px; }
+    .ats-pilot-form-grid, .ats-pilot-detail-grid, .ats-pilot-usage-grid { grid-template-columns: 1fr; }
+    .ats-pilot-form-grid .is-wide { grid-column: auto; }
+    .ats-pilot-manage { padding-right: 16px; padding-left: 16px; }
 }
 
 /* Live candidate result processing */

@@ -4,7 +4,7 @@
 <title>Login - HireScore AI</title>
 <link rel="icon" href="assets/hirescore-mark.png">
 <script src="https://cdn.tailwindcss.com"></script>
-<link rel="stylesheet" href="auth.css">
+<link rel="stylesheet" href="auth.css?v=pilot-access-20260815-01">
 </head>
 
 <body class="auth-page">
@@ -18,6 +18,18 @@
 </div>
 
 <div class="auth-card">
+
+<div id="pilotAccessBlocked" class="pilot-access-blocked hidden">
+<span id="pilotAccessKicker">Pilot Access</span>
+<h2 id="pilotAccessTitle">Pilot Access Unavailable</h2>
+<p id="pilotAccessMessage"></p>
+<small id="pilotAccessExpiry"></small>
+<p class="pilot-data-note">Your data remains preserved and your account has not been deleted.</p>
+<div class="pilot-block-actions">
+<a href="mailto:hirescoreaiats@gmail.com?subject=HireScore AI pilot access">Contact Admin</a>
+<a href="mailto:hirescoreaiats@gmail.com?subject=HireScore AI pilot extension request">Request Extension</a>
+</div>
+</div>
 
 <h2>
 Recruiter Login
@@ -82,7 +94,7 @@ Contact Support
 <!-- SCRIPT -->
 <script src="runtime-config.js"></script>
 <script src="config.js"></script>
-<script src="auth.js"></script>
+<script src="auth.js?v=pilot-access-20260815-02"></script>
 
 </body>
 </html>

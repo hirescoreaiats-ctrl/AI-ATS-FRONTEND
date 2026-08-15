@@ -27,8 +27,33 @@ alert(message)
 }
 }
 
+function showPilotAccessBlocked(access){
+let panel = document.getElementById("pilotAccessBlocked")
+let card = panel?.closest(".auth-card")
+if(!panel || !card) return
+let status = access?.status || "unavailable"
+let content = {
+expired:["Pilot Access Expired","Your HireScore AI pilot has expired."],
+deactivated:["Access Deactivated","Your HireScore AI access has been deactivated. Please contact your administrator for assistance."],
+suspended:["Access Temporarily Suspended","Your account access is temporarily suspended. Please contact your administrator."],
+unavailable:["Pilot Access Unavailable","Your pilot workspace is currently unavailable."]
+}[status] || ["Pilot Access Unavailable", access?.message || "Your pilot workspace is currently unavailable."]
+card.classList.add("is-pilot-blocked")
+panel.classList.remove("hidden")
+document.getElementById("pilotAccessTitle").innerText = content[0]
+document.getElementById("pilotAccessMessage").innerText = access?.message || content[1]
+let expiry = access?.pilot_expires_at
+document.getElementById("pilotAccessExpiry").innerText = expiry ? `Pilot ended: ${new Date(expiry).toLocaleString()}` : ""
+}
+
 function showOAuthErrorFromUrl(){
 let params = new URLSearchParams(window.location.search)
+let pilotStatus = params.get("pilot_status")
+if(pilotStatus){
+showPilotAccessBlocked({status:pilotStatus,pilot_expires_at:params.get("pilot_expires_at")})
+window.history.replaceState({}, document.title, window.location.pathname)
+return
+}
 let error = params.get("error")
 if(!error) return
 
@@ -257,6 +282,11 @@ password:password
 let data = await res.json()
 
 if(data.token){
+
+if(data.workspace_access === false){
+showPilotAccessBlocked(data.pilot_access || {})
+return
+}
 
 localStorage.setItem("token", data.token)
 localStorage.setItem("username", data.name)
