@@ -13766,3 +13766,77 @@ padding:0 0 28px !important;
     .ats-rescore-banner button { width: 100%; }
     .ats-recruiter-signal-grid { grid-template-columns: 1fr; }
 }
+
+/* Long job details retain the normal card size and can be dragged sideways. */
+.ats-management-card,
+.ats-recruiter-job-card,
+.job-card {
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: thin;
+    scrollbar-color: #a5b4fc #eef2ff;
+    overscroll-behavior-x: contain;
+}
+.ats-management-card::-webkit-scrollbar,
+.ats-recruiter-job-card::-webkit-scrollbar,
+.job-card::-webkit-scrollbar,
+.ats-communication-scroll::-webkit-scrollbar { height: 8px; }
+.ats-management-card::-webkit-scrollbar-thumb,
+.ats-recruiter-job-card::-webkit-scrollbar-thumb,
+.job-card::-webkit-scrollbar-thumb,
+.ats-communication-scroll::-webkit-scrollbar-thumb {
+    background: #a5b4fc;
+    border: 2px solid #eef2ff;
+    border-radius: 999px;
+}
+.ats-management-card-body,
+.ats-management-meta,
+.ats-management-desc,
+.ats-recruiter-job-body,
+.ats-recruiter-job-meta,
+.ats-recruiter-job-desc,
+.job-card > * { min-width: max-content; }
+.ats-management-card-body h3,
+.ats-management-card-body p,
+.ats-management-desc,
+.ats-recruiter-job-body h3,
+.ats-recruiter-job-body p,
+.ats-recruiter-job-desc {
+    display: block;
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+}
+#communicationResultsPage .ats-pending-candidates-table {
+    width: 100% !important;
+    min-width: 980px !important;
+    table-layout: fixed;
+}
+#communicationResultsPage .ats-pending-candidates-table th:last-child,
+#communicationResultsPage .ats-pending-candidates-table td:last-child {
+    width: 250px !important;
+    min-width: 250px;
+    overflow: visible;
+}
+.ats-management-card.is-dragging,
+.ats-recruiter-job-card.is-dragging,
+.job-card.is-dragging,
+.ats-communication-scroll.is-dragging {
+    cursor: grabbing !important;
+    user-select: none;
+}
+@media (hover: hover) and (pointer: fine) {
+    .ats-management-card,
+    .ats-recruiter-job-card,
+    .job-card,
+    .ats-communication-scroll { cursor: grab; }
+    .ats-management-card button,
+    .ats-management-card a,
+    .ats-recruiter-job-card button,
+    .ats-recruiter-job-card a,
+    .job-card button,
+    .job-card a,
+    .ats-communication-scroll button,
+    .ats-communication-scroll a { cursor: pointer; }
+}

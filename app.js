@@ -11044,3 +11044,43 @@ window.onload = function(){
 
 
 
+// Mouse-drag horizontal scrolling for every job card and communication table.
+(() => {
+    const scrollSelector = ".ats-management-card, .ats-recruiter-job-card, .job-card, .ats-communication-scroll"
+    const interactiveSelector = "button, a, input, select, textarea, label, [role='button']"
+    let drag = null
+    let suppressClick = false
+    document.addEventListener("pointerdown", event => {
+        if(event.pointerType === "touch" || event.button !== 0) return
+        const target = event.target.closest(scrollSelector)
+        if(!target || event.target.closest(interactiveSelector) || target.scrollWidth <= target.clientWidth) return
+        drag = { target, pointerId: event.pointerId, startX: event.clientX, scrollLeft: target.scrollLeft, moved: false }
+        target.setPointerCapture?.(event.pointerId)
+    })
+    document.addEventListener("pointermove", event => {
+        if(!drag || event.pointerId !== drag.pointerId) return
+        const distance = event.clientX - drag.startX
+        if(!drag.moved && Math.abs(distance) < 4) return
+        drag.moved = true
+        suppressClick = true
+        drag.target.classList.add("is-dragging")
+        drag.target.scrollLeft = drag.scrollLeft - distance
+        event.preventDefault()
+    }, { passive: false })
+    const finishDrag = event => {
+        if(!drag || event.pointerId !== drag.pointerId) return
+        drag.target.classList.remove("is-dragging")
+        drag.target.releasePointerCapture?.(event.pointerId)
+        drag = null
+        setTimeout(() => { suppressClick = false }, 0)
+    }
+    document.addEventListener("pointerup", finishDrag)
+    document.addEventListener("pointercancel", finishDrag)
+    document.addEventListener("click", event => {
+        if(suppressClick) {
+            event.preventDefault()
+            event.stopPropagation()
+        }
+    }, true)
+})()
+
