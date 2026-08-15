@@ -13768,6 +13768,7 @@ padding:0 0 28px !important;
 }
 
 /* Behavior-only overflow support for job-display cards; no visual dimensions change. */
+.ats-recruiter-job-card,
 .job-card-horizontal-scroll {
     overflow-x: auto;
     overflow-y: hidden;
@@ -13775,6 +13776,7 @@ padding:0 0 28px !important;
     touch-action: pan-y;
 }
 
+.ats-recruiter-job-card::-webkit-scrollbar,
 .job-card-horizontal-scroll::-webkit-scrollbar {
     display: none;
 }

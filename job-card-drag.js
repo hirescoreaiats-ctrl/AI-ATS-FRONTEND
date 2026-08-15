@@ -1,5 +1,5 @@
 (() => {
-    const CARD_SELECTOR = ".job-card-horizontal-scroll"
+    const CARD_SELECTOR = ".ats-recruiter-job-card, .job-card-horizontal-scroll"
     const OVERFLOW_VALUE_SELECTOR = [
         ".ats-recruiter-job-body p",
         ".ats-recruiter-job-meta span",
