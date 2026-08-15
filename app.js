@@ -11044,3 +11044,47 @@ window.onload = function(){
 
 
 
+// Reveal long recruiter-card values by dragging, without changing card layout or showing scrollbars.
+(() => {
+    const cardSelector = ".ats-recruiter-job-card"
+    const valueSelector = ".ats-recruiter-job-body p, .ats-recruiter-job-meta span"
+    const controlSelector = "button, a, input, select, textarea, [role='button']"
+    let cardDrag = null
+
+    document.addEventListener("pointerdown", event => {
+        if(event.pointerType === "touch" || event.button !== 0 || event.target.closest(controlSelector)) return
+
+        const card = event.target.closest(cardSelector)
+        if(!card) return
+
+        const values = [...card.querySelectorAll(valueSelector)]
+            .filter(value => value.scrollWidth > value.clientWidth + 1)
+            .map(value => ({ value, start: value.scrollLeft }))
+
+        if(!values.length) return
+        cardDrag = { card, pointerId: event.pointerId, startX: event.clientX, values, moved: false }
+        card.setPointerCapture?.(event.pointerId)
+    })
+
+    document.addEventListener("pointermove", event => {
+        if(!cardDrag || event.pointerId !== cardDrag.pointerId) return
+        const distance = event.clientX - cardDrag.startX
+        if(!cardDrag.moved && Math.abs(distance) < 4) return
+
+        cardDrag.moved = true
+        cardDrag.values.forEach(({ value, start }) => {
+            value.scrollLeft = start - distance
+        })
+        event.preventDefault()
+    }, { passive: false })
+
+    const finishCardDrag = event => {
+        if(!cardDrag || event.pointerId !== cardDrag.pointerId) return
+        cardDrag.card.releasePointerCapture?.(event.pointerId)
+        cardDrag = null
+    }
+
+    document.addEventListener("pointerup", finishCardDrag)
+    document.addEventListener("pointercancel", finishCardDrag)
+})()
+
