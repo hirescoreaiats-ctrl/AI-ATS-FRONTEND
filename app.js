@@ -2479,6 +2479,14 @@ return event?.submitter
     || document.querySelector("#jobPage .job-form .create-btn")
 }
 
+function candidateSourcingRequested(){
+return document.querySelector('input[name="candidateSourcingChoice"]:checked')?.value === "yes"
+}
+
+function candidateSourcingRequestPath(jobId){
+return "/sourcing/request/" + encodeURIComponent(jobId)
+}
+
 async function createJob(event){
 
 if(event) event.preventDefault()
@@ -2510,6 +2518,7 @@ return
 
 }
 
+let requestCandidateSourcing = candidateSourcingRequested()
 
 // API REQUEST
 setCreateJobStatus("loading", "Creating job and preparing the apply link...")
@@ -2557,7 +2566,18 @@ return
 }
 
 // SHOW SUCCESS CARD
-setCreateJobStatus("success", "Job created successfully. Opening sharing details...")
+setCreateJobStatus("success", requestCandidateSourcing ? "Job created successfully. Opening sourcing details..." : "Job created successfully. Opening sharing details...")
+
+if(requestCandidateSourcing){
+let createdJobId = data.job_id || data.id
+let resolvedApplyLink = data.apply_link || data.apply_links?.main
+if(!createdJobId || !resolvedApplyLink){
+setCreateJobStatus("error", "Job was created, but its sourcing details link could not be opened. Please open the job and try again.")
+return
+}
+window.location.assign(candidateSourcingRequestPath(createdJobId))
+return
+}
 
 showSuccessModal(data)
 

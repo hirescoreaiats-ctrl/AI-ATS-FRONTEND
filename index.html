@@ -20,7 +20,7 @@
 <link rel="stylesheet" href="sidebar.css">
 <link rel="stylesheet" href="createjob.css">
 <link rel="stylesheet" href="Dashbord.css">
-    <link rel="stylesheet" href="ui-fix.css?v=pilot-management-20260815-06">
+    <link rel="stylesheet" href="ui-fix.css?v=candidate-sourcing-optin-20260815-07">
 <link rel="stylesheet" href="help-agent.css?v=guide-agent-20260714-27">
 
 </head>
@@ -622,6 +622,18 @@ Back to Dashboard
 </section>
 
 <div class="ats-job-submit-bar">
+<section class="ats-candidate-sourcing-optin" aria-labelledby="candidateSourcingTitle">
+<div class="ats-candidate-sourcing-copy">
+<h3 id="candidateSourcingTitle">Need candidates for this role?</h3>
+<p>HireScore AI can help source relevant candidates for this job.</p>
+</div>
+<div class="ats-candidate-sourcing-options" role="radiogroup" aria-label="Candidate sourcing choice">
+<label><input type="radio" name="candidateSourcingChoice" value="no" checked> <span>No, I'll source candidates myself</span></label>
+<label><input type="radio" name="candidateSourcingChoice" value="yes"> <span>Yes, request candidate sourcing</span></label>
+</div>
+<p class="ats-candidate-sourcing-pricing">Sourcing pricing is reviewed after we receive your requirement. No sourcing payment is charged when this job is created.</p>
+</section>
+<div class="ats-job-submit-actions">
 <div id="createJobStatus" class="ats-create-job-status hidden" aria-live="polite"></div>
 <button type="button" onclick="showPage('dashboard')" class="ats-job-secondary-btn">
 Cancel
@@ -629,6 +641,7 @@ Cancel
 <button type="submit" class="create-btn">
 Create Job
 </button>
+</div>
 </div>
 
 </form>
@@ -3021,7 +3034,7 @@ Message / Issue Description
 <script src="runtime-config.js"></script>
 <script src="config.js"></script>
 <script src="auth.js"></script>
-<script src="app.js?v=pilot-limit-message-20260815-03"></script>
+<script src="app.js?v=candidate-sourcing-optin-20260815-04"></script>
 <script src="pilot-admin.js?v=pilot-management-20260815-02"></script>
 <script src="job-card-drag.js?v=20260815-03"></script>
 <script src="help-agent.js?v=guide-agent-20260714-27"></script>

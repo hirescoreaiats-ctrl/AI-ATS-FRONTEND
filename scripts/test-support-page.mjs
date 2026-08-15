@@ -18,7 +18,7 @@ assert(html.includes('<span class="nav-text">Support</span>'), "Support nav labe
 assert(html.includes('id="supportPage"'), "Support page container should exist");
 assert(html.includes('id="supportForm"'), "Support form should exist");
 assert(html.includes("Live chat is coming soon"), "Live chat coming soon note should be shown");
-assert(html.includes("ui-fix.css?v=support-layout-4"), "Support CSS cache-bust version should be updated");
+assert(html.includes("ui-fix.css?v=candidate-sourcing-optin-20260815-07"), "Support CSS should load the current shared UI bundle");
 assert(app.includes('support: "Support"'), "Support active nav mapping should exist");
 assert(app.includes('"supportPage"'), "Support page should be part of page switching");
 assert(app.includes('"/support": "support"'), "Direct /support route should resolve to support page");
