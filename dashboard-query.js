@@ -2055,6 +2055,13 @@
   function safeSummary(jobs) {
     return (Array.isArray(jobs) ? jobs : []).map((j) => ({ id: j.id, job_title: j.job_title, company_name: j.company_name, is_active: j.is_active, total_applicants: Number(j.total_applicants || 0), top_score: Number(j.top_score || 0), shortlisted_count: Number(j.shortlisted_count || 0), communication_count: Number(j.communication_count || 0), applications_by_source: j.applications_by_source || {} }));
   }
+  function dashboardMetrics(jobs) {
+    const active = (Array.isArray(jobs) ? jobs : []).filter((j) => j.is_active !== false);
+    const applicants = active.reduce((sum, j) => sum + Number(j.total_applicants || 0), 0);
+    const topScore = active.reduce((max, j) => Math.max(max, Number(j.top_score || 0)), 0);
+    const scoreTotal = active.reduce((sum, j) => sum + Number(j.top_score || 0), 0);
+    return { activeJobs: active.length, totalApplicants: applicants, topScore, avgScore: active.length ? Math.round(scoreTotal / active.length) : 0 };
+  }
   function hydrate() {
     const memoryData = queryClient.getQueryData(key());
     if (memoryData) return memoryData;
@@ -2074,7 +2081,8 @@
     hydrate();
     if (force) await queryClient.invalidateQueries({ queryKey: key(), exact: true });
     const data = await queryClient.fetchQuery({ queryKey: key(), queryFn, staleTime: STALE_TIME, gcTime: GC_TIME });
-    localStorage.setItem(storageKey(), JSON.stringify({ savedAt: Date.now(), data: safeSummary(data) }));
+    const safeData = safeSummary(data);
+    localStorage.setItem(storageKey(), JSON.stringify({ savedAt: Date.now(), metrics: dashboardMetrics(safeData), data: safeData }));
     return data;
   }
   function clearAllDashboardCaches() {

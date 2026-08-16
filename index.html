@@ -198,6 +198,46 @@ Logout
 </div>
 </div>
 
+<script>
+(() => {
+  const prefix = "hirescore:dashboard-summary:v1:";
+  const maxAge = 24 * 60 * 60 * 1000;
+  try {
+    const token = localStorage.getItem("token") || "";
+    const payloadPart = token.split(".")[1] || "";
+    const padded = payloadPart.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(payloadPart.length / 4) * 4, "=");
+    const payload = JSON.parse(atob(padded));
+    const identity = payload.organization_id || payload.org_id || payload.user_id || payload.sub;
+    if (!identity) return;
+    const cached = JSON.parse(localStorage.getItem(prefix + identity) || "null");
+    if (!cached?.data || Date.now() - Number(cached.savedAt || 0) >= maxAge) return;
+    const active = cached.data.filter(job => job.is_active !== false);
+    const calculated = {
+      activeJobs: active.length,
+      totalApplicants: active.reduce((sum, job) => sum + Number(job.total_applicants || 0), 0),
+      topScore: active.reduce((max, job) => Math.max(max, Number(job.top_score || 0)), 0),
+      avgScore: active.length ? Math.round(active.reduce((sum, job) => sum + Number(job.top_score || 0), 0) / active.length) : 0
+    };
+    const metrics = cached.metrics || calculated;
+    const values = {
+      dash_active_jobs: metrics.activeJobs,
+      dash_total_applicants: metrics.totalApplicants,
+      dash_top_score: metrics.topScore,
+      dash_avg_score: metrics.avgScore
+    };
+    Object.entries(values).forEach(([id, value]) => {
+      const element = document.getElementById(id);
+      if (!element || !Number.isFinite(Number(value))) return;
+      element.textContent = String(value);
+      element.classList.remove("ats-metric-skeleton");
+      element.removeAttribute("aria-label");
+    });
+  } catch (_) {
+    // Invalid or unavailable tenant cache: retain the visible skeleton.
+  }
+})();
+</script>
+
 <div class="ats-dashboard-main-grid">
 <div class="dashboard-graph-card" data-help-id="ai-score-column">
 <div class="ats-dashboard-card-head">
