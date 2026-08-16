@@ -13945,3 +13945,29 @@ body.ats-pilot-mode #pilotUsersPage {
     display: none;
 }
 .ats-metric-skeleton{display:inline-block;width:3.25rem;min-height:1.8rem;border-radius:.35rem;background:linear-gradient(90deg,rgba(148,163,184,.18) 25%,rgba(148,163,184,.38) 50%,rgba(148,163,184,.18) 75%);background-size:200% 100%;animation:ats-metric-shimmer 1.25s infinite}@keyframes ats-metric-shimmer{to{background-position:-200% 0}}
+
+/* Keep the desktop sidebar footer fully inside short/dynamic viewports. */
+@media (min-width: 769px) {
+    .ats-sidebar {
+        height: 100vh !important;
+        height: 100dvh !important;
+        min-height: 0;
+        box-sizing: border-box;
+    }
+
+    .ats-sidebar-menu {
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-width: none;
+    }
+
+    .ats-sidebar-menu::-webkit-scrollbar {
+        display: none;
+    }
+
+    .ats-sidebar-footer {
+        flex: 0 0 auto;
+        padding-bottom: max(22px, env(safe-area-inset-bottom)) !important;
+    }
+}
