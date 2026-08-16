@@ -1,5 +1,5 @@
 (() => {
-  // node_modules/@tanstack/query-core/build/modern/subscribable.js
+  // node_modules/.pnpm/@tanstack+query-core@5.101.4/node_modules/@tanstack/query-core/build/modern/subscribable.js
   var Subscribable = class {
     constructor() {
       this.listeners = /* @__PURE__ */ new Set();
@@ -22,7 +22,7 @@
     }
   };
 
-  // node_modules/@tanstack/query-core/build/modern/focusManager.js
+  // node_modules/.pnpm/@tanstack+query-core@5.101.4/node_modules/@tanstack/query-core/build/modern/focusManager.js
   var FocusManager = class extends Subscribable {
     #focused;
     #cleanup;
@@ -84,7 +84,7 @@
   };
   var focusManager = new FocusManager();
 
-  // node_modules/@tanstack/query-core/build/modern/timeoutManager.js
+  // node_modules/.pnpm/@tanstack+query-core@5.101.4/node_modules/@tanstack/query-core/build/modern/timeoutManager.js
   var defaultTimeoutProvider = {
     // We need the wrapper function syntax below instead of direct references to
     // global setTimeout etc.
@@ -149,7 +149,7 @@
     setTimeout(callback, 0);
   }
 
-  // node_modules/@tanstack/query-core/build/modern/utils.js
+  // node_modules/.pnpm/@tanstack+query-core@5.101.4/node_modules/@tanstack/query-core/build/modern/utils.js
   var isServer = typeof window === "undefined" || "Deno" in globalThis;
   function noop() {
   }
@@ -396,7 +396,7 @@
     return object;
   }
 
-  // node_modules/@tanstack/query-core/build/modern/environmentManager.js
+  // node_modules/.pnpm/@tanstack+query-core@5.101.4/node_modules/@tanstack/query-core/build/modern/environmentManager.js
   var environmentManager = /* @__PURE__ */ (() => {
     let isServerFn = () => isServer;
     return {
@@ -415,7 +415,7 @@
     };
   })();
 
-  // node_modules/@tanstack/query-core/build/modern/thenable.js
+  // node_modules/.pnpm/@tanstack+query-core@5.101.4/node_modules/@tanstack/query-core/build/modern/thenable.js
   function pendingThenable() {
     let resolve;
     let reject;
@@ -448,7 +448,7 @@
     return thenable;
   }
 
-  // node_modules/@tanstack/query-core/build/modern/notifyManager.js
+  // node_modules/.pnpm/@tanstack+query-core@5.101.4/node_modules/@tanstack/query-core/build/modern/notifyManager.js
   var defaultScheduler = systemSetTimeoutZero;
   function createNotifyManager() {
     let queue = [];
@@ -528,7 +528,7 @@
   }
   var notifyManager = createNotifyManager();
 
-  // node_modules/@tanstack/query-core/build/modern/onlineManager.js
+  // node_modules/.pnpm/@tanstack+query-core@5.101.4/node_modules/@tanstack/query-core/build/modern/onlineManager.js
   var OnlineManager = class extends Subscribable {
     #online = true;
     #cleanup;
@@ -580,7 +580,7 @@
   };
   var onlineManager = new OnlineManager();
 
-  // node_modules/@tanstack/query-core/build/modern/retryer.js
+  // node_modules/.pnpm/@tanstack+query-core@5.101.4/node_modules/@tanstack/query-core/build/modern/retryer.js
   function defaultRetryDelay(failureCount) {
     return Math.min(1e3 * 2 ** failureCount, 3e4);
   }
@@ -700,7 +700,7 @@
     };
   }
 
-  // node_modules/@tanstack/query-core/build/modern/removable.js
+  // node_modules/.pnpm/@tanstack+query-core@5.101.4/node_modules/@tanstack/query-core/build/modern/removable.js
   var Removable = class {
     #gcTimeout;
     destroy() {
@@ -728,7 +728,7 @@
     }
   };
 
-  // node_modules/@tanstack/query-core/build/modern/infiniteQueryBehavior.js
+  // node_modules/.pnpm/@tanstack+query-core@5.101.4/node_modules/@tanstack/query-core/build/modern/infiniteQueryBehavior.js
   function infiniteQueryBehavior(pages) {
     return {
       onFetch: (context, query) => {
@@ -829,7 +829,7 @@
     return pages.length > 0 ? options.getPreviousPageParam?.(pages[0], pages, pageParams[0], pageParams) : void 0;
   }
 
-  // node_modules/@tanstack/query-core/build/modern/query.js
+  // node_modules/.pnpm/@tanstack+query-core@5.101.4/node_modules/@tanstack/query-core/build/modern/query.js
   var Query = class extends Removable {
     #queryType;
     #initialState;
@@ -1266,7 +1266,7 @@
     };
   }
 
-  // node_modules/@tanstack/query-core/build/modern/mutation.js
+  // node_modules/.pnpm/@tanstack+query-core@5.101.4/node_modules/@tanstack/query-core/build/modern/mutation.js
   var Mutation = class extends Removable {
     #client;
     #observers;
@@ -1540,7 +1540,7 @@
     };
   }
 
-  // node_modules/@tanstack/query-core/build/modern/mutationCache.js
+  // node_modules/.pnpm/@tanstack+query-core@5.101.4/node_modules/@tanstack/query-core/build/modern/mutationCache.js
   var MutationCache = class extends Subscribable {
     constructor(config = {}) {
       super();
@@ -1657,7 +1657,7 @@
     return mutation.options.scope?.id;
   }
 
-  // node_modules/@tanstack/query-core/build/modern/queryCache.js
+  // node_modules/.pnpm/@tanstack+query-core@5.101.4/node_modules/@tanstack/query-core/build/modern/queryCache.js
   var QueryCache = class extends Subscribable {
     constructor(config = {}) {
       super();
@@ -1747,7 +1747,7 @@
     }
   };
 
-  // node_modules/@tanstack/query-core/build/modern/queryClient.js
+  // node_modules/.pnpm/@tanstack+query-core@5.101.4/node_modules/@tanstack/query-core/build/modern/queryClient.js
   var QueryClient = class {
     #queryCache;
     #mutationCache;
@@ -2037,6 +2037,7 @@
   // dashboard-query-source.js
   var STALE_TIME = 3e4;
   var GC_TIME = 6e5;
+  var PERSIST_TIME = 24 * 60 * 60 * 1e3;
   var REFRESH_INTERVAL = 6e4;
   var PREFIX = "hirescore:dashboard-summary:v1:";
   var queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: STALE_TIME, gcTime: GC_TIME, retry: 1, refetchOnMount: true, refetchOnReconnect: true, refetchOnWindowFocus: true } } });
@@ -2055,13 +2056,19 @@
     return (Array.isArray(jobs) ? jobs : []).map((j) => ({ id: j.id, job_title: j.job_title, company_name: j.company_name, is_active: j.is_active, total_applicants: Number(j.total_applicants || 0), top_score: Number(j.top_score || 0), shortlisted_count: Number(j.shortlisted_count || 0), communication_count: Number(j.communication_count || 0), applications_by_source: j.applications_by_source || {} }));
   }
   function hydrate() {
-    if (queryClient.getQueryData(key())) return;
+    const memoryData = queryClient.getQueryData(key());
+    if (memoryData) return memoryData;
     try {
       const c = JSON.parse(localStorage.getItem(storageKey()) || "null");
-      if (c?.data && Date.now() - c.savedAt < GC_TIME) queryClient.setQueryData(key(), c.data, { updatedAt: c.savedAt });
+      if (c?.data && Date.now() - c.savedAt < PERSIST_TIME) {
+        queryClient.setQueryData(key(), c.data, { updatedAt: c.savedAt });
+        return c.data;
+      }
+      if (c) localStorage.removeItem(storageKey());
     } catch {
       localStorage.removeItem(storageKey());
     }
+    return void 0;
   }
   async function fetchDashboard(queryFn, force = false) {
     hydrate();
@@ -2075,7 +2082,7 @@
     Object.keys(localStorage).filter((k) => k.startsWith(PREFIX)).forEach((k) => localStorage.removeItem(k));
   }
   hydrate();
-  window.hireScoreQueries = { queryClient, key, getDashboard: () => queryClient.getQueryData(key()), fetchDashboard, invalidateDashboard: () => queryClient.invalidateQueries({ queryKey: key(), exact: true }), clearAllDashboardCaches };
+  window.hireScoreQueries = { queryClient, key, getDashboard: () => hydrate(), fetchDashboard, invalidateDashboard: () => queryClient.invalidateQueries({ queryKey: key(), exact: true }), clearAllDashboardCaches };
   setInterval(() => {
     if (!document.hidden) window.loadDashboard?.(true);
   }, REFRESH_INTERVAL);
