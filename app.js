@@ -846,7 +846,7 @@ button.classList.remove("is-loading")
 
 async function refreshRecruiterWorkflow(jobId){
 await Promise.allSettled([
-loadDashboard(),
+loadDashboard(true),
 loadShortlistJobDropdown(),
 jobId ? loadShortlistedCandidates() : Promise.resolve(),
 loadCommunicationJobs(),
@@ -2589,6 +2589,9 @@ if(applyLinkInput) applyLinkInput.value=data.apply_link
 
 let openJobBtn = document.getElementById("openJobBtn")
 if(openJobBtn) openJobBtn.href=data.apply_link
+
+await window.hireScoreQueries?.invalidateDashboard?.()
+loadDashboard(true)
 }catch(error){
 setCreateJobStatus("error", "Unable to create job right now. Please try again.")
 alert("Unable to create job right now. Please try again.")
@@ -5381,6 +5384,8 @@ async function shortlistCandidate(id, currentStatus){
     alert("OK " + data.message)
 
     // * refresh UI
+    await window.hireScoreQueries?.invalidateDashboard?.()
+    loadDashboard(true)
     loadResults(currentJobId)
     openTopCandidates()
 }
@@ -6067,28 +6072,10 @@ Deactivate
 })
 }
 
-async function loadDashboard(force=false){
-let now = Date.now()
-if(dashboardLoadPromise) return dashboardLoadPromise
-if(!force && now - lastDashboardLoadAt < 1500) return Promise.resolve()
-
-let table = document.getElementById("dashboardJobTable")
-if(table && !dashboardJobs.length && !table.children.length){
-table.innerHTML = `
-<tr>
-<td colspan="5" class="p-4 text-center text-gray-500">Loading jobs...</td>
-</tr>
-`
-}
-
-dashboardLoadPromise = (async()=>{
-lastDashboardLoadAt = Date.now()
-let res = await fetch(API + "/jobs", {
-    headers: authHeaders()
-})
-let jobs = await res.json()
-
+function renderDashboard(jobs){
 dashboardJobs = Array.isArray(jobs) ? jobs : []
+document.querySelectorAll(".ats-metric-skeleton").forEach(el=>el.classList.remove("ats-metric-skeleton"))
+let table = document.getElementById("dashboardJobTable")
 
 if(!table) return
 
@@ -6097,14 +6084,13 @@ renderDashboardJobTable()
 updateDashboardCards()
 
 loadTopCandidate()
-
-})()
-
-try{
-await dashboardLoadPromise
-}finally{
-dashboardLoadPromise = null
 }
+async function loadDashboard(force=false){
+let now=Date.now();if(dashboardLoadPromise)return dashboardLoadPromise;if(!force&&now-lastDashboardLoadAt<1500)return Promise.resolve()
+let cached=window.hireScoreQueries?.getDashboard?.();if(Array.isArray(cached))renderDashboard(cached);else{let table=document.getElementById("dashboardJobTable");if(table&&!table.children.length)table.innerHTML=`<tr><td colspan="5" class="p-4 text-center text-gray-500">Loading jobs...</td></tr>`}
+let queryFn=async()=>{let res=await fetch(API+"/jobs",{headers:authHeaders()});if(!res.ok)throw new Error(`Dashboard request failed (${res.status})`);let jobs=await res.json();if(!Array.isArray(jobs))throw new Error("Invalid dashboard response");return jobs}
+dashboardLoadPromise=(async()=>{lastDashboardLoadAt=Date.now();let jobs=window.hireScoreQueries?await window.hireScoreQueries.fetchDashboard(queryFn,force||Boolean(cached)):await queryFn();renderDashboard(jobs)})()
+try{await dashboardLoadPromise}catch(error){if(!cached){let table=document.getElementById("dashboardJobTable");if(table)table.innerHTML=`<tr><td colspan="5" class="p-4 text-center text-red-600">Could not load dashboard. Please retry.</td></tr>`}console.warn("Dashboard refresh failed; retaining last valid values.",error)}finally{dashboardLoadPromise=null}
 }
 async function deactivateJob(jobId){
 

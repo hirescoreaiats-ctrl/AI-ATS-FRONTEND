@@ -388,6 +388,7 @@ window.history.replaceState({}, document.title, window.location.pathname)
 // ---------------- LOGOUT ----------------
 
 function logoutUser(){
+window.hireScoreQueries?.clearAllDashboardCaches?.()
 localStorage.removeItem("token")
 localStorage.removeItem("username")
 localStorage.removeItem("userEmail")
