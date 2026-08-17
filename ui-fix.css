@@ -5419,6 +5419,27 @@ overflow:visible;
 text-align:center;
 }
 
+/* Pending follow-up has two action buttons; reserve enough room so the
+   right-hand action is never clipped by the workspace edge. */
+#communicationResultsPage [data-comm-panel="pending"] .ats-followup-table th:nth-child(1),
+#communicationResultsPage [data-comm-panel="pending"] .ats-followup-table td:nth-child(1){width:44px}
+#communicationResultsPage [data-comm-panel="pending"] .ats-followup-table th:nth-child(2),
+#communicationResultsPage [data-comm-panel="pending"] .ats-followup-table td:nth-child(2){width:30%}
+#communicationResultsPage [data-comm-panel="pending"] .ats-followup-table th:nth-child(3),
+#communicationResultsPage [data-comm-panel="pending"] .ats-followup-table td:nth-child(3){width:15%}
+#communicationResultsPage [data-comm-panel="pending"] .ats-followup-table th:nth-child(4),
+#communicationResultsPage [data-comm-panel="pending"] .ats-followup-table td:nth-child(4){width:17%}
+#communicationResultsPage [data-comm-panel="pending"] .ats-followup-table th:nth-child(5),
+#communicationResultsPage [data-comm-panel="pending"] .ats-followup-table td:nth-child(5){width:13%}
+#communicationResultsPage [data-comm-panel="pending"] .ats-followup-table th:nth-child(6),
+#communicationResultsPage [data-comm-panel="pending"] .ats-followup-table td:nth-child(6){
+width:220px;
+min-width:220px;
+padding-left:8px!important;
+padding-right:8px!important;
+overflow:hidden;
+}
+
 #communicationResultsPage .ats-fixed-table{
 border-radius:12px;
 border:1px solid #e5e7eb;
