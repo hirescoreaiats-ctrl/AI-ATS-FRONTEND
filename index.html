@@ -203,7 +203,10 @@ Logout
   const prefix = "hirescore:dashboard-summary:v1:";
   const maxAge = 24 * 60 * 60 * 1000;
   try {
-    const token = localStorage.getItem("token") || "";
+    // OAuth/new-account redirects carry the new identity in the URL before auth.js
+    // updates localStorage. Always prefer it so the previous account cache cannot paint.
+    const redirectToken = new URLSearchParams(window.location.search).get("token");
+    const token = redirectToken || localStorage.getItem("token") || "";
     const payloadPart = token.split(".")[1] || "";
     const padded = payloadPart.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(payloadPart.length / 4) * 4, "=");
     const payload = JSON.parse(atob(padded));

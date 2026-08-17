@@ -2042,7 +2042,8 @@
   var PREFIX = "hirescore:dashboard-summary:v1:";
   var queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: STALE_TIME, gcTime: GC_TIME, retry: 1, refetchOnMount: true, refetchOnReconnect: true, refetchOnWindowFocus: true } } });
   function identity() {
-    const token = localStorage.getItem("token") || "";
+    const redirectToken = new URLSearchParams(window.location.search).get("token");
+    const token = redirectToken || localStorage.getItem("token") || "";
     try {
       const p = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
       return String(p.organization_id || p.org_id || p.user_id || p.sub || "anonymous");
