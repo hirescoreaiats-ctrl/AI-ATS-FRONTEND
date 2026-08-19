@@ -4867,6 +4867,17 @@ return item
 return candidateProfileStore[key] || normalized
 }
 
+async function refreshCandidateRankingFromServer(candidate, candidateId){
+let updated = updateCandidateProfileCache(candidate || {})
+let jobId = updated.job_id || window.currentJobId || ""
+if(jobId){
+// Refetch the committed job ranking so Results and Profile share one snapshot.
+await loadResults(jobId, {silent:true})
+updated = findCurrentCandidate(candidateId || updated.resume_id || updated.id) || updated
+}
+return updated
+}
+
 function setCandidateProfileHeader(title, subtitle, backLabel, backAction){
 let titleEl = document.getElementById("candidateProfileTitle")
 let page = document.getElementById("candidateProfilePage")
@@ -5031,7 +5042,7 @@ loadCandidateWorkspace(candidateId)
 async function loadCandidateWorkspace(candidateId){
 if(!candidateId) return
 try{
-let res = await fetch(API + "/candidate-workspace/" + encodeURIComponent(candidateId))
+let res = await fetch(API + "/candidate-workspace/" + encodeURIComponent(candidateId), {headers:authHeaders()})
 if(!res.ok) return
 let data = await res.json()
 let notesBox = document.getElementById("candidateNotesList")
@@ -5125,7 +5136,7 @@ if(!res.ok){
 alert(data.detail || "Could not re-parse this candidate.")
 return
 }
-let updated = updateCandidateProfileCache(data.candidate || {})
+let updated = await refreshCandidateRankingFromServer(data.candidate || {}, candidateId)
 renderStoredCandidateProfile(updated, {
 jobId: window.currentJobId || updated.job_id || "",
 jobTitle: window.currentJobTitle || updated.designation || "Selected Job",
@@ -5241,7 +5252,7 @@ if(!res.ok){
 alert(data.detail || "Could not update candidate data.")
 return
 }
-let updated = updateCandidateProfileCache(data.candidate || {})
+let updated = await refreshCandidateRankingFromServer(data.candidate || {}, candidateId)
 closeCandidateEditModal()
 renderStoredCandidateProfile(updated, {
 jobId: window.currentJobId || updated.job_id || "",
@@ -5277,7 +5288,7 @@ if(!res.ok){
 alert(data.detail || "Could not re-review candidate.")
 return
 }
-let updated = updateCandidateProfileCache(data.candidate || {})
+let updated = await refreshCandidateRankingFromServer(data.candidate || {}, candidateId)
 renderStoredCandidateProfile(updated, {
 jobId: window.currentJobId || updated.job_id || "",
 jobTitle: window.currentJobTitle || updated.designation || "Selected Job",
