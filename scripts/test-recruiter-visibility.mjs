@@ -15,6 +15,9 @@ assert.match(app, /parser_confidence/, "parser confidence should be rendered");
 assert.match(app, /async function\s+refreshCandidateRankingFromServer/, "candidate mutations should share a server refetch path");
 assert.match(app, /await loadResults\(jobId, \{silent:true\}\)/, "candidate mutations should refresh job results");
 assert.match(app, /candidate-workspace\/"\s*\+\s*encodeURIComponent\(candidateId\), \{headers:authHeaders\(\)\}/, "candidate workspace should send tenant auth headers");
+assert.match(app, /request_candidate_sourcing:requestCandidateSourcing/, "job creation should persist the sourcing opt-in");
+assert.match(app, /data\.requirement_url/, "sourcing jobs should use the backend requirement URL");
+assert.doesNotMatch(app, /\/sourcing\/request\//, "sourcing should not redirect to an undeployed relative route");
 
 assert.match(html, /jobResultRescoreBanner/, "result page should include rescore banner container");
 

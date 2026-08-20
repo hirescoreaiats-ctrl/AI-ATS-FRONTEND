@@ -2483,8 +2483,9 @@ function candidateSourcingRequested(){
 return document.querySelector('input[name="candidateSourcingChoice"]:checked')?.value === "yes"
 }
 
-function candidateSourcingRequestPath(jobId){
-return "/sourcing/request/" + encodeURIComponent(jobId)
+function candidateSourcingRequestPath(jobId, requirementUrl=""){
+if(requirementUrl) return requirementUrl
+return "https://hirescoreai.com/requirement-platform/?view=requirements&job_id=" + encodeURIComponent(jobId)
 }
 
 async function createJob(event){
@@ -2549,7 +2550,8 @@ hiring_manager:hiringManager,
 
 jd_text:jd,
 public_apply_enabled:publicApplyEnabled,
-source_tracking_enabled:sourceTrackingEnabled
+source_tracking_enabled:sourceTrackingEnabled,
+request_candidate_sourcing:requestCandidateSourcing
 
 })
 
@@ -2575,7 +2577,7 @@ if(!createdJobId || !resolvedApplyLink){
 setCreateJobStatus("error", "Job was created, but its sourcing details link could not be opened. Please open the job and try again.")
 return
 }
-window.location.assign(candidateSourcingRequestPath(createdJobId))
+window.location.assign(candidateSourcingRequestPath(createdJobId, data.requirement_url))
 return
 }
 
