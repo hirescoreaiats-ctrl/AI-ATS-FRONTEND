@@ -2495,6 +2495,7 @@ let submitButton = createJobSubmitButton(event)
 
 let jobTitle=document.getElementById("jobTitle").value
 let company=document.getElementById("company").value
+let companyWebsite=document.getElementById("companyWebsite")?.value.trim() || ""
 let department=document.getElementById("department").value
 let location=document.getElementById("location").value
 let workMode=document.getElementById("workMode").value
@@ -2536,6 +2537,7 @@ body:JSON.stringify({
 
 job_title:jobTitle,
 company_name:company,
+company_website:companyWebsite || null,
 department:department,
 
 location:location,

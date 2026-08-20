@@ -16,6 +16,9 @@ assert.match(app, /async function\s+refreshCandidateRankingFromServer/, "candida
 assert.match(app, /await loadResults\(jobId, \{silent:true\}\)/, "candidate mutations should refresh job results");
 assert.match(app, /candidate-workspace\/"\s*\+\s*encodeURIComponent\(candidateId\), \{headers:authHeaders\(\)\}/, "candidate workspace should send tenant auth headers");
 assert.match(app, /request_candidate_sourcing:requestCandidateSourcing/, "job creation should persist the sourcing opt-in");
+assert.match(app, /company_website:companyWebsite \|\| null/, "job creation should send the optional company website");
+assert.match(html, /id="companyWebsite"/, "create-job form should include a company website field");
+assert.match(html, /Company Website <span class="ats-field-optional">Optional<\/span>/, "company website should be visibly optional");
 assert.match(app, /data\.requirement_url/, "sourcing jobs should use the backend requirement URL");
 assert.doesNotMatch(app, /\/sourcing\/request\//, "sourcing should not redirect to an undeployed relative route");
 

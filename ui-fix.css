@@ -10505,6 +10505,15 @@ text-transform:uppercase;
 color:#334155;
 }
 
+#jobPage .form-group label .ats-field-optional{
+margin-left:6px;
+color:#64748b;
+font-size:10px;
+font-weight:850;
+letter-spacing:.02em;
+text-transform:none;
+}
+
 #jobPage input,
 #jobPage select,
 #jobPage textarea{
