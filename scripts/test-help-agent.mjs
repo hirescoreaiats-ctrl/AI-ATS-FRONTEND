@@ -8,7 +8,7 @@ const app = readFileSync("app.js", "utf8");
 
 assert.match(html, /help-agent\.css\?v=guide-agent-20260714-27/, "help css should be loaded");
 assert.match(html, /help-agent\.js\?v=guide-agent-20260714-27/, "help js should be loaded");
-assert.match(html, /app\.js\?v=sourcing-requirement-publish-20260821-01/, "app js cache should match the current frontend bundle");
+assert.match(html, /app\.js\?v=sourcing-approval-20260821-01/, "app js cache should match the current frontend bundle");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
 assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
 

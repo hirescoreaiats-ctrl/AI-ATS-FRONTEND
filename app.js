@@ -2570,7 +2570,7 @@ return
 }
 
 // SHOW SUCCESS CARD
-setCreateJobStatus("success", requestCandidateSourcing ? "Job created successfully. Opening sourcing details..." : "Job created successfully. Opening sharing details...")
+setCreateJobStatus("success", requestCandidateSourcing ? "Job submitted for admin approval. Opening submission status..." : "Job created successfully. Opening sharing details...")
 
 if(requestCandidateSourcing){
 let createdJobId = data.job_id || data.id
