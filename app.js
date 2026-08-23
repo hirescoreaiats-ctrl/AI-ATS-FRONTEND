@@ -1032,6 +1032,13 @@ document.body.classList.toggle(
 ].includes(page)
 )
 setActiveNavForPage(page)
+let agentPageContext = {
+current_screen: page,
+current_route: window.location?.pathname || "/"
+}
+if(page !== "candidateProfile") Object.assign(agentPageContext, {candidate_id:null,candidate_name:null})
+if(["dashboard","job","results","allJobs"].includes(page)) Object.assign(agentPageContext, {job_id:null,job_title:null,candidate_ids:[]})
+window.HireScoreHelpAgent?.setContext(agentPageContext)
 resetPageScroll()
 
 // recruiter dashboard
@@ -2798,6 +2805,14 @@ showPage("jobResult")
 stopJobResultLiveRefresh()
 window.currentJobId = jobId
 window.currentJobTitle = jobTitle
+window.HireScoreHelpAgent?.setContext({
+current_screen:"jobResult",
+job_id:jobId,
+job_title:jobTitle,
+candidate_id:null,
+candidate_name:null,
+candidate_ids:[]
+})
 
 let title = document.getElementById("jobResultTitle")
 
@@ -2905,6 +2920,12 @@ renderSkillDropdown()
 
 currentResults = results
 window.currentResultsSnapshot = currentResults
+window.HireScoreHelpAgent?.setContext({
+current_screen:"jobResult",
+job_id:jobId,
+job_title:window.currentJobTitle || data.job?.job_title || "Selected Job",
+candidate_count:results.length
+})
 
 let totalApplicants = results.length
 
@@ -5322,6 +5343,15 @@ label: "Back to Candidates",
 action: "showPage('results')"
 }
 
+window.HireScoreHelpAgent?.setContext({
+current_screen:"candidateProfile",
+job_id:window.currentJobId || candidate.job_id || null,
+job_title:window.currentJobTitle || candidate.designation || "Selected Job",
+candidate_id:candidate.resume_id || candidate.id || candidateId,
+candidate_name:candidate.full_name || candidate.name || "Candidate",
+candidate_ids:[candidate.resume_id || candidate.id || candidateId]
+})
+
 showPage("candidateProfile")
 setCandidateProfileHeader(
 `${candidate.full_name || "Candidate"} - Profile`,
@@ -5333,6 +5363,33 @@ renderStoredCandidateProfile(candidate, {
 jobId: window.currentJobId || candidate.job_id || "",
 jobTitle: window.currentJobTitle || candidate.designation || "Selected Job",
 profileNote: "Stored profile view from ranking data. No AI summary or expensive model call is used on this page."
+})
+}
+
+window.applyAgentCandidateFilter = function(candidateIds){
+let shouldFilter = Array.isArray(candidateIds)
+let allowed = new Set((candidateIds || []).map(value => String(value)))
+let table = document.getElementById("resultsTable")
+if(!table) return
+table.querySelectorAll("tr").forEach(row => {
+let trigger = row.querySelector("[data-profile-candidate-id]")
+if(!trigger) return
+let candidateId = String(trigger.dataset.profileCandidateId || "")
+row.hidden = shouldFilter && !allowed.has(candidateId)
+})
+let total = document.getElementById("stat_total_app")
+if(total) total.innerText = String(allowed.size)
+}
+
+window.refreshAfterAgentAction = async function(result){
+let jobId = result?.job?.id || result?.job_id || window.currentJobId || ""
+if(jobId && typeof loadResults === "function") await loadResults(jobId, {silent:true})
+if(typeof loadDashboard === "function") await loadDashboard()
+window.HireScoreHelpAgent?.setContext({
+current_screen:jobId ? "jobResult" : "dashboard",
+job_id:jobId || null,
+job_title:result?.job?.job_title || window.currentJobTitle || null,
+candidate_ids:Array.isArray(result?.candidate_ids) ? result.candidate_ids : []
 })
 }
 

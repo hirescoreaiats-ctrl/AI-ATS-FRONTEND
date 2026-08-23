@@ -5,7 +5,8 @@ const SETTINGS_KEYS = {
 onboardingSeen: "hs_help_onboarding_seen",
 mode: "hs_help_agent_mode",
 actionEnabled: "hs_action_agent_enabled",
-confirmationRequired: "hs_action_confirmation_required"
+confirmationRequired: "hs_action_confirmation_required",
+panelOpen: "hs_recruiting_agent_panel_open"
 };
 
 const SENSITIVE_INTENTS = new Set([
@@ -28,6 +29,26 @@ const MUTATING_ACTION_IDS = new Set([
 ]);
 
 const WORKFLOWS = {
+view_active_jobs: {
+id:"view_active_jobs", title:"Active Jobs", category:"Jobs", requiredContext:[], route:"dashboard", tourId:"dashboard_overview",
+description:"Show active jobs and their real applicant activity.", steps:["Review active jobs.","Open the job that needs action."], allowedModes:["guide"], isSensitiveAction:false
+},
+jobs_needing_attention: {
+id:"jobs_needing_attention", title:"Jobs Needing Attention", category:"Jobs", requiredContext:[], route:"dashboard", tourId:"dashboard_overview",
+description:"Find active jobs with candidates waiting for recruiter action.", steps:["Review attention counts.","Open a job and act on candidates."], allowedModes:["guide"], isSensitiveAction:false
+},
+applicant_metrics: {
+id:"applicant_metrics", title:"Today's Applicants", category:"Jobs", requiredContext:[], route:"dashboard", tourId:"dashboard_overview",
+description:"Show current applicant counts from the ATS database.", steps:["Review today's applicant count.","Open active jobs for details."], allowedModes:["guide"], isSensitiveAction:false
+},
+view_sourcing_status: {
+id:"view_sourcing_status", title:"Sourcing Status", category:"Sourcing", requiredContext:["job"], route:"dashboard", tourId:"dashboard_overview",
+description:"Check the selected job's sourcing request and approval status.", steps:["Open the job.","Review sourcing approval status."], allowedModes:["guide"], isSensitiveAction:false
+},
+filter_candidates: {
+id:"filter_candidates", title:"Filter Candidates", category:"Candidates", requiredContext:["job"], route:"jobResult", tourId:"review_ai_ranked_candidates",
+description:"Filter the current job's stored candidates by skill, experience, location, score, or recency.", steps:["Apply validated filters.","Review matching candidate evidence.","Select candidates for the next action."], allowedModes:["guide","action"], isSensitiveAction:false
+},
 search_talent: {
 id:"search_talent", title:"Talent Search", category:"Candidates", requiredContext:[], route:"results", tourId:"review_ai_ranked_candidates",
 description:"Search candidates across all jobs using role, skills, and resume evidence.",
@@ -265,7 +286,7 @@ dashboard_overview: [
 ["create-job-button","Create Job","Start here when you need to add a new JD or opening."],
 ["job-card","Job management","Open candidate results, top candidates, posts, and folder upload from each job row."],
 ["ai-score-column","Applications and AI ranking","This area shows job volume and scoring signals across active jobs."],
-["help-agent-button","Help Agent","Open this guide anytime when you are unsure what to do next."]
+["help-agent-button","Recruiting Agent","Use the AI operating layer from any ATS screen."]
 ],
 create_job: [["create-job-button","Create Job","Click Create Job, fill role details, add skills/JD, and save the opening."],["job-form","Job details form","Complete the required fields before saving."],["jobs-menu","Jobs menu","Return to Jobs to review the created role."]],
 share_public_apply_link: [["public-apply-link-button","Apply Pages","Open Apply Pages from the Jobs dashboard."],["apply-page-list","Job apply links","Choose the job and copy the public application link."],["jobs-menu","Jobs menu","Return to Jobs when you need to manage openings."]],
@@ -545,7 +566,7 @@ return {intent, entities, confidence, clarification_needed:needsClarification, c
 }
 
 function currentHelpRoute(){
-return window.location?.pathname || "dashboard";
+return state.conversationContext?.current_screen || window.location?.pathname || "dashboard";
 }
 
 function currentHelpContext(){
@@ -553,10 +574,12 @@ let contextCandidateIds = state.conversationContext?.job_id && state.selectedJob
 ? []
 : (state.conversationContext?.candidate_ids || []);
 return Object.assign({}, state.conversationContext || {}, {
-job_id: state.selectedJob?.id || null,
-job_title: state.selectedJob?.job_title || null,
-candidate_id: state.selectedCandidate?.id || null,
+current_screen: state.conversationContext?.current_screen || "dashboard",
+job_id: state.selectedJob?.id || state.conversationContext?.job_id || window.currentJobId || null,
+job_title: state.selectedJob?.job_title || state.conversationContext?.job_title || window.currentJobTitle || null,
+candidate_id: state.selectedCandidate?.id || state.conversationContext?.candidate_id || null,
 candidate_ids: state.selectedCandidate?.id ? [state.selectedCandidate.id] : contextCandidateIds,
+active_filters: state.conversationContext?.active_filters || {},
 previous_intent: state.lastParsedPlan?.intent || null
 });
 }
@@ -654,7 +677,9 @@ search_query: mergedEntities.search_query || null,
 job_id: mergedEntities.job_id || null,
 job_title: mergedEntities.job_title || null,
 candidate_name: mergedEntities.candidate_name || null,
+candidate_id: mergedEntities.candidate_id || null,
 candidate_ids: Array.isArray(mergedEntities.candidate_ids) ? mergedEntities.candidate_ids : null,
+filters: mergedEntities.filters && typeof mergedEntities.filters === "object" ? mergedEntities.filters : null,
 candidate_group: mergedEntities.candidate_group || null,
 stage: mergedEntities.stage || null,
 target_stage: mergedEntities.target_stage || null,
@@ -673,7 +698,10 @@ ready_for_action_agent: authoritative ? Boolean(data.ready_for_action_agent) : B
 requires_confirmation: Boolean(data.requires_confirmation),
 candidate_preview: Array.isArray(data.candidate_preview) ? data.candidate_preview : [],
 job_options: Array.isArray(data.job_options) ? data.job_options : [],
+job_preview: Array.isArray(data.job_preview) ? data.job_preview : (Array.isArray(data.ui?.job_cards) ? data.ui.job_cards : []),
 confirmation: data.confirmation && typeof data.confirmation === "object" ? data.confirmation : null,
+navigation: data.navigation && typeof data.navigation === "object" ? data.navigation : (data.ui?.navigation || null),
+ui: data.ui && typeof data.ui === "object" ? data.ui : null,
 guidance: data.assistant_reply || data.guidance || data.message || null,
 confidence: Number(data.confidence || 0),
 clarification_needed: responseType === "clarification" ? (clarificationNeeded || !intent) : false,
@@ -959,15 +987,58 @@ let missing = Array.isArray(intentResult.missing_fields) && intentResult.missing
 : "";
 let contextLine = context && context.job ? `<p><strong>Job:</strong> ${esc(context.job.job_title || "Selected job")}</p>` : "";
 let previewRows = Array.isArray(intentResult.candidate_preview) ? intentResult.candidate_preview.slice(0, 10) : [];
-let preview = previewRows.length ? `<div class="hs-help-agent-preview"><strong>AI explanation for ${intentResult.candidate_preview.length} candidate${intentResult.candidate_preview.length === 1 ? "" : "s"}</strong><ol>${previewRows.map((candidate, index) => {
+let preview = previewRows.length ? `<div class="hs-help-agent-preview"><strong>${intentResult.candidate_preview.length} matching candidate${intentResult.candidate_preview.length === 1 ? "" : "s"}</strong><ol>${previewRows.map((candidate, index) => {
 let explanation = candidate.recruiter_explanation || candidate.ranking_reason || "Open the candidate profile to review detailed score evidence.";
 let strengths = Array.isArray(candidate.strengths) && candidate.strengths.length ? `<p><b>Strengths:</b> ${esc(candidate.strengths.join("; "))}</p>` : "";
 let concerns = Array.isArray(candidate.concerns) && candidate.concerns.length ? `<p><b>Gaps:</b> ${esc(candidate.concerns.join("; "))}</p>` : "";
 let skills = Array.isArray(candidate.matched_skills) && candidate.matched_skills.length ? `<p><b>Matched skills:</b> ${esc(candidate.matched_skills.join(", "))}</p>` : "";
-return `<li><span>#${index + 1} ${candidateProfileButton(candidate, "Candidate")}</span><small>Score ${esc(candidate.rank_score ?? candidate.final_score ?? "N/A")} | ${esc(candidate.recommendation || candidate.status || candidate.stage || "Review")}</small><p>${esc(explanation)}</p>${strengths}${concerns}${skills}</li>`;
+let candidateId = candidate.id || candidate.resume_id || candidate.candidate_id || "";
+return `<li class="hs-agent-candidate-card"><span>#${index + 1} ${candidateProfileButton(candidate, "Candidate")}</span><small>Score ${esc(candidate.rank_score ?? candidate.final_score ?? "N/A")} | ${esc(candidate.stage || candidate.status || "Review")} | ${esc(candidate.relevant_experience_years ?? "N/A")} years</small><p>${esc(explanation)}</p>${strengths}${concerns}${skills}<div class="hs-agent-card-actions"><button type="button" onclick="window.HireScoreHelpAgent.candidateAction('${esc(candidateId)}','view')">View Candidate</button><button type="button" onclick="window.HireScoreHelpAgent.candidateAction('${esc(candidateId)}','shortlist')">Shortlist</button><button type="button" onclick="window.HireScoreHelpAgent.candidateAction('${esc(candidateId)}','compare')">Compare</button></div></li>`;
 }).join("")}</ol></div>` : "";
+let jobRows = Array.isArray(intentResult.job_preview) ? intentResult.job_preview.slice(0, 12) : [];
+let jobs = jobRows.length ? `<div class="hs-help-agent-preview hs-agent-job-results"><strong>${jobRows.length} job${jobRows.length === 1 ? "" : "s"}</strong>${renderJobCards(jobRows)}</div>` : "";
 let confirmation = intentResult.confirmation?.summary ? `<p><strong>Confirmation:</strong> ${esc(intentResult.confirmation.summary)}</p>` : "";
-return `<strong>${esc(title)}</strong><p>${esc(guidance)}</p>${contextLine}${taskHtml}${preview}${confirmation}${missing}<p>Helping Agent will show the visual tour. Action Agent will act only after permission and confirmation.</p>`;
+return `<strong>${esc(title)}</strong><p>${esc(guidance)}</p>${contextLine}${taskHtml}${jobs}${preview}${confirmation}${missing}`;
+}
+
+function contextQuickActions(){
+let screen = state.conversationContext?.current_screen || "dashboard";
+if(screen === "candidateProfile" || state.conversationContext?.candidate_id){
+return [["explain_candidate_score","Why this score?"],["shortlist_candidate","Shortlist candidate"],["schedule_interview","Schedule interview"],["filter_candidates","Compare candidates"]];
+}
+if(["jobResult","results","topCandidate","insight"].includes(screen) || state.conversationContext?.job_id){
+return [["select_top_candidates","Top 10 candidates"],["filter_candidates","Filter candidates"],["candidate_workflow","Shortlist best matches"],["view_sourcing_status","Sourcing status"]];
+}
+if(screen === "interviewDashboard") return [["schedule_interview","Schedule interview"],["applicant_metrics","Today's applicants"],["view_active_jobs","Active jobs"]];
+return [["jobs_needing_attention","Jobs needing attention"],["applicant_metrics","Today's applicants"],["view_active_jobs","Active jobs"],["create_job","Create a job"]];
+}
+
+function renderQuickActions(){
+let box = document.getElementById("hsHelpQuick");
+if(!box) return;
+box.innerHTML = contextQuickActions().map(item => `<button type="button" onclick="window.HireScoreHelpAgent.quickAction('${item[0]}')">${esc(item[1])}</button>`).join("");
+}
+
+function renderContextBar(){
+let box = document.getElementById("hsAgentContext");
+if(!box) return;
+let context = currentHelpContext();
+let label = context.candidate_name
+? `Reviewing ${context.candidate_name}${context.job_title ? ` for ${context.job_title}` : ""}`
+: context.job_title
+? `Viewing ${context.job_title}${context.candidate_count != null ? ` — ${context.candidate_count} candidates` : ""}`
+: context.current_screen === "interviewDashboard" ? "Viewing upcoming interviews" : "Recruiting workspace";
+box.innerHTML = `<span></span><strong>${esc(label)}</strong>`;
+renderQuickActions();
+}
+
+function setContext(nextContext){
+let next = nextContext && typeof nextContext === "object" ? nextContext : {};
+state.conversationContext = Object.assign({}, state.conversationContext, next);
+if(next.job_id || next.job_title) state.selectedJob = Object.assign({}, state.selectedJob || {}, {id:next.job_id || state.selectedJob?.id, job_title:next.job_title || state.selectedJob?.job_title});
+if(Object.prototype.hasOwnProperty.call(next,"job_id") && !next.job_id) state.selectedJob = null;
+if(Object.prototype.hasOwnProperty.call(next,"candidate_id")) state.selectedCandidate = next.candidate_id ? {id:next.candidate_id, full_name:next.candidate_name || "Candidate"} : null;
+renderContextBar();
 }
 
 function openPageLabel(workflow){
@@ -1508,6 +1579,17 @@ let workflow = WORKFLOWS[intentResult.intent];
 state.lastIntent = intentResult.intent;
 state.lastParsedPlan = intentResult;
 
+if(Array.isArray(intentResult.job_preview) && intentResult.job_preview.length){
+state.lastJobOptions = intentResult.job_preview;
+}
+if(Array.isArray(intentResult.candidate_preview) && (intentResult.candidate_preview.length || intentResult.intent === "filter_candidates")){
+let candidateIds = intentResult.candidate_preview.map(item => item.id || item.resume_id || item.candidate_id).filter(Boolean);
+state.conversationContext = Object.assign({}, state.conversationContext, {candidate_ids:candidateIds, active_filters:intentResult.entities?.filters || {}});
+if(intentResult.intent === "filter_candidates" && typeof window.applyAgentCandidateFilter === "function"){
+window.applyAgentCandidateFilter(candidateIds);
+}
+}
+
 if(workflow.id === "search_talent"){
 return handleTalentSearch(intentResult);
 }
@@ -1550,7 +1632,7 @@ actionButton("View All Jobs","openPage",{page:"dashboard"})
 return;
 }
 
-if(shouldRequireCandidate(intentResult) && !contextOverride?.candidate){
+if(shouldRequireCandidate(intentResult) && !contextOverride?.candidate && !state.selectedCandidate?.id && !intentResult.entities?.candidate_id && !(intentResult.entities?.candidate_ids || []).length){
 state.pendingContextType = "candidate";
 let candidateName = intentResult.entities.candidate_name;
 let question = candidateName ? `I found the name "${esc(candidateName)}", but I need you to choose the candidate from results.` : "Which candidate should I use?";
@@ -1586,7 +1668,7 @@ return `<div class="hs-help-card-list">${jobs.map((job, index)=>`
 <button type="button" class="hs-help-select-card" onclick="window.HireScoreHelpAgent.selectJob(${index})">
 <strong>${esc(job.job_title || "Untitled Job")}</strong>
 <span>${esc(job.company_name || "Company not specified")}</span>
-<small>${esc(job.location || "Location N/A")} ${job.work_mode ? " | " + esc(job.work_mode) : ""} | ${Number(job.total_applicants || 0)} candidates | ${job.is_active === false ? "Inactive" : "Active"}</small>
+<small>${esc(job.location || "Location N/A")} ${job.work_mode ? " | " + esc(job.work_mode) : ""} | ${Number(job.applicant_count ?? job.total_applicants ?? 0)} candidates | Top score ${esc(job.top_score ?? "N/A")} | ${job.is_active === false ? "Inactive" : "Active"}</small>
 </button>
 `).join("")}</div>`;
 }
@@ -2155,8 +2237,9 @@ body:JSON.stringify({confirmation_token:plan.confirmation.token})
 removeMessage(loadingMessage);
 let receipts = Array.isArray(data?.receipts) ? data.receipts.map(item => `<li>${esc(item.action_id || "action")}: ${esc(item.status || "completed")} (${esc(item.count ?? 0)})</li>`).join("") : "";
 state.jobsCache = null;
+if(typeof window.refreshAfterAgentAction === "function") await window.refreshAfterAgentAction(data);
 addMessage("agent", `<strong>Action Agent completed.</strong><p>${esc(data?.candidate_count || 0)} candidate${Number(data?.candidate_count || 0) === 1 ? "" : "s"} processed for ${esc(data?.job?.job_title || plan?.entities?.job_title || "the selected job")}.</p>${receipts ? `<ul>${receipts}</ul>` : ""}`, [
-actionButton("Open Recruiter","openPage",{page:"results"}),
+actionButton("View Updated Candidates","openPage",{page:"jobResult"}),
 actionButton("Open Communication","openPage",{page:"communication"})
 ]);
 return;
@@ -2201,6 +2284,7 @@ addMessage("agent", `<strong>Action Agent completed.</strong><p>${esc(context.ca
 actionButton("Open Communication","openPage",{page:"communication"}),
 actionButton("Start Visual Tour","tour",{tourId:"send_candidate_email", page:"communication"})
 ]);
+if(typeof window.refreshAfterAgentAction === "function") await window.refreshAfterAgentAction({job:{id:context.job_id,job_title:job.job_title},candidate_ids:context.candidate_ids});
 }catch(error){
 removeMessage(loadingMessage);
 addMessage("agent", `<strong>Action Agent could not complete this.</strong><p>${esc(error.message || "Please try again.")}</p>`, [
@@ -2304,14 +2388,19 @@ showTourStep();
 function openDrawer(){
 ensureShell();
 document.getElementById("hsHelpRoot")?.classList.add("is-open");
+document.body.classList.add("hs-agent-workspace-open");
+setSetting(SETTINGS_KEYS.panelOpen, "true");
 if(!state.messages.length){
-addMessage("agent", `<strong>Hi, I am your HireScore guide.</strong><p>Ask me about jobs, JD upload, resume upload, AI scores, shortlisting, emails, interviews, tests, pilot access, or plan limits.</p>`);
+addMessage("agent", `<strong>HireScore Recruiting Agent</strong><p>I can retrieve live jobs and candidates, explain stored scoring evidence, and execute confirmed recruiting actions.</p>`);
 }
+renderContextBar();
 renderModeInfo();
 }
 
 function closeDrawer(){
 document.getElementById("hsHelpRoot")?.classList.remove("is-open");
+document.body.classList.remove("hs-agent-workspace-open");
+setSetting(SETTINGS_KEYS.panelOpen, "false");
 }
 
 function showOnboarding(){
@@ -2355,12 +2444,24 @@ renderModeInfo();
 async function quickAction(workflowId){
 let workflow = WORKFLOWS[workflowId];
 if(!workflow) return;
-addMessage("user", esc(workflow.title));
-if(workflowId === "send_candidate_email" && state.lastParsedPlan?.intent === "send_candidate_email"){
-let job = currentEmailWorkflowJob();
-if(job) return respondWithGroupEmailPlan(state.lastParsedPlan, job);
+if(workflowId === "filter_candidates"){
+let input = document.getElementById("hsHelpInput");
+if(input){ input.placeholder = "e.g. Show top 10 candidates with AWS and 5+ years"; input.focus(); }
+return;
 }
-handleWorkflow({intent:workflowId, entities:{}, confidence:1, clarification_needed:false});
+let prompts = {
+view_active_jobs:"Show my active jobs",
+jobs_needing_attention:"Which jobs need attention?",
+applicant_metrics:"How many candidates applied today?",
+view_sourcing_status:"Is sourcing approved for this role?",
+select_top_candidates:"Show me the top 10 candidates",
+candidate_workflow:"Shortlist the best 5 candidates",
+explain_candidate_score:"Why is this candidate a strong or weak fit?",
+shortlist_candidate:"Shortlist this candidate",
+schedule_interview:"Schedule an interview for this candidate",
+create_job:"Create a new job"
+};
+return handleUserText(prompts[workflowId] || workflow.title);
 }
 
 function ensureShell(){
@@ -2369,24 +2470,24 @@ let root = document.createElement("div");
 root.id = "hsHelpRoot";
 root.innerHTML = `
 <button id="hsHelpButton" class="hs-help-button" type="button" data-help-id="help-agent-button" onclick="window.HireScoreHelpAgent.openDrawer()">
-<span>?</span><strong>Help Agent</strong>
+<span>AI</span><strong>Recruiting Agent</strong>
 </button>
-<aside class="hs-help-drawer" aria-label="HireScore Help Agent">
+<aside class="hs-help-drawer" aria-label="HireScore AI Recruiting Agent">
 <div class="hs-help-drawer-head">
-<div><strong>HireScore Help Agent</strong><span>Your product guide</span></div>
-<button type="button" aria-label="Close Help Agent" onclick="window.HireScoreHelpAgent.closeDrawer()">x</button>
+<div><strong>HireScore AI Agent</strong><span>Live recruiting workspace</span></div>
+<button type="button" aria-label="Collapse Recruiting Agent" onclick="window.HireScoreHelpAgent.closeDrawer()">›</button>
 </div>
-<div class="hs-help-quick">
-${QUICK_ACTIONS.map(item => `<button type="button" onclick="window.HireScoreHelpAgent.quickAction('${item[0]}')">${esc(item[1])}</button>`).join("")}
+<div id="hsAgentContext" class="hs-agent-context"></div>
+<div id="hsHelpQuick" class="hs-help-quick">
 </div>
 <div id="hsHelpMessages" class="hs-help-messages"></div>
 <div class="hs-help-compose">
-<label class="hs-agent-mode"><span>Agent Mode</span><select id="hsAgentMode" onchange="window.HireScoreHelpAgent.changeMode(this.value)"><option value="guide">Guide Agent</option><option value="action">Action Agent - Requires permission</option></select></label>
+<label class="hs-agent-mode"><span>Operating mode</span><select id="hsAgentMode" onchange="window.HireScoreHelpAgent.changeMode(this.value)"><option value="guide">Insights & navigation</option><option value="action">Confirmed recruiting actions</option></select></label>
 <div id="hsHelpModeInfo" class="hs-help-mode-info"></div>
 </div>
 <form id="hsHelpForm" class="hs-help-form">
 <label class="hs-help-attach" title="Upload JD file"><input id="hsHelpJDFile" type="file" accept=".pdf,.docx,.txt">JD</label>
-<input id="hsHelpInput" type="text" placeholder="Ask me anything, or attach a JD to create a job" autocomplete="off">
+<input id="hsHelpInput" type="text" placeholder="Ask about this screen or run a recruiting action" autocomplete="off">
 <button type="submit">Send</button>
 </form>
 </aside>
@@ -2396,7 +2497,7 @@ ${QUICK_ACTIONS.map(item => `<button type="button" onclick="window.HireScoreHelp
 <p>I can guide you through the product and help you get started faster.</p>
 <span>Choose how you want to continue:</span>
 <button type="button" onclick="window.HireScoreHelpAgent.startOnboardingTour()">Start Product Walkthrough</button>
-<button type="button" onclick="window.HireScoreHelpAgent.askAgentFromOnboarding()">Ask Help Agent</button>
+<button type="button" onclick="window.HireScoreHelpAgent.askAgentFromOnboarding()">Ask Recruiting Agent</button>
 <button type="button" onclick="window.HireScoreHelpAgent.skipOnboarding()">Skip for now</button>
 </section>
 </div>
@@ -2423,6 +2524,7 @@ event.target.value = "";
 if(file) handleAgentJDFile(file);
 });
 renderModeInfo();
+renderContextBar();
 }
 
 function applyRuntimeHelpIds(){
@@ -2475,6 +2577,8 @@ if(localStorage.getItem(SETTINGS_KEYS.actionEnabled) == null) setSetting(SETTING
 if(localStorage.getItem(SETTINGS_KEYS.confirmationRequired) == null) setSetting(SETTINGS_KEYS.confirmationRequired, "true");
 ensureShell();
 applyRuntimeHelpIds();
+let shouldOpen = getSetting(SETTINGS_KEYS.panelOpen, window.innerWidth >= 1180 ? "true" : "false") === "true";
+if(shouldOpen) openDrawer();
 if(getSetting(SETTINGS_KEYS.onboardingSeen, "false") !== "true"){
 setTimeout(showOnboarding, 700);
 }
@@ -2482,6 +2586,21 @@ setTimeout(showOnboarding, 700);
 
 window.HireScoreHelpAgent = {
 openDrawer, closeDrawer, quickAction, changeMode, enableActionAgent,
+setContext,
+candidateAction:function(candidateId, action){
+let candidate = state.lastParsedPlan?.candidate_preview?.find(item => String(item.id || item.resume_id || item.candidate_id) === String(candidateId));
+if(candidate) setContext({candidate_id:candidateId, candidate_name:candidate.full_name || candidate.name, candidate_ids:[candidateId]});
+if(action === "view"){
+let button = document.querySelector(`[data-profile-candidate-id="${CSS.escape(String(candidateId))}"]`);
+if(button) button.click();
+return;
+}
+if(action === "shortlist") return handleUserText("Shortlist this candidate");
+let selected = Array.isArray(state.conversationContext.compare_candidate_ids) ? state.conversationContext.compare_candidate_ids : [];
+selected = Array.from(new Set([...selected, candidateId])).slice(-2);
+setContext({compare_candidate_ids:selected, candidate_ids:selected});
+addMessage("agent", selected.length < 2 ? "<p>Select one more candidate to compare.</p>" : "<p>Two candidates selected. Ask what evidence you want compared.</p>");
+},
 keepGuideAgent:function(){ setSetting(SETTINGS_KEYS.mode, "guide"); setSetting(SETTINGS_KEYS.actionEnabled, "false"); closePermission(); renderModeInfo(); },
 startOnboardingTour:function(){ closeOnboarding(true); openPage("dashboard"); setTimeout(()=>startTour("dashboard_overview"), 450); },
 askAgentFromOnboarding:function(){ closeOnboarding(true); openDrawer(); },
@@ -2533,6 +2652,11 @@ state.conversationContext = Object.assign({}, state.conversationContext, {job_id
 state.pendingContextType = null;
 let selectedJobLabel = [job.job_title, job.company_name ? `at ${job.company_name}` : "", job.location ? `(${job.location})` : ""].filter(Boolean).join(" ");
 addMessage("user", esc(selectedJobLabel || "Selected job"));
+if(["view_active_jobs", "jobs_needing_attention", "applicant_metrics"].includes(state.lastParsedPlan?.intent)){
+openPage("results");
+addMessage("agent", `<strong>Opened ${esc(job.job_title || "the selected job")}.</strong><p>The center workspace now shows its live candidate results.</p>`);
+return;
+}
 if(state.pendingProductFeature){
 let feature = state.pendingProductFeature;
 state.pendingProductFeature = null;

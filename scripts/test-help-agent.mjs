@@ -6,9 +6,9 @@ const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 const app = readFileSync("app.js", "utf8");
 
-assert.match(html, /help-agent\.css\?v=guide-agent-20260714-27/, "help css should be loaded");
-assert.match(html, /help-agent\.js\?v=guide-agent-20260714-27/, "help js should be loaded");
-assert.match(html, /app\.js\?v=sourcing-approval-20260821-01/, "app js cache should match the current frontend bundle");
+assert.match(html, /help-agent\.css\?v=recruiting-agent-20260823-01/, "agent css should be loaded");
+assert.match(html, /help-agent\.js\?v=recruiting-agent-20260823-01/, "agent js should be loaded");
+assert.match(html, /app\.js\?v=recruiting-agent-20260823-01/, "app js cache should match the current frontend bundle");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
 assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
 
@@ -16,10 +16,10 @@ assert.match(help, /hs_help_onboarding_seen/, "onboarding persistence key should
 assert.match(help, /hs_help_agent_mode/, "mode persistence key should exist");
 assert.match(help, /hs_action_agent_enabled/, "action permission key should exist");
 assert.match(help, /Start Product Walkthrough/, "onboarding walkthrough option should exist");
-assert.match(help, /Ask Help Agent/, "onboarding ask option should exist");
+assert.match(help, /Ask Recruiting Agent/, "onboarding ask option should exist");
 assert.match(help, /Skip for now/, "onboarding skip option should exist");
 assert.match(help, /Guide Agent/, "guide mode should exist");
-assert.match(help, /Action Agent - Requires permission/, "locked action mode should exist");
+assert.match(help, /Confirmed recruiting actions/, "confirmed action mode should exist");
 assert.match(help, /Enable Action Agent\?/, "permission modal should exist");
 assert.match(help, /I will not perform sensitive actions|I will never perform sensitive actions/, "action safety copy should exist");
 assert.match(help, /\/api\/v1\/help\/parse-intent/, "frontend should call backend intent parser");
@@ -108,13 +108,18 @@ assert.match(app, /ownDomainDnsTableHtml\(records, status\)/, "imported DNS reco
 const pageIds = new Set([...html.matchAll(/id="([A-Za-z0-9]+)Page"/g)].map(match => match[1]));
 const workflowBlock = help.slice(help.indexOf("const WORKFLOWS"), help.indexOf("const QUICK_ACTIONS"));
 const workflowRoutes = [...workflowBlock.matchAll(/\bid:"([a-z_]+)"[\s\S]*?route:"([A-Za-z0-9]+)"/g)];
-assert.equal(workflowRoutes.length, 27, "every registered workflow should expose a route");
+assert.equal(workflowRoutes.length, 32, "every registered workflow should expose a route");
 for (const [, workflowId, route] of workflowRoutes) {
   assert.ok(pageIds.has(route), `${workflowId} should route to an existing ${route}Page container`);
 }
 
 for (const workflow of [
   "search_talent",
+  "filter_candidates",
+  "view_active_jobs",
+  "jobs_needing_attention",
+  "applicant_metrics",
+  "view_sourcing_status",
   "create_job",
   "edit_job",
   "share_public_apply_link",
@@ -179,14 +184,27 @@ assert.match(help, /showTourStep/, "visual tour runner should exist");
 
 assert.match(css, /\.hs-help-drawer/, "drawer styles should exist");
 assert.match(css, /\.hs-help-button/, "floating button styles should exist");
-assert.match(css, /#hsHelpRoot\.has-messages \.hs-help-quick/, "quick chips should hide after chat starts");
+assert.match(css, /#hsHelpRoot\.has-messages \.hs-help-quick/, "context quick actions should remain available after chat starts");
 assert.match(css, /height:100dvh/, "drawer should use dynamic viewport height");
-assert.match(css, /grid-template-rows:auto auto minmax\(0,1fr\) auto auto/, "composer should have a dedicated fixed drawer row");
+assert.match(css, /grid-template-rows:auto auto auto minmax\(0,1fr\) auto auto/, "composer should have a dedicated fixed drawer row");
 assert.match(css, /\.hs-help-drawer\{[\s\S]*?overflow:hidden/, "the drawer itself should never scroll the composer away");
 assert.match(css, /\.hs-help-messages\{[\s\S]*?overflow-y:auto/, "only the conversation should scroll independently");
 assert.match(help, /<\/div>\s*<form id="hsHelpForm" class="hs-help-form">/, "query form should remain outside the scrollable mode panel");
 assert.match(css, /\.hs-help-attach/, "JD upload control should be styled inside the composer");
 assert.match(css, /\.hs-tour-target/, "tour target highlight styles should exist");
 assert.match(css, /@media \(max-width: 720px\)/, "mobile drawer styles should exist");
+
+assert.match(help, /HireScore AI Agent/, "persistent panel should use product-native agent naming");
+assert.match(help, /function\s+contextQuickActions/, "quick actions should depend on screen context");
+assert.match(help, /function\s+setContext/, "frontend should expose structured context updates");
+assert.match(help, /current_screen/, "current screen should reach the backend context");
+assert.match(help, /job_preview/, "structured job results should render");
+assert.match(help, /View Candidate/, "candidate cards should expose navigation");
+assert.match(help, /Shortlist/, "candidate cards should expose shortlist action");
+assert.match(help, /Compare/, "candidate cards should expose compare selection");
+assert.match(app, /window\.refreshAfterAgentAction/, "completed actions should refresh persisted ATS state");
+assert.match(app, /window\.applyAgentCandidateFilter/, "candidate results should update the center workspace");
+assert.match(app, /shouldFilter\s*=\s*Array\.isArray/, "empty real filter results should hide every candidate row");
+assert.match(css, /body\.hs-agent-workspace-open > \.w-full > \.flex-1/, "desktop content should resize around the persistent panel");
 
 console.log("Help Agent smoke checks passed.");
