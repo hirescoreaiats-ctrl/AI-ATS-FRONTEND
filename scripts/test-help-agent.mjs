@@ -6,8 +6,8 @@ const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 const app = readFileSync("app.js", "utf8");
 
-assert.match(html, /help-agent\.css\?v=recruiting-agent-20260823-08/, "agent css should be loaded");
-assert.match(html, /help-agent\.js\?v=recruiting-agent-20260823-08/, "agent js should be loaded");
+assert.match(html, /help-agent\.css\?v=recruiting-agent-20260823-10/, "agent css should be loaded");
+assert.match(html, /help-agent\.js\?v=recruiting-agent-20260823-10/, "agent js should be loaded");
 assert.doesNotMatch(html, /AI Matching|Pipeline ready/, "legacy AI status block should be removed");
 assert.match(html, /app\.js\?v=recruiting-agent-20260823-01/, "app js cache should match the current frontend bundle");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
@@ -21,6 +21,7 @@ assert.match(help, /Ask Recruiting Agent/, "onboarding ask option should exist")
 assert.match(help, /Skip for now/, "onboarding skip option should exist");
 assert.match(help, /Guide Agent/, "guide mode should exist");
 assert.match(help, /Confirmed recruiting actions/, "confirmed action mode should exist");
+assert.match(help, /hs-agent-mode-details/, "mode guidance should stay available in a compact expandable control");
 assert.match(help, /Enable Action Agent\?/, "permission modal should exist");
 assert.match(help, /I will not perform sensitive actions|I will never perform sensitive actions/, "action safety copy should exist");
 assert.match(help, /\/api\/v1\/help\/parse-intent/, "frontend should call backend intent parser");
@@ -186,6 +187,7 @@ assert.match(help, /showTourStep/, "visual tour runner should exist");
 assert.match(css, /\.hs-help-drawer/, "drawer styles should exist");
 assert.match(css, /\.hs-help-button/, "floating button styles should exist");
 assert.match(css, /#hsHelpRoot\.has-messages \.hs-help-quick/, "context quick actions should remain available after chat starts");
+assert.match(css, /#hsHelpRoot\.has-messages \.hs-help-quick\{display:flex\}/, "quick actions should use a compact single-row scroller");
 assert.match(css, /height:min\(720px,calc\(100dvh - 90px\)\)/, "top overlay should stay within the dynamic viewport");
 assert.match(css, /grid-template-rows:auto auto auto minmax\(0,1fr\) auto auto/, "composer should have a dedicated fixed drawer row");
 assert.match(css, /\.hs-help-drawer\{[\s\S]*?overflow:hidden/, "the drawer itself should never scroll the composer away");
@@ -199,6 +201,9 @@ assert.match(help, /<strong>HireScoreAI Agent<\/strong><span>Live recruiting wor
 assert.match(help, /HireScoreAI Agent/, "sidebar card should keep a fixed HireScoreAI Agent name");
 assert.match(help, /hsHelpLauncherPrompt/, "sidebar card should contain a contextual dialogue box");
 assert.match(help, /Open AI Agent/, "sidebar card should expose a clear open-agent action");
+assert.match(help, /Refresh AI Agent panel/, "open panel should expose a panel-only refresh action");
+assert.match(help, /function\s+refreshPanel/, "panel refresh should reset only agent conversation state");
+assert.match(help, /The dashboard stayed unchanged/, "panel refresh should explain that the ATS workspace is preserved");
 assert.match(help, /document\.body\.appendChild\(root\)/, "agent panel root should stay at body level above dashboard stacking contexts");
 assert.match(help, /sidebarFooter\.insertBefore\(launcher, sidebarFooter\.firstChild\)/, "only the desktop launcher should mount inside the sidebar footer");
 assert.match(help, /function\s+contextQuickActions/, "quick actions should depend on screen context");

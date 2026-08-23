@@ -928,17 +928,21 @@ if(select) select.value = mode();
 if(!modeInfo) return;
 if(mode() === "action"){
 modeInfo.innerHTML = `
-<strong>Action Agent is active</strong>
-<p>I can perform supported tasks for you, but I will always ask for confirmation first.</p>
+<details class="hs-agent-mode-details">
+<summary><span aria-hidden="true"></span><strong>Action Agent active</strong><small>Details</small></summary>
+<div><p>I can perform supported tasks for you, but I will always ask for confirmation first.</p>
 <ul><li>Find top candidates</li><li>Shortlist selected candidates after preview</li><li>Move shortlisted candidates to Communication</li><li>Prepare interview scheduling when slot details are available</li></ul>
-<small>I will never perform sensitive actions without your confirmation.</small>
+<small>I will never perform sensitive actions without your confirmation.</small></div>
+</details>
 `;
 }else{
 modeInfo.innerHTML = `
-<strong>Guide Agent is active</strong>
-<p>I can guide you step by step, open the right page, and start visual walkthroughs.</p>
+<details class="hs-agent-mode-details">
+<summary><span aria-hidden="true"></span><strong>Guide Agent active</strong><small>Details</small></summary>
+<div><p>I can guide you step by step, open the right page, and start visual walkthroughs.</p>
 <ul><li>Explain how to use HireScore AI</li><li>Open the correct page</li><li>Start visual walkthroughs</li><li>Show step-by-step guidance</li><li>Help find jobs or candidates</li></ul>
-<small>Cannot upload resumes, send emails, schedule interviews, shortlist/reject candidates, send tests, or change plan/settings.</small>
+<small>Cannot upload resumes, send emails, schedule interviews, shortlist/reject candidates, send tests, or change plan/settings.</small></div>
+</details>
 `;
 }
 }
@@ -2447,6 +2451,39 @@ document.getElementById("hsHelpButton")?.classList.remove("is-hidden");
 setSetting(SETTINGS_KEYS.panelOpen, "false");
 }
 
+function refreshPanel(){
+let preservedContext = Object.assign({}, state.conversationContext || {});
+state.messages = [];
+state.lastIntent = null;
+state.pendingContextType = null;
+state.lastJobOptions = [];
+state.lastCandidateOptions = [];
+state.selectedJob = preservedContext.job_id || preservedContext.job_title ? Object.assign({}, state.selectedJob || {}, {id:preservedContext.job_id, job_title:preservedContext.job_title}) : null;
+state.selectedCandidate = preservedContext.candidate_id ? {id:preservedContext.candidate_id, full_name:preservedContext.candidate_name || "Candidate"} : null;
+state.lastTalentSearch = null;
+state.jobDraft = null;
+state.pendingProductFeature = null;
+state.pendingGroupEmailRequest = null;
+state.pendingEmailCandidates = [];
+state.pendingEmailSenderChoice = null;
+state.lastParsedPlan = null;
+state.lastUserText = "";
+state.conversationContext = preservedContext;
+state.jobsCache = null;
+state.clarificationAttempts = 0;
+state.lastClarificationText = "";
+document.getElementById("hsHelpInput")?.setAttribute("value", "");
+let input = document.getElementById("hsHelpInput");
+if(input) input.value = "";
+renderMessages();
+renderContextBar();
+renderModeInfo();
+applyRuntimeHelpIds();
+let context = currentHelpContext();
+let subject = context.candidate_name ? context.candidate_name : context.job_title ? context.job_title : "this workspace";
+addMessage("agent", `<strong>Agent panel refreshed</strong><p>I refreshed this conversation and the latest page context for ${esc(subject)}. The dashboard stayed unchanged.</p>`);
+}
+
 function showOnboarding(){
 ensureShell();
 document.getElementById("hsHelpOnboarding")?.classList.remove("hidden");
@@ -2531,14 +2568,17 @@ root.innerHTML = `
 <aside class="hs-help-drawer" aria-label="HireScore AI Recruiting Agent">
 <div class="hs-help-drawer-head">
 <div><strong>HireScoreAI Agent</strong><span>Live recruiting workspace</span></div>
-<button type="button" aria-label="Collapse Recruiting Agent" onclick="window.HireScoreHelpAgent.closeDrawer()">›</button>
+<div class="hs-help-drawer-actions">
+<button type="button" aria-label="Refresh AI Agent panel" title="Refresh AI Agent panel" onclick="window.HireScoreHelpAgent.refreshPanel()">↻</button>
+<button type="button" aria-label="Collapse Recruiting Agent" title="Close AI Agent panel" onclick="window.HireScoreHelpAgent.closeDrawer()">›</button>
+</div>
 </div>
 <div id="hsAgentContext" class="hs-agent-context"></div>
 <div id="hsHelpQuick" class="hs-help-quick">
 </div>
 <div id="hsHelpMessages" class="hs-help-messages"></div>
 <div class="hs-help-compose">
-<label class="hs-agent-mode"><span>Operating mode</span><select id="hsAgentMode" onchange="window.HireScoreHelpAgent.changeMode(this.value)"><option value="guide">Insights & navigation</option><option value="action">Confirmed recruiting actions</option></select></label>
+<label class="hs-agent-mode"><span>Agent mode</span><select id="hsAgentMode" onchange="window.HireScoreHelpAgent.changeMode(this.value)"><option value="guide">Insights & navigation</option><option value="action">Confirmed recruiting actions</option></select></label>
 <div id="hsHelpModeInfo" class="hs-help-mode-info"></div>
 </div>
 <form id="hsHelpForm" class="hs-help-form">
@@ -2644,7 +2684,7 @@ setTimeout(showOnboarding, 700);
 }
 
 window.HireScoreHelpAgent = {
-openDrawer, closeDrawer, quickAction, changeMode, enableActionAgent,
+openDrawer, closeDrawer, refreshPanel, quickAction, changeMode, enableActionAgent,
 setContext,
 candidateAction:function(candidateId, action){
 let candidate = state.lastParsedPlan?.candidate_preview?.find(item => String(item.id || item.resume_id || item.candidate_id) === String(candidateId));
