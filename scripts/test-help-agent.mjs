@@ -6,8 +6,8 @@ const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 const app = readFileSync("app.js", "utf8");
 
-assert.match(html, /help-agent\.css\?v=recruiting-agent-20260823-10/, "agent css should be loaded");
-assert.match(html, /help-agent\.js\?v=recruiting-agent-20260823-10/, "agent js should be loaded");
+assert.match(html, /help-agent\.css\?v=recruiting-agent-20260823-11/, "agent css should be loaded");
+assert.match(html, /help-agent\.js\?v=recruiting-agent-20260823-11/, "agent js should be loaded");
 assert.doesNotMatch(html, /AI Matching|Pipeline ready/, "legacy AI status block should be removed");
 assert.match(html, /app\.js\?v=recruiting-agent-20260823-01/, "app js cache should match the current frontend bundle");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
@@ -201,6 +201,7 @@ assert.match(help, /<strong>HireScoreAI Agent<\/strong><span>Live recruiting wor
 assert.match(help, /HireScoreAI Agent/, "sidebar card should keep a fixed HireScoreAI Agent name");
 assert.match(help, /hsHelpLauncherPrompt/, "sidebar card should contain a contextual dialogue box");
 assert.match(help, /Open AI Agent/, "sidebar card should expose a clear open-agent action");
+assert.match(css, /\.ats-sidebar-footer \.hs-help-launch-open\{[\s\S]*?background:linear-gradient\(135deg,rgba\(79,70,229,\.92\),rgba\(37,99,235,\.88\)\)/, "sidebar open-agent action should use the dashboard CTA treatment");
 assert.match(help, /Refresh AI Agent panel/, "open panel should expose a panel-only refresh action");
 assert.match(help, /function\s+refreshPanel/, "panel refresh should reset only agent conversation state");
 assert.match(help, /The dashboard stayed unchanged/, "panel refresh should explain that the ATS workspace is preserved");

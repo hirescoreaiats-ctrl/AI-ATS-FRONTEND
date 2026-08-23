@@ -77,8 +77,28 @@ box-shadow:0 8px 18px rgba(79,70,229,.2);
 }
 .ats-sidebar-footer .hs-help-agent-name{font-size:14px;font-weight:850;letter-spacing:-.01em;color:#f8fafc}
 .ats-sidebar-footer .hs-help-launch-dialog{padding:10px 11px;border-color:rgba(148,163,184,.14);background:rgba(15,23,42,.5);color:#cbd5e1;font-size:11px;font-weight:650;line-height:1.42;text-align:left}
-.ats-sidebar-footer .hs-help-launch-open{color:#dbeafe;font-size:12px;font-weight:850}
-.ats-sidebar-footer .hs-help-launch-open b{width:28px;height:28px;background:rgba(99,102,241,.18);border:1px solid rgba(129,140,248,.28);color:#e0e7ff}
+.ats-sidebar-footer .hs-help-launch-open{
+min-height:38px;
+padding:5px 6px 5px 12px;
+border:1px solid rgba(165,180,252,.24);
+border-radius:10px;
+background:linear-gradient(135deg,rgba(79,70,229,.92),rgba(37,99,235,.88));
+color:#fff;
+font-size:12px;
+font-weight:900;
+letter-spacing:.005em;
+box-shadow:0 9px 20px rgba(37,99,235,.18),inset 0 1px 0 rgba(255,255,255,.14);
+}
+.ats-sidebar-footer .hs-help-launch-open b{
+width:28px;
+height:28px;
+background:rgba(255,255,255,.16);
+border:1px solid rgba(255,255,255,.2);
+color:#fff;
+transition:transform .18s ease,background .18s ease;
+}
+.ats-sidebar-footer .hs-help-button:hover .hs-help-launch-open{background:linear-gradient(135deg,#4f46e5,#2563eb);border-color:rgba(199,210,254,.34)}
+.ats-sidebar-footer .hs-help-button:hover .hs-help-launch-open b{background:rgba(255,255,255,.24);transform:translateX(2px)}
 .ats-sidebar-footer .hs-help-button:hover{border-color:rgba(129,140,248,.34);background:linear-gradient(145deg,rgba(30,41,59,.9),rgba(15,23,42,.82));box-shadow:0 14px 28px rgba(2,6,23,.2),inset 0 1px 0 rgba(255,255,255,.05);transform:translateY(-1px)}
 .ats-sidebar-footer .hs-help-button.is-hidden{display:none;visibility:hidden;transform:none}
 
