@@ -482,8 +482,12 @@ let wantsTenCandidatePage = wantsOpenFeature && numberedCandidateRequest && incl
 let wantsAiAnalytics = includesAny(text, ["ai analytics", "ai insight", "ai insights", "hiring insight", "hiring insights", "candidate analytics", "pool analytics"]);
 let wantsShortlistExplanation = includesAny(text, ["shortlist explanation", "shortlisted explanation", "ai shortlist explanation", "shortlist ai explanation"]);
 let wantsShortlistAnalytics = includesAny(text, ["shortlist analytics", "shortlisted analytics", "shortlist insight", "shortlisted insight"]);
+let wantsCandidateFitExplanation = includesAny(text, ["fit for", "fit this", "fit that", "fit role", "role fit", "good fit", "strong fit", "weak fit", "suitable", "suitability", "why this candidate", "why that candidate", "how this candidate", "how that candidate", "why is he", "why is she"])
+&& includesAny(text, ["candidate", "profile", "guy", "person", "he ", "she ", " him", " her", "this", "that", "fit", "suitable"]);
 
-if(wantsShortlistExplanation){
+if(wantsCandidateFitExplanation){
+intent = "explain_candidate_score"; confidence = 0.97;
+}else if(wantsShortlistExplanation){
 intent = "view_shortlist_ai_explanation"; confidence = 0.95;
 }else if(wantsShortlistAnalytics){
 intent = "view_shortlist_analytics"; confidence = 0.95;
@@ -1139,7 +1143,9 @@ if(!text) return false;
 let wantsSend = /\b(?:send|bhej|bhejna|mail|email|outreach)\b/.test(text);
 let emailWord = /\b(?:mail|email|message|outreach)\b/.test(text);
 let candidateGroup = /\b(?:candidate|candidates|shortlisted|shortlist|top|best|all|every|\d{1,3}|ten)\b/.test(text);
-if(!wantsSend || !emailWord || !candidateGroup) return false;
+let contextualCandidate = Boolean(state.selectedCandidate?.id || (state.conversationContext?.candidate_ids || []).length === 1)
+&& /\b(?:this|that|him|her|guy|person|candidate|profile)\b/.test(text);
+if(!wantsSend || !emailWord || (!candidateGroup && !contextualCandidate)) return false;
 if(includesAny(text, ["reply sync", "sender setup", "connect gmail", "email dashboard", "mail dashboard"])) return false;
 return true;
 }
@@ -1159,7 +1165,14 @@ function groupEmailPlanFromText(raw){
 let text = normalizeText(raw || "");
 let limit = extractLimit(raw);
 let group = "top_candidates";
-if(/\b(?:all|every|saare|sare|sabhi|sabi)\b/.test(text)){
+let focusedIds = state.selectedCandidate?.id
+? [state.selectedCandidate.id]
+: (Array.isArray(state.conversationContext?.candidate_ids) && state.conversationContext.candidate_ids.length === 1 ? state.conversationContext.candidate_ids.slice(0, 1) : []);
+let contextualCandidate = focusedIds.length === 1 && /\b(?:this|that|him|her|guy|person|candidate|profile)\b/.test(text);
+if(contextualCandidate){
+group = "selected";
+limit = 1;
+}else if(/\b(?:all|every|saare|sare|sabhi|sabi)\b/.test(text)){
 group = "all";
 limit = null;
 }else if(/\bshortlist(?:ed)?\b/.test(text)){
@@ -1173,6 +1186,7 @@ intent:"send_candidate_email",
 entities:{
 job_title: extractJobTitle(raw),
 candidate_group: group,
+candidate_ids: contextualCandidate ? focusedIds : null,
 limit,
 target_stage:"communication"
 },
@@ -1185,6 +1199,7 @@ clarification_needed:false
 function groupEmailLabel(plan){
 let group = plan?.entities?.candidate_group;
 let limit = plan?.entities?.limit;
+if(group === "selected") return "the selected candidate";
 if(group === "all") return "all candidates";
 if(group === "shortlisted") return limit ? `top ${limit} shortlisted candidates` : "shortlisted candidates";
 return `top ${limit || 10} candidates`;
@@ -1223,6 +1238,11 @@ rows = window.currentResultsSnapshot;
 }
 let group = plan?.entities?.candidate_group;
 let limit = Number(plan?.entities?.limit || 10);
+let explicitIds = Array.isArray(plan?.entities?.candidate_ids) ? plan.entities.candidate_ids.map(String) : [];
+if(explicitIds.length){
+rows = rows.filter(row => explicitIds.includes(String(row.id || row.candidate_id || row.resume_id || "")));
+limit = explicitIds.length;
+}
 if(group === "shortlisted"){
 rows = rows.filter(row => normalizeText(row.status || row.stage || "").includes("shortlist"));
 }
@@ -1539,6 +1559,58 @@ actionButton("View Jobs","openPage",{page:"dashboard"})
 return true;
 }
 
+function topCandidateExplanationHtml(candidateName, jobTitle, recommendation){
+let summary = clean(recommendation?.summary || recommendation?.detailed_assessment || recommendation?.explanation || "");
+let verdict = clean(recommendation?.verdict || recommendation?.fit_band || "AI explanation");
+let strengths = Array.isArray(recommendation?.strengths) ? recommendation.strengths.filter(Boolean).slice(0, 6) : [];
+let gaps = Array.isArray(recommendation?.gaps) ? recommendation.gaps.filter(Boolean).slice(0, 6) : [];
+let projects = Array.isArray(recommendation?.project_evidence) ? recommendation.project_evidence.filter(Boolean).slice(0, 4) : (Array.isArray(recommendation?.projects) ? recommendation.projects.filter(Boolean).slice(0, 4) : []);
+let list = (label, rows, cssClass="") => rows.length ? `<div class="hs-agent-fit-section ${cssClass}"><strong>${esc(label)}</strong><ul>${rows.map(item => `<li>${esc(typeof item === "string" ? item : (item.description || item.title || JSON.stringify(item)))}</li>`).join("")}</ul></div>` : "";
+return `<strong>AI fit explanation for ${esc(candidateName || "the selected candidate")}</strong>
+<p><strong>Job:</strong> ${esc(jobTitle || "Selected job")} · <strong>Verdict:</strong> ${esc(verdict)}</p>
+${summary ? `<p>${esc(summary)}</p>` : ""}
+${list("Why the candidate fits", strengths)}
+${list("Gaps / points to verify", gaps, "is-gap")}
+${list("Relevant project evidence", projects)}
+<p><small>This is the same JD-based explanation used by the Top Candidate AI Explanation flow.</small></p>`;
+}
+
+async function handleCandidateFitExplanation(raw){
+let local = resolveIntent(raw);
+if(local?.intent !== "explain_candidate_score") return false;
+let job = selectedJobIdentity();
+let candidateIds = state.selectedCandidate?.id ? [state.selectedCandidate.id] : (state.conversationContext?.candidate_ids || []);
+let candidateId = candidateIds.length === 1 ? candidateIds[0] : null;
+if(!job || !candidateId) return false;
+let candidateName = state.selectedCandidate?.full_name || state.conversationContext?.candidate_name || "the selected candidate";
+let loadingMessage = {role:"agent", html:"<em>Loading the Top Candidate AI explanation...</em>", actions:[]};
+state.messages.push(loadingMessage);
+renderMessages();
+try{
+let recommendation;
+try{
+recommendation = await fetchJson(`${apiBase()}/top-candidate-recommendation/${encodeURIComponent(job.id)}/${encodeURIComponent(candidateId)}`, {headers:requestHeaders()});
+}catch(error){
+recommendation = await fetchJson(`${apiBase()}/ai-explanation/${encodeURIComponent(candidateId)}`, {headers:requestHeaders()});
+}
+removeMessage(loadingMessage);
+state.lastIntent = "explain_candidate_score";
+state.lastParsedPlan = {intent:"explain_candidate_score", entities:{job_id:job.id, job_title:job.title, candidate_id:candidateId, candidate_ids:[candidateId]}, candidate_preview:[], clarification_needed:false};
+addMessage("agent", topCandidateExplanationHtml(candidateName, job.title, recommendation), [
+actionButton("Open Full AI Explanation","candidateExplanation",{candidateId}),
+actionButton("View Candidate","candidateAction",{candidateId, candidateAction:"view"})
+]);
+return true;
+}catch(error){
+removeMessage(loadingMessage);
+addMessage("agent", `<strong>I could not load the AI explanation.</strong><p>${esc(error.message || "Please try again.")}</p>`, [
+actionButton("Open Full AI Explanation","candidateExplanation",{candidateId}),
+actionButton("View Candidate","candidateAction",{candidateId, candidateAction:"view"})
+]);
+return true;
+}
+}
+
 async function handleProductFeatureQuery(raw){
 let feature = matchProductFeature(raw);
 if(!feature) return false;
@@ -1632,6 +1704,11 @@ state.lastJobOptions = intentResult.job_preview;
 if(Array.isArray(intentResult.candidate_preview) && (intentResult.candidate_preview.length || intentResult.intent === "filter_candidates")){
 let candidateIds = intentResult.candidate_preview.map(item => item.id || item.resume_id || item.candidate_id).filter(Boolean);
 state.conversationContext = Object.assign({}, state.conversationContext, {candidate_ids:candidateIds, active_filters:intentResult.entities?.filters || {}});
+if(candidateIds.length === 1){
+let focusedCandidate = intentResult.candidate_preview[0];
+state.selectedCandidate = {id:candidateIds[0], full_name:focusedCandidate.full_name || focusedCandidate.name || focusedCandidate.candidate_name || "Candidate"};
+state.conversationContext = Object.assign({}, state.conversationContext, {candidate_id:candidateIds[0], candidate_name:state.selectedCandidate.full_name});
+}
 if(intentResult.intent === "filter_candidates" && typeof window.applyAgentCandidateFilter === "function"){
 window.applyAgentCandidateFilter(candidateIds);
 }
@@ -1818,6 +1895,7 @@ if(await handleTalentSearchFollowUp(value)) return;
 if(handleDnsSetupFromChat(value)) return;
 if(await handleEmailSendConfirmation(value)) return;
 if(handleEmailSenderChoiceFollowUp(value)) return;
+if(await handleCandidateFitExplanation(value)) return;
 if(await handleGroupCandidateEmailRequest(value)) return;
 if(await handleProductFeatureQuery(value)) return;
 let localFeatureIntent = resolveIntent(value);
@@ -2712,6 +2790,8 @@ if(item.action === "planTour") startPlanTour();
 if(item.action === "actionAgent") executeActionAgent();
 if(item.action === "readGuide") readGuide(item.data.workflowId);
 if(item.action === "senderChoice") openSenderChoice(item.data.choice);
+if(item.action === "candidateExplanation" && typeof window.openAIExplanation === "function") window.openAIExplanation(item.data.candidateId);
+if(item.action === "candidateAction") window.HireScoreHelpAgent.candidateAction(item.data.candidateId, item.data.candidateAction || "view");
 if(item.action === "talentPage") handleTalentSearchFollowUp("show me on page");
 if(item.action === "talentWorkflow") handleTalentSearchFollowUp("i need workflow");
 if(item.action === "openApplyLink"){
