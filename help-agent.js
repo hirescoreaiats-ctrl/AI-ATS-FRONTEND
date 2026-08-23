@@ -6,7 +6,7 @@ onboardingSeen: "hs_help_onboarding_seen",
 mode: "hs_help_agent_mode",
 actionEnabled: "hs_action_agent_enabled",
 confirmationRequired: "hs_action_confirmation_required",
-panelOpen: "hs_recruiting_agent_panel_open"
+panelOpen: "hs_recruiting_agent_top_panel_open_v2"
 };
 
 const SENSITIVE_INTENTS = new Set([
@@ -2388,7 +2388,6 @@ showTourStep();
 function openDrawer(){
 ensureShell();
 document.getElementById("hsHelpRoot")?.classList.add("is-open");
-document.body.classList.add("hs-agent-workspace-open");
 setSetting(SETTINGS_KEYS.panelOpen, "true");
 if(!state.messages.length){
 addMessage("agent", `<strong>HireScore Recruiting Agent</strong><p>I can retrieve live jobs and candidates, explain stored scoring evidence, and execute confirmed recruiting actions.</p>`);
@@ -2399,7 +2398,6 @@ renderModeInfo();
 
 function closeDrawer(){
 document.getElementById("hsHelpRoot")?.classList.remove("is-open");
-document.body.classList.remove("hs-agent-workspace-open");
 setSetting(SETTINGS_KEYS.panelOpen, "false");
 }
 
@@ -2470,7 +2468,7 @@ let root = document.createElement("div");
 root.id = "hsHelpRoot";
 root.innerHTML = `
 <button id="hsHelpButton" class="hs-help-button" type="button" data-help-id="help-agent-button" onclick="window.HireScoreHelpAgent.openDrawer()">
-<span>AI</span><strong>Recruiting Agent</strong>
+<span>AI</span><span class="hs-help-launch-copy"><strong>Ask HireScore AI</strong><small>Search jobs, review candidates, or run a recruiting action</small></span><b aria-hidden="true">↑</b>
 </button>
 <aside class="hs-help-drawer" aria-label="HireScore AI Recruiting Agent">
 <div class="hs-help-drawer-head">
@@ -2577,7 +2575,7 @@ if(localStorage.getItem(SETTINGS_KEYS.actionEnabled) == null) setSetting(SETTING
 if(localStorage.getItem(SETTINGS_KEYS.confirmationRequired) == null) setSetting(SETTINGS_KEYS.confirmationRequired, "true");
 ensureShell();
 applyRuntimeHelpIds();
-let shouldOpen = getSetting(SETTINGS_KEYS.panelOpen, window.innerWidth >= 1180 ? "true" : "false") === "true";
+let shouldOpen = getSetting(SETTINGS_KEYS.panelOpen, "false") === "true";
 if(shouldOpen) openDrawer();
 if(getSetting(SETTINGS_KEYS.onboardingSeen, "false") !== "true"){
 setTimeout(showOnboarding, 700);

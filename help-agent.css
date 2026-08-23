@@ -6,25 +6,31 @@ font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-ser
 
 .hs-help-button{
 position:fixed;
-right:0;
-top:46%;
+right:auto;
+left:50%;
+top:16px;
 z-index:82;
 display:inline-flex;
 align-items:center;
-gap:9px;
-height:54px;
-padding:0 12px 0 8px;
+gap:12px;
+width:min(680px,calc(100vw - 420px));
+min-width:420px;
+height:66px;
+padding:0 12px 0 16px;
 border:0;
-border-radius:14px 0 0 14px;
-background:#0f172a;
+border:1px solid rgba(255,255,255,.1);
+border-radius:20px;
+background:linear-gradient(135deg,#20242d,#111827);
 color:#fff;
-box-shadow:0 18px 38px rgba(15,23,42,.26);
+box-shadow:0 18px 46px rgba(15,23,42,.28);
 font-size:13px;
 font-weight:900;
 cursor:pointer;
+transform:translateX(-50%);
+text-align:left;
 }
 
-#hsHelpRoot.is-open .hs-help-button{opacity:0;pointer-events:none;transform:translateX(100%)}
+#hsHelpRoot.is-open .hs-help-button{opacity:0;pointer-events:none;transform:translate(-50%,-130%)}
 
 .hs-help-button span{
 width:28px;
@@ -37,27 +43,38 @@ background:linear-gradient(135deg,#4f46e5,#14b8a6);
 font-size:16px;
 }
 
+.hs-help-button .hs-help-launch-copy{
+width:auto;
+height:auto;
+min-width:0;
+display:grid;
+flex:1;
+gap:3px;
+border-radius:0;
+background:transparent;
+}
+
+.hs-help-launch-copy strong{font-size:15px;font-weight:900;color:#fff}
+.hs-help-launch-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:650;color:#aeb8ca}
+.hs-help-button b{width:38px;height:38px;display:grid;place-items:center;flex:0 0 auto;border-radius:50%;background:#f8fafc;color:#111827;font-size:20px;font-weight:950}
+
 .hs-help-drawer{
 position:fixed;
-top:0;
-right:0;
+top:72px;
+right:18px;
 z-index:84;
-width:min(400px,calc(100vw - 18px));
-height:100dvh;
-max-height:100dvh;
+width:min(420px,calc(100vw - 36px));
+height:min(720px,calc(100dvh - 90px));
+max-height:calc(100dvh - 90px);
 display:grid;
 grid-template-rows:auto auto auto minmax(0,1fr) auto auto;
 overflow:hidden;
 background:#f8fafc;
-border-left:1px solid #dbe4ef;
-box-shadow:-22px 0 60px rgba(15,23,42,.18);
+border:1px solid #dbe4ef;
+border-radius:16px;
+box-shadow:0 24px 64px rgba(15,23,42,.28);
 transform:translateX(105%);
 transition:transform .22s ease;
-}
-
-body > .w-full > .flex-1{transition:margin-right .22s ease}
-@media (min-width:1180px){
-body.hs-agent-workspace-open > .w-full > .flex-1{margin-right:400px}
 }
 
 #hsHelpRoot.is-open .hs-help-drawer{
@@ -72,6 +89,7 @@ gap:14px;
 padding:18px 18px 14px;
 background:linear-gradient(135deg,#0f172a,#1e293b);
 color:#fff;
+border-radius:15px 15px 0 0;
 }
 
 .hs-help-drawer-head strong{
@@ -496,25 +514,35 @@ color:#0f172a;
 
 @media (max-width: 720px){
 .hs-help-button{
-right:14px;
-bottom:14px;
-top:auto;
-height:42px;
-border-radius:999px;
+right:12px;
+left:12px;
+top:12px;
+bottom:auto;
+width:auto;
+min-width:0;
+height:54px;
+padding-left:10px;
+border-radius:16px;
+transform:none;
 }
 
+#hsHelpRoot.is-open .hs-help-button{transform:translateY(-130%)}
+.hs-help-button .hs-help-launch-copy small{display:none}
+.hs-help-button b{width:34px;height:34px}
+
 .hs-help-drawer{
-top:auto;
-bottom:0;
-width:100vw;
-height:min(92dvh,720px);
-border-left:0;
-border-radius:16px 16px 0 0;
-transform:translateY(105%);
+top:62px;
+right:8px;
+bottom:auto;
+width:calc(100vw - 16px);
+height:calc(100dvh - 70px);
+max-height:calc(100dvh - 70px);
+border-radius:16px;
+transform:translateX(105%);
 }
 
 #hsHelpRoot.is-open .hs-help-drawer{
-transform:translateY(0);
+transform:translateX(0);
 }
 
 .hs-help-compose{

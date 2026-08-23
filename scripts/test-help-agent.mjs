@@ -6,8 +6,8 @@ const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 const app = readFileSync("app.js", "utf8");
 
-assert.match(html, /help-agent\.css\?v=recruiting-agent-20260823-01/, "agent css should be loaded");
-assert.match(html, /help-agent\.js\?v=recruiting-agent-20260823-01/, "agent js should be loaded");
+assert.match(html, /help-agent\.css\?v=recruiting-agent-20260823-03/, "agent css should be loaded");
+assert.match(html, /help-agent\.js\?v=recruiting-agent-20260823-03/, "agent js should be loaded");
 assert.match(html, /app\.js\?v=recruiting-agent-20260823-01/, "app js cache should match the current frontend bundle");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
 assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
@@ -185,7 +185,7 @@ assert.match(help, /showTourStep/, "visual tour runner should exist");
 assert.match(css, /\.hs-help-drawer/, "drawer styles should exist");
 assert.match(css, /\.hs-help-button/, "floating button styles should exist");
 assert.match(css, /#hsHelpRoot\.has-messages \.hs-help-quick/, "context quick actions should remain available after chat starts");
-assert.match(css, /height:100dvh/, "drawer should use dynamic viewport height");
+assert.match(css, /height:min\(720px,calc\(100dvh - 90px\)\)/, "top overlay should stay within the dynamic viewport");
 assert.match(css, /grid-template-rows:auto auto auto minmax\(0,1fr\) auto auto/, "composer should have a dedicated fixed drawer row");
 assert.match(css, /\.hs-help-drawer\{[\s\S]*?overflow:hidden/, "the drawer itself should never scroll the composer away");
 assert.match(css, /\.hs-help-messages\{[\s\S]*?overflow-y:auto/, "only the conversation should scroll independently");
@@ -195,6 +195,7 @@ assert.match(css, /\.hs-tour-target/, "tour target highlight styles should exist
 assert.match(css, /@media \(max-width: 720px\)/, "mobile drawer styles should exist");
 
 assert.match(help, /HireScore AI Agent/, "persistent panel should use product-native agent naming");
+assert.match(help, /Ask HireScore AI/, "collapsed state should use a conversational prompt bar");
 assert.match(help, /function\s+contextQuickActions/, "quick actions should depend on screen context");
 assert.match(help, /function\s+setContext/, "frontend should expose structured context updates");
 assert.match(help, /current_screen/, "current screen should reach the backend context");
@@ -205,6 +206,8 @@ assert.match(help, /Compare/, "candidate cards should expose compare selection")
 assert.match(app, /window\.refreshAfterAgentAction/, "completed actions should refresh persisted ATS state");
 assert.match(app, /window\.applyAgentCandidateFilter/, "candidate results should update the center workspace");
 assert.match(app, /shouldFilter\s*=\s*Array\.isArray/, "empty real filter results should hide every candidate row");
-assert.match(css, /body\.hs-agent-workspace-open > \.w-full > \.flex-1/, "desktop content should resize around the persistent panel");
+assert.match(css, /\.hs-help-drawer\{[\s\S]*?top:72px;[\s\S]*?right:18px;/, "agent should open as a top-right overlay without resizing ATS content");
+assert.match(css, /\.hs-help-button\{[\s\S]*?width:min\(680px,calc\(100vw - 420px\)\)/, "initial agent state should be a wide top prompt bar");
+assert.doesNotMatch(css, /hs-agent-workspace-open/, "agent must not squeeze or shift the existing ATS layout");
 
 console.log("Help Agent smoke checks passed.");
