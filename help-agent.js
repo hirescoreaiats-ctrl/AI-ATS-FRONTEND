@@ -494,8 +494,8 @@ let wantsTenCandidatePage = wantsOpenFeature && numberedCandidateRequest && incl
 let wantsAiAnalytics = includesAny(text, ["ai analytics", "ai insight", "ai insights", "hiring insight", "hiring insights", "candidate analytics", "pool analytics"]);
 let wantsShortlistExplanation = includesAny(text, ["shortlist explanation", "shortlisted explanation", "ai shortlist explanation", "shortlist ai explanation"]);
 let wantsShortlistAnalytics = includesAny(text, ["shortlist analytics", "shortlisted analytics", "shortlist insight", "shortlisted insight"]);
-let wantsCandidateFitExplanation = includesAny(text, ["fit for", "fit this", "fit that", "fit role", "role fit", "good fit", "strong fit", "weak fit", "suitable", "suitability", "why this candidate", "why that candidate", "how this candidate", "how that candidate", "why is he", "why is she", "why this is the best candidate", "why is this the best candidate", "why that is the best candidate", "why is he the best", "why is she the best", "why best candidate", "kyu best", "kyun best"])
-&& includesAny(text, ["candidate", "profile", "guy", "person", "he ", "she ", " him", " her", "this", "that", "fit", "suitable"]);
+let wantsCandidateFitExplanation = includesAny(text, ["fit for", "fit this", "fit that", "fit role", "role fit", "good fit", "strong fit", "weak fit", "suitable", "suitability", "why this candidate", "why that candidate", "how this candidate", "how that candidate", "why is he", "why is she", "why this is the best candidate", "why is this the best candidate", "why that is the best candidate", "why is he the best", "why is she the best", "why best candidate", "why consider", "why should i consider", "why need to consider", "why i need to consider", "why do i need to consider", "why select", "why choose", "kyu best", "kyun best", "kyu select", "kyun select", "inha kyu", "inhe kyu", "inko kyu"])
+&& includesAny(text, ["candidate", "candidates", "profile", "guy", "person", "he ", "she ", " him", " her", "this", "that", "these", "three", "them", "inha", "inhe", "inko", "fit", "suitable", "consider", "select", "choose"]);
 
 if(wantsCandidateFitExplanation){
 intent = "explain_candidate_score"; confidence = 0.97;
@@ -1590,6 +1590,70 @@ ${list("Relevant project evidence", projects)}
 <p><small>This is the same JD-based explanation used by the Top Candidate AI Explanation flow.</small></p>`;
 }
 
+function isGroupCandidateFitRequest(raw, candidateIds){
+if(!Array.isArray(candidateIds) || candidateIds.length < 2) return false;
+let text = normalizeText(raw || "");
+let asksWhy = includesAny(text, ["why", "reason", "kyu", "kyun", "q select", "consider", "fit", "suitable"]);
+let refersToGroup = includesAny(text, ["these", "those", "them", "three", "candidates", "all", "inha", "inhe", "inko", "unha", "unhe"]);
+let decisionQuestion = includesAny(text, ["consider", "select", "choose", "shortlist", "fit", "suitable", "why"]);
+return asksWhy && refersToGroup && decisionQuestion;
+}
+
+function groupCandidateExplanationHtml(jobTitle, rows){
+let cards = rows.map((row, index) => {
+let recommendation = row.recommendation || {};
+let candidate = row.candidate || {};
+let name = candidate.full_name || candidate.name || candidate.candidate_name || `Candidate ${index + 1}`;
+let score = candidate.rank_score ?? candidate.final_score ?? candidate.score ?? "N/A";
+let verdict = clean(recommendation.verdict || recommendation.fit_band || candidate.fit_band || "Review").replaceAll("_", " ");
+let summary = clean(recommendation.summary || recommendation.detailed_assessment || recommendation.explanation || candidate.recruiter_explanation || candidate.ranking_reason || "Open the full explanation to review JD evidence.");
+let strengths = Array.isArray(recommendation.strengths) ? recommendation.strengths.filter(Boolean).slice(0, 4) : (Array.isArray(candidate.strengths) ? candidate.strengths.filter(Boolean).slice(0, 4) : []);
+let gaps = Array.isArray(recommendation.gaps) ? recommendation.gaps.filter(Boolean).slice(0, 4) : (Array.isArray(candidate.concerns) ? candidate.concerns.filter(Boolean).slice(0, 4) : []);
+let list = (label, values, cssClass="") => values.length ? `<div class="hs-agent-fit-section ${cssClass}"><strong>${esc(label)}</strong><ul>${values.map(value => `<li>${esc(typeof value === "string" ? value : (value.description || value.title || JSON.stringify(value)))}</li>`).join("")}</ul></div>` : "";
+return `<article class="hs-agent-candidate-card hs-agent-comparison-card"><strong>#${index + 1} ${candidateProfileButton(candidate, name)}</strong><small>Score ${esc(score)} · ${esc(verdict)}</small><p>${esc(summary)}</p>${list("Why consider", strengths)}${list("Verify before selection", gaps, "is-gap")}</article>`;
+}).join("");
+return `<strong>Why these ${rows.length} candidates are worth considering</strong><p><strong>Job:</strong> ${esc(jobTitle || "Selected job")}</p><p>I compared each candidate with the same JD-based AI Explanation used on the Top Candidate page. They should not be selected blindly—the strengths explain why they reached the top, while the verification points show the trade-offs.</p><div class="hs-help-agent-preview hs-agent-group-explanation">${cards}</div><p><small>Final shortlist decision should include recruiter validation of the highlighted gaps and role constraints.</small></p>`;
+}
+
+async function handleGroupCandidateFitExplanation(raw){
+let candidateIds = state.selectedCandidate?.id ? [state.selectedCandidate.id] : (state.conversationContext?.candidate_ids || []);
+if(!isGroupCandidateFitRequest(raw, candidateIds)) return false;
+let job = selectedJobIdentity();
+if(!job) return false;
+let previews = Array.isArray(state.lastParsedPlan?.candidate_preview) ? state.lastParsedPlan.candidate_preview : state.lastCandidateOptions;
+let selected = candidateIds.slice(0, 10).map(candidateId => {
+let candidate = (previews || []).find(item => String(item.id || item.resume_id || item.candidate_id) === String(candidateId)) || {id:candidateId};
+return {candidateId, candidate};
+});
+let loadingMessage = {role:"agent", html:`<em>Comparing ${selected.length} candidates with the job description and loading their AI explanations...</em>`, actions:[]};
+state.messages.push(loadingMessage);
+renderMessages();
+try{
+let settled = await Promise.allSettled(selected.map(async item => {
+let recommendation;
+try{
+recommendation = await fetchJson(`${apiBase()}/top-candidate-recommendation/${encodeURIComponent(job.id)}/${encodeURIComponent(item.candidateId)}`, {headers:requestHeaders()});
+}catch(error){
+recommendation = await fetchJson(`${apiBase()}/ai-explanation/${encodeURIComponent(item.candidateId)}`, {headers:requestHeaders()});
+}
+return {...item, recommendation};
+}));
+let rows = settled.map((result, index) => result.status === "fulfilled" ? result.value : {...selected[index], recommendation:{}});
+removeMessage(loadingMessage);
+state.lastIntent = "explain_candidate_score";
+addMessage("agent", groupCandidateExplanationHtml(job.title, rows), [
+actionButton("Open Top Candidates Page","openPage",{page:"topCandidate"}),
+actionButton("Compare Candidates","workflow",{workflowId:"filter_candidates"}),
+actionButton("Shortlist After Review","workflow",{workflowId:"candidate_workflow"})
+]);
+return true;
+}catch(error){
+removeMessage(loadingMessage);
+addMessage("agent", `<strong>I could not load the group AI explanation.</strong><p>${esc(error.message || "Please try again.")}</p>`, [actionButton("Open Top Candidates Page","openPage",{page:"topCandidate"})]);
+return true;
+}
+}
+
 async function handleCandidateFitExplanation(raw){
 let local = resolveIntent(raw);
 if(local?.intent !== "explain_candidate_score") return false;
@@ -1768,6 +1832,7 @@ if(Array.isArray(intentResult.job_preview) && intentResult.job_preview.length){
 state.lastJobOptions = intentResult.job_preview;
 }
 if(Array.isArray(intentResult.candidate_preview) && (intentResult.candidate_preview.length || intentResult.intent === "filter_candidates")){
+state.lastCandidateOptions = intentResult.candidate_preview.slice(0, 10);
 let candidateIds = intentResult.candidate_preview.map(item => item.id || item.resume_id || item.candidate_id).filter(Boolean);
 state.conversationContext = Object.assign({}, state.conversationContext, {candidate_ids:candidateIds, active_filters:intentResult.entities?.filters || {}});
 if(candidateIds.length === 1){
@@ -2136,6 +2201,7 @@ if(await handleTalentSearchFollowUp(value)) return;
 if(handleDnsSetupFromChat(value)) return;
 if(await handleEmailSendConfirmation(value)) return;
 if(handleEmailSenderChoiceFollowUp(value)) return;
+if(await handleGroupCandidateFitExplanation(value)) return;
 if(await handleCandidateFitExplanation(value)) return;
 if(await handleCandidateStatusRequest(value)) return;
 if(await handleGroupCandidateEmailRequest(value)) return;

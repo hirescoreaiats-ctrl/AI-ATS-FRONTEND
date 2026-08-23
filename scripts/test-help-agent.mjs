@@ -7,7 +7,7 @@ const css = readFileSync("help-agent.css", "utf8");
 const app = readFileSync("app.js", "utf8");
 
 assert.match(html, /help-agent\.css\?v=recruiting-agent-20260823-15/, "agent css should be loaded");
-assert.match(html, /help-agent\.js\?v=recruiting-agent-20260823-18/, "agent js should be loaded");
+assert.match(html, /help-agent\.js\?v=recruiting-agent-20260823-19/, "agent js should be loaded");
 assert.doesNotMatch(html, /AI Matching|Pipeline ready/, "legacy AI status block should be removed");
 assert.match(html, /app\.js\?v=recruiting-agent-20260823-01/, "app js cache should match the current frontend bundle");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
@@ -45,6 +45,10 @@ assert.match(help, /function\s+conversationHistory/, "recent conversation memory
 assert.match(help, /function\s+handleCandidateFitExplanation/, "candidate fit follow-ups should use the dedicated Top Candidate explanation flow");
 assert.match(help, /\/top-candidate-recommendation\//, "candidate fit follow-ups should call the existing JD-based Top Candidate recommendation endpoint");
 assert.match(help, /same JD-based explanation used by the Top Candidate AI Explanation flow/, "chat should identify the reused Top Candidate explanation evidence");
+assert.match(help, /function\s+handleGroupCandidateFitExplanation/, "group why-select follow-ups should use each candidate's Top Candidate AI Explanation");
+assert.match(help, /Promise\.allSettled\(selected\.map/, "group explanations should load every selected candidate without failing the whole comparison");
+assert.match(help, /Why these \$\{rows\.length\} candidates are worth considering/, "group explanation should provide a comparative recruiter response");
+assert.match(help, /Verify before selection/, "group explanation should show candidate-specific risks alongside strengths");
 assert.match(help, /function\s+handleCandidateStatusRequest/, "candidate status follow-ups should use the live workflow status endpoint");
 assert.match(help, /\/candidate-workflow\//, "candidate status should retrieve pipeline, email, and response state");
 assert.match(help, /Pipeline stage:[\s\S]*Email status:[\s\S]*Candidate response:/, "candidate status should explain pipeline and outreach state together");
@@ -149,6 +153,10 @@ const contextualFit = runtimeWindow.HireScoreHelpAgent.resolveIntent("i want you
 assert.equal(contextualFit.intent, "explain_candidate_score", "candidate fit follow-ups should use the stored score explanation workflow");
 const contextualBest = runtimeWindow.HireScoreHelpAgent.resolveIntent("can you tell why this is the best candaite");
 assert.equal(contextualBest.intent, "explain_candidate_score", "why-best follow-ups should use the Top Candidate AI explanation workflow");
+const contextualGroup = runtimeWindow.HireScoreHelpAgent.resolveIntent("can tell me why i need to consider this three candidates");
+assert.equal(contextualGroup.intent, "explain_candidate_score", "why-consider group follow-ups should stay in the score explanation workflow");
+const contextualHindiGroup = runtimeWindow.HireScoreHelpAgent.resolveIntent("mai inha hi kyu select kru");
+assert.equal(contextualHindiGroup.intent, "explain_candidate_score", "Hinglish why-select group follow-ups should be understood");
 runtimeWindow.HireScoreHelpAgent._state.selectedJob = { id: "fw-1", job_title: "Firmware Engineer" };
 runtimeWindow.HireScoreHelpAgent._state.selectedCandidate = { id: "sunny-1", full_name: "Guang 'Sunny' Yang" };
 runtimeWindow.HireScoreHelpAgent._state.conversationContext = { job_id: "fw-1", job_title: "Firmware Engineer", candidate_id: "sunny-1", candidate_ids: ["sunny-1"] };
