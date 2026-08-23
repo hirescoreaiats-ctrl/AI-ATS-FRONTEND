@@ -1006,11 +1006,55 @@ let screen = state.conversationContext?.current_screen || "dashboard";
 if(screen === "candidateProfile" || state.conversationContext?.candidate_id){
 return [["explain_candidate_score","Why this score?"],["shortlist_candidate","Shortlist candidate"],["schedule_interview","Schedule interview"],["filter_candidates","Compare candidates"]];
 }
-if(["jobResult","results","topCandidate","insight"].includes(screen) || state.conversationContext?.job_id){
+if(["jobResult","topCandidate","insight","shortlistAnalytics","shortlistExplanation"].includes(screen)){
 return [["select_top_candidates","Top 10 candidates"],["filter_candidates","Filter candidates"],["candidate_workflow","Shortlist best matches"],["view_sourcing_status","Sourcing status"]];
 }
+if(["job","editJob","editForm"].includes(screen)) return [["create_job","Build this job"],["share_public_apply_link","Public apply setup"],["upload_resumes","Plan resume upload"],["view_active_jobs","View active jobs"]];
+if(screen === "results") return [["search_talent","Search talent"],["view_shortlisted_candidates","Review shortlist"],["jobs_needing_attention","Jobs needing attention"],["view_active_jobs","Active jobs"]];
+if(["communication","communicationResults"].includes(screen)) return [["send_candidate_email","Draft outreach"],["view_shortlisted_candidates","Shortlisted candidates"],["move_candidates_to_interview","Move to interview"],["schedule_interview","Schedule interview"]];
 if(screen === "interviewDashboard") return [["schedule_interview","Schedule interview"],["applicant_metrics","Today's applicants"],["view_active_jobs","Active jobs"]];
+if(screen === "bulk") return [["search_talent","Search talent"],["select_top_candidates","Review top candidates"],["view_ai_hiring_insights","Hiring insights"],["view_active_jobs","Active jobs"]];
+if(["applyJob","jobPosts"].includes(screen)) return [["share_public_apply_link","Apply page help"],["view_sourcing_status","Sourcing status"],["view_active_jobs","Active jobs"],["create_job","Create another job"]];
+if(screen === "pilotUsers") return [["invite_pilot_user","Invite pilot user"],["view_plan_usage_limits","Review limits"],["deactivate_pilot_user","Manage pilot access"]];
 return [["jobs_needing_attention","Jobs needing attention"],["applicant_metrics","Today's applicants"],["view_active_jobs","Active jobs"],["create_job","Create a job"]];
+}
+
+function agentPagePresentation(){
+let context = currentHelpContext();
+let screen = context.current_screen || "dashboard";
+if(screen === "candidateProfile" || context.candidate_id) return {
+title: context.candidate_name ? `Review ${context.candidate_name}` : "Review this candidate",
+subtitle: "Explain the score, compare evidence, shortlist, or schedule an interview"
+};
+if(["jobResult","topCandidate","insight","shortlistAnalytics","shortlistExplanation"].includes(screen)) return {
+title: context.job_title ? `${context.job_title} Action Agent` : "Candidate Action Agent",
+subtitle: "Find top matches, verify skill gaps, shortlist, or check sourcing"
+};
+let presentations = {
+dashboard:["Jobs Action Agent","Review attention, applicants, active roles, or create a job"],
+job:["Create Job with AI","Get help with role details, JD structure, skills, and sourcing"],
+editJob:["Edit Job with AI","Review role details, requirements, skills, and publishing setup"],
+editForm:["Edit Job with AI","Improve the JD, required skills, experience, and sourcing details"],
+results:["Recruiter Action Agent","Search talent, review shortlists, or open an active job"],
+communication:["Outreach Action Agent","Draft messages and move shortlisted candidates forward"],
+communicationResults:["Candidate Outreach Agent","Review replies, draft follow-ups, and advance candidates"],
+interviewDashboard:["Interview Action Agent","Schedule interviews and review upcoming candidate activity"],
+bulk:["Bulk Hiring Action Agent","Search talent, review top candidates, and inspect hiring insights"],
+applyJob:["Apply Page Action Agent","Manage public apply links and sourcing visibility"],
+jobPosts:["Job Publishing Agent","Prepare job posts, apply links, and sourcing status"],
+pilotUsers:["Pilot Access Agent","Invite users, review plan limits, or manage pilot access"],
+support:["HireScore Support Agent","Ask about this screen or get help with your recruiting workflow"]
+};
+let selected = presentations[screen] || presentations.dashboard;
+return {title:selected[0], subtitle:selected[1]};
+}
+
+function renderLauncher(){
+let presentation = agentPagePresentation();
+let title = document.querySelector("#hsHelpButton .hs-help-launch-copy strong");
+let subtitle = document.querySelector("#hsHelpButton .hs-help-launch-copy small");
+if(title) title.textContent = presentation.title;
+if(subtitle) subtitle.textContent = presentation.subtitle;
 }
 
 function renderQuickActions(){
@@ -1030,6 +1074,7 @@ let label = context.candidate_name
 : context.current_screen === "interviewDashboard" ? "Viewing upcoming interviews" : "Recruiting workspace";
 box.innerHTML = `<span></span><strong>${esc(label)}</strong>`;
 renderQuickActions();
+renderLauncher();
 }
 
 function setContext(nextContext){
@@ -2388,6 +2433,7 @@ showTourStep();
 function openDrawer(){
 ensureShell();
 document.getElementById("hsHelpRoot")?.classList.add("is-open");
+document.getElementById("hsHelpButton")?.classList.add("is-hidden");
 setSetting(SETTINGS_KEYS.panelOpen, "true");
 if(!state.messages.length){
 addMessage("agent", `<strong>HireScore Recruiting Agent</strong><p>I can retrieve live jobs and candidates, explain stored scoring evidence, and execute confirmed recruiting actions.</p>`);
@@ -2398,6 +2444,7 @@ renderModeInfo();
 
 function closeDrawer(){
 document.getElementById("hsHelpRoot")?.classList.remove("is-open");
+document.getElementById("hsHelpButton")?.classList.remove("is-hidden");
 setSetting(SETTINGS_KEYS.panelOpen, "false");
 }
 
@@ -2457,7 +2504,17 @@ candidate_workflow:"Shortlist the best 5 candidates",
 explain_candidate_score:"Why is this candidate a strong or weak fit?",
 shortlist_candidate:"Shortlist this candidate",
 schedule_interview:"Schedule an interview for this candidate",
-create_job:"Create a new job"
+create_job:"Help me create a new job",
+share_public_apply_link:"Help me create and share the public apply link",
+upload_resumes:"Help me plan the resume upload for this job",
+search_talent:"Search the talent pool for matching candidates",
+view_shortlisted_candidates:"Show shortlisted candidates",
+send_candidate_email:"Draft an outreach email for the selected candidates",
+move_candidates_to_interview:"Move the selected candidates to interview stage",
+view_ai_hiring_insights:"Show AI hiring insights for this job",
+invite_pilot_user:"Help me invite a pilot user",
+view_plan_usage_limits:"Show my plan usage and limits",
+deactivate_pilot_user:"Help me manage or deactivate pilot access"
 };
 return handleUserText(prompts[workflowId] || workflow.title);
 }
@@ -2508,9 +2565,10 @@ root.innerHTML = `
 </section>
 </div>
 `;
+document.body.appendChild(root);
 let sidebarFooter = document.querySelector(".ats-sidebar-footer");
-if(sidebarFooter && window.innerWidth > 720) sidebarFooter.insertBefore(root, sidebarFooter.firstChild);
-else document.body.appendChild(root);
+let launcher = document.getElementById("hsHelpButton");
+if(sidebarFooter && launcher && window.innerWidth > 720) sidebarFooter.insertBefore(launcher, sidebarFooter.firstChild);
 document.getElementById("hsHelpForm").addEventListener("submit", event => {
 event.preventDefault();
 let input = document.getElementById("hsHelpInput");

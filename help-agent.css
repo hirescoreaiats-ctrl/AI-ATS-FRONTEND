@@ -1,6 +1,6 @@
 #hsHelpRoot{
 position:relative;
-z-index:80;
+z-index:100;
 font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
 }
 
@@ -30,7 +30,7 @@ transform:translateX(-50%);
 text-align:left;
 }
 
-#hsHelpRoot.is-open .hs-help-button{opacity:0;pointer-events:none;transform:translate(-50%,-130%)}
+.hs-help-button.is-hidden{opacity:0;pointer-events:none;visibility:hidden;transform:translate(-50%,-130%)}
 
 .hs-help-button span{
 width:28px;
@@ -58,11 +58,6 @@ background:transparent;
 .hs-help-launch-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:650;color:#aeb8ca}
 .hs-help-button b{width:38px;height:38px;display:grid;place-items:center;flex:0 0 auto;border-radius:50%;background:#f8fafc;color:#111827;font-size:20px;font-weight:950}
 
-.ats-sidebar-footer #hsHelpRoot{
-position:relative;
-z-index:81;
-}
-
 .ats-sidebar-footer .hs-help-button{
 position:relative;
 inset:auto;
@@ -72,21 +67,24 @@ height:56px;
 margin:0 0 12px;
 padding:0 9px;
 gap:9px;
-border-radius:12px;
+border:1px solid rgba(99,102,241,.5);
+border-radius:14px;
+background:linear-gradient(135deg,rgba(79,70,229,.28),rgba(15,23,42,.96));
 transform:none;
-box-shadow:0 12px 28px rgba(0,0,0,.2);
+box-shadow:0 14px 34px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.08);
 }
 
-.ats-sidebar-footer .hs-help-button .hs-help-launch-copy strong{font-size:13px}
-.ats-sidebar-footer .hs-help-button .hs-help-launch-copy small{font-size:10.5px}
+.ats-sidebar-footer .hs-help-button .hs-help-launch-copy strong{font-size:13px;color:#fff}
+.ats-sidebar-footer .hs-help-button .hs-help-launch-copy small{font-size:10.5px;color:#cbd5e1}
 .ats-sidebar-footer .hs-help-button b{width:32px;height:32px;font-size:17px}
-.ats-sidebar-footer #hsHelpRoot.is-open .hs-help-button{visibility:hidden;transform:none}
+.ats-sidebar-footer .hs-help-button:hover{border-color:#818cf8;background:linear-gradient(135deg,rgba(79,70,229,.42),rgba(15,23,42,.98));transform:translateY(-1px)}
+.ats-sidebar-footer .hs-help-button.is-hidden{visibility:hidden;transform:none}
 
 .hs-help-drawer{
 position:fixed;
 top:72px;
 right:18px;
-z-index:84;
+z-index:104;
 width:min(420px,calc(100vw - 36px));
 height:min(720px,calc(100dvh - 90px));
 max-height:calc(100dvh - 90px);
@@ -550,7 +548,7 @@ border-radius:16px;
 transform:none;
 }
 
-#hsHelpRoot.is-open .hs-help-button{transform:translateY(-130%)}
+.hs-help-button.is-hidden{transform:translateY(-130%)}
 .hs-help-button .hs-help-launch-copy small{display:none}
 .hs-help-button b{width:34px;height:34px}
 
