@@ -6,8 +6,8 @@ const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 const app = readFileSync("app.js", "utf8");
 
-assert.match(html, /help-agent\.css\?v=recruiting-agent-20260823-07/, "agent css should be loaded");
-assert.match(html, /help-agent\.js\?v=recruiting-agent-20260823-07/, "agent js should be loaded");
+assert.match(html, /help-agent\.css\?v=recruiting-agent-20260823-08/, "agent css should be loaded");
+assert.match(html, /help-agent\.js\?v=recruiting-agent-20260823-08/, "agent js should be loaded");
 assert.doesNotMatch(html, /AI Matching|Pipeline ready/, "legacy AI status block should be removed");
 assert.match(html, /app\.js\?v=recruiting-agent-20260823-01/, "app js cache should match the current frontend bundle");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
@@ -217,8 +217,10 @@ assert.match(app, /window\.applyAgentCandidateFilter/, "candidate results should
 assert.match(app, /shouldFilter\s*=\s*Array\.isArray/, "empty real filter results should hide every candidate row");
 assert.match(css, /\.hs-help-drawer\{[\s\S]*?top:72px;[\s\S]*?right:18px;/, "agent should open as a top-right overlay without resizing ATS content");
 assert.match(css, /\.hs-help-button\{[\s\S]*?width:min\(680px,calc\(100vw - 420px\)\)/, "initial agent state should be a wide top prompt bar");
-assert.match(css, /\.ats-sidebar-footer \.hs-help-button\{[\s\S]*?width:100%;[\s\S]*?min-height:154px;/, "sidebar agent card should have room for contextual dialogue");
+assert.match(css, /\.ats-sidebar-footer \.hs-help-button\{[\s\S]*?width:100%;[\s\S]*?min-height:158px;/, "sidebar agent card should have room for contextual dialogue");
+assert.match(css, /background:linear-gradient\(145deg,rgba\(30,41,59,\.74\),rgba\(15,23,42,\.72\)\)/, "sidebar agent card should match the dashboard navy surface");
 assert.match(css, /\.ats-sidebar-menu\{[\s\S]*?overflow-y:auto/, "sidebar navigation should scroll when the taller agent card needs space");
+assert.match(css, /\.ats-sidebar-footer \.hs-help-button\.is-hidden\{display:none;/, "opening the agent should immediately return launcher space to sidebar navigation");
 assert.doesNotMatch(css, /hs-agent-workspace-open/, "agent must not squeeze or shift the existing ATS layout");
 
 console.log("Help Agent smoke checks passed.");

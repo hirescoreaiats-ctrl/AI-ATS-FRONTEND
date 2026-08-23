@@ -55,22 +55,32 @@ position:relative;
 inset:auto;
 width:100%;
 min-width:0;
-min-height:154px;
+min-height:158px;
 height:auto;
 margin:0 0 12px;
-padding:0 9px;
-gap:8px 9px;
-border:1px solid rgba(99,102,241,.5);
+padding:12px;
+gap:9px 10px;
+border:1px solid rgba(148,163,184,.16);
 border-radius:14px;
-background:linear-gradient(135deg,rgba(79,70,229,.28),rgba(15,23,42,.96));
+background:linear-gradient(145deg,rgba(30,41,59,.74),rgba(15,23,42,.72));
 transform:none;
-box-shadow:0 14px 34px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.08);
+box-shadow:0 12px 24px rgba(2,6,23,.16),inset 0 1px 0 rgba(255,255,255,.035);
 }
 
-.ats-sidebar-footer .hs-help-agent-name{font-size:14px}
-.ats-sidebar-footer .hs-help-launch-dialog{font-size:10.5px;text-align:left}
-.ats-sidebar-footer .hs-help-button:hover{border-color:#818cf8;background:linear-gradient(135deg,rgba(79,70,229,.42),rgba(15,23,42,.98));transform:translateY(-1px)}
-.ats-sidebar-footer .hs-help-button.is-hidden{visibility:hidden;transform:none}
+.ats-sidebar-footer .hs-help-agent-mark{
+width:34px;
+height:34px;
+border-radius:10px;
+background:linear-gradient(135deg,#4f46e5,#2563eb);
+border:1px solid rgba(199,210,254,.22);
+box-shadow:0 8px 18px rgba(79,70,229,.2);
+}
+.ats-sidebar-footer .hs-help-agent-name{font-size:14px;font-weight:850;letter-spacing:-.01em;color:#f8fafc}
+.ats-sidebar-footer .hs-help-launch-dialog{padding:10px 11px;border-color:rgba(148,163,184,.14);background:rgba(15,23,42,.5);color:#cbd5e1;font-size:11px;font-weight:650;line-height:1.42;text-align:left}
+.ats-sidebar-footer .hs-help-launch-open{color:#dbeafe;font-size:12px;font-weight:850}
+.ats-sidebar-footer .hs-help-launch-open b{width:28px;height:28px;background:rgba(99,102,241,.18);border:1px solid rgba(129,140,248,.28);color:#e0e7ff}
+.ats-sidebar-footer .hs-help-button:hover{border-color:rgba(129,140,248,.34);background:linear-gradient(145deg,rgba(30,41,59,.9),rgba(15,23,42,.82));box-shadow:0 14px 28px rgba(2,6,23,.2),inset 0 1px 0 rgba(255,255,255,.05);transform:translateY(-1px)}
+.ats-sidebar-footer .hs-help-button.is-hidden{display:none;visibility:hidden;transform:none}
 
 .ats-sidebar-menu{min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(129,140,248,.45) transparent}
 .ats-sidebar-menu::-webkit-scrollbar{width:5px}
