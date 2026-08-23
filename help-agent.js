@@ -357,10 +357,9 @@ return clean(text).toLowerCase()
 .replace(/\buplod\b/g,"upload")
 .replace(/\buplaod\b/g,"upload")
 .replace(/\bmil\b|\bmeil\b|\bmaiil\b|\bmal\b/g,"mail")
-.replace(/\bcandiate\b/g,"candidate")
-.replace(/\bcandiates\b/g,"candidates")
-.replace(/\bcandiadte\b/g,"candidate")
-.replace(/\banalhyst\b|\banaylst\b|\banalst\b|\banalist\b/g,"analyst")
+.replace(/\bcandiate\b|\bcandaite\b|\bcnadiate\b|\bcandiadte\b/g,"candidate")
+.replace(/\bcandiates\b|\bcandaites\b|\bcnadiates\b|\bcandiadtes\b/g,"candidates")
+.replace(/\banalhyst\b|\banaylst\b|\banalst\b|\banalist\b|\bnalyst\b|\banalyts\b/g,"analyst")
 .replace(/\bscintiest\b|\bsciencist\b|\bscientiest\b/g,"scientist")
 .replace(/\bcommincation\b|\bcommuncation\b|\bcomunication\b/g,"communication")
 .replace(/\bsehdule\b|\bshedule\b/g,"schedule")
@@ -2790,7 +2789,9 @@ nextTour, prevTour, endTour,
 startPlanTour, executeActionAgent,
 resolveIntent,
 _state: state,
-_workflows: WORKFLOWS
+_workflows: WORKFLOWS,
+_groupEmailPlanFromText: groupEmailPlanFromText,
+_matchJobs: matchJobs
 };
 
 document.addEventListener("DOMContentLoaded", init);

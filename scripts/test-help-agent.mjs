@@ -6,8 +6,8 @@ const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 const app = readFileSync("app.js", "utf8");
 
-assert.match(html, /help-agent\.css\?v=recruiting-agent-20260823-14/, "agent css should be loaded");
-assert.match(html, /help-agent\.js\?v=recruiting-agent-20260823-14/, "agent js should be loaded");
+assert.match(html, /help-agent\.css\?v=recruiting-agent-20260823-15/, "agent css should be loaded");
+assert.match(html, /help-agent\.js\?v=recruiting-agent-20260823-15/, "agent js should be loaded");
 assert.doesNotMatch(html, /AI Matching|Pipeline ready/, "legacy AI status block should be removed");
 assert.match(html, /app\.js\?v=recruiting-agent-20260823-01/, "app js cache should match the current frontend bundle");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
@@ -84,6 +84,9 @@ assert.match(help, /Candidate confirmation list/, "group email workflow should p
 assert.match(help, /Mail cannot be sent from your own email\/domain until DNS is verified/, "own-domain path should explain DNS verification before sending");
 assert.match(help, /\\bmil\\b\|\\bmeil\\b/, "Help Agent should normalize common mail typos");
 assert.match(help, /analhyst/, "Help Agent should normalize common analyst typos");
+assert.match(help, /cnadiates/, "Help Agent should normalize transposed candidate typos used in outreach requests");
+assert.match(help, /\\bnalyst\\b/, "Help Agent should normalize missing-first-letter analyst typos");
+assert.match(help, /\\banalyts\\b/, "Help Agent should normalize transposed analyst typos");
 assert.match(help, /\(\?:send\|mail\|email\|message\|outreach\)\.\*\?\(\?:of\|for\|to\)/, "send-mail candidate requests should extract the job title before candidate wording");
 assert.match(help, /function\s+jobRecordId/, "Help Agent should normalize job id fields from job cards");
 assert.match(help, /candidate\|candidates\|resume\|resumes\|profile\|profiles/, "candidate-of-job phrasing should be recognized");
@@ -106,6 +109,24 @@ assert.match(help, /parseDnsRecordLine/, "Help Agent should parse DNS record row
 assert.match(help, /importOwnDomainDnsFromHelpAgent/, "Help Agent should send parsed DNS setup into the sender setup UI");
 assert.match(app, /function\s+importOwnDomainDnsFromHelpAgent/, "sender setup should accept DNS records imported by Help Agent");
 assert.match(app, /ownDomainDnsTableHtml\(records, status\)/, "imported DNS records should render in the own-domain DNS table");
+
+const runtimeWindow = {
+  addEventListener() {},
+  dashboardJobs: [
+    { id: "da-1", job_title: "Data Analyst", company_name: "Techindia", is_active: true },
+    { id: "fw-1", job_title: "Firmware Engineer", company_name: "Optical Zuno", is_active: true },
+    { id: "sales-1", job_title: "Sales Executive", company_name: "Vardhan", is_active: true }
+  ]
+};
+const runtimeDocument = { addEventListener() {} };
+const runtimeStorage = { getItem() { return null; }, setItem() {} };
+new Function("window", "document", "localStorage", help)(runtimeWindow, runtimeDocument, runtimeStorage);
+const typoEmailPlan = runtimeWindow.HireScoreHelpAgent._groupEmailPlanFromText("can you help me to send mail for 10 cnadiates of data nalyst job");
+assert.equal(typoEmailPlan.intent, "send_candidate_email", "typo-heavy candidate mail request should stay in the email workflow");
+assert.equal(typoEmailPlan.entities.job_title, "data analyst", "email workflow should recover the intended Data Analyst title");
+assert.equal(typoEmailPlan.entities.limit, 10, "email workflow should preserve the requested candidate count");
+const typoEmailMatches = runtimeWindow.HireScoreHelpAgent._matchJobs(runtimeWindow.dashboardJobs, typoEmailPlan.job_query);
+assert.deepEqual(typoEmailMatches.map(job => job.id), ["da-1"], "email workflow should not show unrelated Firmware or Sales jobs");
 
 const pageIds = new Set([...html.matchAll(/id="([A-Za-z0-9]+)Page"/g)].map(match => match[1]));
 const workflowBlock = help.slice(help.indexOf("const WORKFLOWS"), help.indexOf("const QUICK_ACTIONS"));
