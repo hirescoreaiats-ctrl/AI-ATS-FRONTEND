@@ -6,8 +6,8 @@ const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 const app = readFileSync("app.js", "utf8");
 
-assert.match(html, /help-agent\.css\?v=recruiting-agent-20260823-03/, "agent css should be loaded");
-assert.match(html, /help-agent\.js\?v=recruiting-agent-20260823-03/, "agent js should be loaded");
+assert.match(html, /help-agent\.css\?v=recruiting-agent-20260823-04/, "agent css should be loaded");
+assert.match(html, /help-agent\.js\?v=recruiting-agent-20260823-04/, "agent js should be loaded");
 assert.match(html, /app\.js\?v=recruiting-agent-20260823-01/, "app js cache should match the current frontend bundle");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
 assert.match(help, /data-help-id="help-agent-button"|help-agent-button/, "help button target should exist");
@@ -196,6 +196,7 @@ assert.match(css, /@media \(max-width: 720px\)/, "mobile drawer styles should ex
 
 assert.match(help, /HireScore AI Agent/, "persistent panel should use product-native agent naming");
 assert.match(help, /Ask HireScore AI/, "collapsed state should use a conversational prompt bar");
+assert.match(help, /sidebarFooter\.insertBefore\(root, sidebarFooter\.firstChild\)/, "desktop agent launcher should mount inside the sidebar footer");
 assert.match(help, /function\s+contextQuickActions/, "quick actions should depend on screen context");
 assert.match(help, /function\s+setContext/, "frontend should expose structured context updates");
 assert.match(help, /current_screen/, "current screen should reach the backend context");
@@ -208,6 +209,7 @@ assert.match(app, /window\.applyAgentCandidateFilter/, "candidate results should
 assert.match(app, /shouldFilter\s*=\s*Array\.isArray/, "empty real filter results should hide every candidate row");
 assert.match(css, /\.hs-help-drawer\{[\s\S]*?top:72px;[\s\S]*?right:18px;/, "agent should open as a top-right overlay without resizing ATS content");
 assert.match(css, /\.hs-help-button\{[\s\S]*?width:min\(680px,calc\(100vw - 420px\)\)/, "initial agent state should be a wide top prompt bar");
+assert.match(css, /\.ats-sidebar-footer \.hs-help-button\{[\s\S]*?width:100%;[\s\S]*?height:56px;/, "sidebar launcher should be compact");
 assert.doesNotMatch(css, /hs-agent-workspace-open/, "agent must not squeeze or shift the existing ATS layout");
 
 console.log("Help Agent smoke checks passed.");

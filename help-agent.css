@@ -58,6 +58,30 @@ background:transparent;
 .hs-help-launch-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:650;color:#aeb8ca}
 .hs-help-button b{width:38px;height:38px;display:grid;place-items:center;flex:0 0 auto;border-radius:50%;background:#f8fafc;color:#111827;font-size:20px;font-weight:950}
 
+.ats-sidebar-footer #hsHelpRoot{
+position:relative;
+z-index:81;
+}
+
+.ats-sidebar-footer .hs-help-button{
+position:relative;
+inset:auto;
+width:100%;
+min-width:0;
+height:56px;
+margin:0 0 12px;
+padding:0 9px;
+gap:9px;
+border-radius:12px;
+transform:none;
+box-shadow:0 12px 28px rgba(0,0,0,.2);
+}
+
+.ats-sidebar-footer .hs-help-button .hs-help-launch-copy strong{font-size:13px}
+.ats-sidebar-footer .hs-help-button .hs-help-launch-copy small{font-size:10.5px}
+.ats-sidebar-footer .hs-help-button b{width:32px;height:32px;font-size:17px}
+.ats-sidebar-footer #hsHelpRoot.is-open .hs-help-button{visibility:hidden;transform:none}
+
 .hs-help-drawer{
 position:fixed;
 top:72px;

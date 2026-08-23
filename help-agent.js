@@ -2508,7 +2508,9 @@ root.innerHTML = `
 </section>
 </div>
 `;
-document.body.appendChild(root);
+let sidebarFooter = document.querySelector(".ats-sidebar-footer");
+if(sidebarFooter && window.innerWidth > 720) sidebarFooter.insertBefore(root, sidebarFooter.firstChild);
+else document.body.appendChild(root);
 document.getElementById("hsHelpForm").addEventListener("submit", event => {
 event.preventDefault();
 let input = document.getElementById("hsHelpInput");
