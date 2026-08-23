@@ -319,6 +319,8 @@ pendingProductFeature: null,
 pendingGroupEmailRequest: null,
 pendingEmailCandidates: [],
 pendingEmailSenderChoice: null,
+interviewDraft: null,
+sourcingDraft: null,
 lastParsedPlan: null,
 lastUserText: "",
 conversationContext: {},
@@ -363,6 +365,16 @@ return clean(text).toLowerCase()
 .replace(/\bscintiest\b|\bsciencist\b|\bscientiest\b/g,"scientist")
 .replace(/\bcommincation\b|\bcommuncation\b|\bcomunication\b/g,"communication")
 .replace(/\bsehdule\b|\bshedule\b/g,"schedule")
+.replace(/\bscedule\b|\bschedul\b|\bsheduleing\b|\bsheduling\b/g,"schedule")
+.replace(/\binterveiw\b|\bintervieww\b|\binterviw\b|\bintreview\b/g,"interview")
+.replace(/\brequimremnts?\b|\brequiemnts?\b|\brequierments?\b|\brequirments?\b/g,"requirement")
+.replace(/\bsorcing\b|\bsoucing\b|\bsourching\b/g,"sourcing")
+.replace(/\baply\b|\bappply\b/g,"apply")
+.replace(/\bpaeg\b/g,"page")
+.replace(/\bcreatre\b|\bcrate\b|\bcreatee\b/g,"create")
+.replace(/\bstauts\b|\bstatuc\b/g,"status")
+.replace(/\breslts\b|\bresutls\b/g,"results")
+.replace(/\bprofil\b/g,"profile")
 .replace(/\bkrna\b/g,"karna")
 .replace(/\bkarni\b/g,"karna")
 .replace(/\bwali\b/g,"wali")
@@ -482,7 +494,7 @@ let wantsTenCandidatePage = wantsOpenFeature && numberedCandidateRequest && incl
 let wantsAiAnalytics = includesAny(text, ["ai analytics", "ai insight", "ai insights", "hiring insight", "hiring insights", "candidate analytics", "pool analytics"]);
 let wantsShortlistExplanation = includesAny(text, ["shortlist explanation", "shortlisted explanation", "ai shortlist explanation", "shortlist ai explanation"]);
 let wantsShortlistAnalytics = includesAny(text, ["shortlist analytics", "shortlisted analytics", "shortlist insight", "shortlisted insight"]);
-let wantsCandidateFitExplanation = includesAny(text, ["fit for", "fit this", "fit that", "fit role", "role fit", "good fit", "strong fit", "weak fit", "suitable", "suitability", "why this candidate", "why that candidate", "how this candidate", "how that candidate", "why is he", "why is she"])
+let wantsCandidateFitExplanation = includesAny(text, ["fit for", "fit this", "fit that", "fit role", "role fit", "good fit", "strong fit", "weak fit", "suitable", "suitability", "why this candidate", "why that candidate", "how this candidate", "how that candidate", "why is he", "why is she", "why this is the best candidate", "why is this the best candidate", "why that is the best candidate", "why is he the best", "why is she the best", "why best candidate", "kyu best", "kyun best"])
 && includesAny(text, ["candidate", "profile", "guy", "person", "he ", "she ", " him", " her", "this", "that", "fit", "suitable"]);
 
 if(wantsCandidateFitExplanation){
@@ -886,6 +898,9 @@ renderMessages();
 function actionButton(label, action, data){
 return {label, action, data:data || {}};
 }
+
+function yesAnswer(text){ return /^(?:yes|y|haan|han|ha|ok|okay|sure|confirm|kar do|kardo|do it)(?: please)?$/.test(normalizeText(text)); }
+function noAnswer(text){ return /^(?:no|n|nahi|nahin|nope|cancel|mat karo|mat karna|skip)(?: please)?$/.test(normalizeText(text)); }
 
 function isTalentPageFollowUp(text){
 return includesAny(text, ["show me on page", "show on page", "open page", "view page", "open result", "open results", "candidate page", "results page", "on page", "page pe", "page par"]);
@@ -1611,6 +1626,57 @@ return true;
 }
 }
 
+function isCandidateStatusRequest(raw){
+let text = normalizeText(raw || "");
+let asksStatus = includesAny(text, ["check status", "his status", "her status", "candidate status", "profile status", "current status", "what stage", "which stage", "kis stage", "kya status", "status kya"]);
+let contextualCandidate = Boolean(state.selectedCandidate?.id || (state.conversationContext?.candidate_ids || []).length === 1);
+return asksStatus && contextualCandidate;
+}
+
+function candidateStatusHtml(data, fallbackName, fallbackJob){
+let name = data?.name || fallbackName || "Selected candidate";
+let jobTitle = data?.job_title || fallbackJob || "Selected job";
+let stage = clean(data?.stage || data?.status || "Not available").replaceAll("_", " ");
+let workflowStatus = clean(data?.status || stage).replaceAll("_", " ");
+let mailStatus = clean(data?.mail_status || "Not contacted");
+let responseStatus = clean(data?.response_status || "No candidate response yet");
+let history = Array.isArray(data?.history) ? data.history.slice(0, 3) : [];
+let historyHtml = history.length ? `<div class="hs-agent-fit-section"><strong>Recent stage updates</strong><ul>${history.map(item => `<li>${esc(clean(item.from_stage || "previous").replaceAll("_", " "))} → ${esc(clean(item.to_stage || "current").replaceAll("_", " "))}${item.reason ? ` — ${esc(item.reason)}` : ""}</li>`).join("")}</ul></div>` : "";
+return `<strong>Current candidate status</strong>
+<p><strong>${esc(name)}</strong> · ${esc(jobTitle)}</p>
+<div class="hs-agent-fit-section"><ul>
+<li><strong>Pipeline stage:</strong> ${esc(stage)}</li>
+<li><strong>Workflow status:</strong> ${esc(workflowStatus)}</li>
+<li><strong>Email status:</strong> ${esc(mailStatus)}</li>
+<li><strong>Candidate response:</strong> ${esc(responseStatus)}</li>
+</ul></div>${historyHtml}`;
+}
+
+async function handleCandidateStatusRequest(raw){
+if(!isCandidateStatusRequest(raw)) return false;
+let candidateIds = state.selectedCandidate?.id ? [state.selectedCandidate.id] : (state.conversationContext?.candidate_ids || []);
+let candidateId = candidateIds.length === 1 ? candidateIds[0] : null;
+if(!candidateId) return false;
+let job = selectedJobIdentity();
+let loadingMessage = {role:"agent", html:"<em>Checking the latest candidate, interview, and email status...</em>", actions:[]};
+state.messages.push(loadingMessage);
+renderMessages();
+try{
+let data = await fetchJson(`${apiBase()}/candidate-workflow/${encodeURIComponent(candidateId)}`, {headers:requestHeaders()});
+removeMessage(loadingMessage);
+addMessage("agent", candidateStatusHtml(data, state.selectedCandidate?.full_name, job?.title), [
+actionButton("View Candidate","candidateAction",{candidateId, candidateAction:"view"}),
+actionButton("Open Outreach Queue","openPage",{page:"communication"}),
+actionButton("Open Interview Dashboard","openPage",{page:"interviewDashboard"})
+]);
+return true;
+}catch(error){
+removeMessage(loadingMessage);
+addMessage("agent", `<strong>I could not load the latest candidate status.</strong><p>${esc(error.message || "Please try again.")}</p>`, [actionButton("View Candidate","candidateAction",{candidateId, candidateAction:"view"})]);
+return true;
+}
+}
+
 async function handleProductFeatureQuery(raw){
 let feature = matchProductFeature(raw);
 if(!feature) return false;
@@ -1865,6 +1931,179 @@ let question = intentResult?.clarification_question ? `<p>${esc(intentResult.cla
 addMessage("agent", `<strong>${title}</strong>${question}<p>${esc(body)}</p>`, actions);
 }
 
+function interviewDateFromText(raw){
+let source = String(raw || "").toLowerCase();
+let text = normalizeText(raw);
+let direct = source.match(/\b(20\d{2})[-\/]([01]?\d)[-\/]([0-3]?\d)\b/);
+if(direct) return `${direct[1]}-${String(direct[2]).padStart(2,"0")}-${String(direct[3]).padStart(2,"0")}`;
+let local = source.match(/\b([0-3]?\d)[-\/]([01]?\d)[-\/](20\d{2})\b/);
+if(local) return `${local[3]}-${String(local[2]).padStart(2,"0")}-${String(local[1]).padStart(2,"0")}`;
+let date = new Date();
+if(/\btomorrow\b|\bkal\b/.test(text)) date.setDate(date.getDate() + 1);
+else if(!/\btoday\b|\baaj\b/.test(text)) return "";
+let pad = value => String(value).padStart(2,"0");
+return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`;
+}
+
+function interviewTimeFromText(raw){
+let text = String(raw || "").toLowerCase();
+let match = text.match(/\b([01]?\d|2[0-3])[:.]([0-5]\d)\s*(am|pm)?\b/) || text.match(/\b(1[0-2]|0?[1-9])\s*(am|pm)\b/);
+if(!match) return "";
+let hour = Number(match[1]);
+let minute = Number(match[2] && /^\d+$/.test(match[2]) ? match[2] : 0);
+let meridiem = (match[3] || (match[2] && /^(am|pm)$/.test(match[2]) ? match[2] : "") || "").toLowerCase();
+if(meridiem === "pm" && hour < 12) hour += 12;
+if(meridiem === "am" && hour === 12) hour = 0;
+return `${String(hour).padStart(2,"0")}:${String(minute).padStart(2,"0")}`;
+}
+
+function meetingLinkFromText(raw){
+return ((String(raw || "").match(/https?:\/\/[^\s<>"]+/i) || [""])[0] || "").replace(/[),.;]+$/,"");
+}
+
+async function candidateRecordForInterview(jobId, candidateId){
+let data = await fetchJson(`${apiBase()}/results/${encodeURIComponent(jobId)}`, {headers:requestHeaders()});
+let rows = Array.isArray(data?.results) ? data.results : [];
+return rows.find(row => String(row.id || row.resume_id || row.candidate_id) === String(candidateId)) || null;
+}
+
+function askInterviewNext(){
+let draft = state.interviewDraft;
+if(!draft) return false;
+if(!draft.date){
+state.pendingContextType = "interview_date";
+addMessage("agent", `<strong>Interview kis date ko schedule karna hai?</strong><p>Example: tomorrow, 25/08/2026, or 2026-08-25.</p>`);
+return true;
+}
+if(!draft.time){
+state.pendingContextType = "interview_time";
+addMessage("agent", `<strong>Interview kitne baje rakhna hai?</strong><p>Example: 3 PM or 15:30. Time aapke local timezone (${esc(Intl.DateTimeFormat().resolvedOptions().timeZone || "local time")}) mein use hoga.</p>`);
+return true;
+}
+if(!draft.meeting_url){
+state.pendingContextType = "interview_link";
+addMessage("agent", `<strong>Meeting link share kijiye.</strong><p>Google Meet, Zoom, or Microsoft Teams ka complete https:// link paste karein.</p>`);
+return true;
+}
+if(draft.send_email == null){
+state.pendingContextType = "interview_email";
+addMessage("agent", `<strong>Kya main candidate ko interview email bhi bhej doon?</strong><p>Email mein role, date, time, duration, aur meeting link include hoga.</p>`, [
+actionButton("Yes, send email","interviewReply",{value:"yes"}),
+actionButton("No, schedule only","interviewReply",{value:"no"})
+]);
+return true;
+}
+state.pendingContextType = "interview_confirm";
+let candidate = draft.candidate_name || "Selected candidate";
+addMessage("agent", `<strong>Please confirm interview details</strong><p><strong>Candidate:</strong> ${esc(candidate)}</p><p><strong>Job:</strong> ${esc(draft.job_title)}</p><p><strong>When:</strong> ${esc(draft.date)} at ${esc(draft.time)} (${esc(Intl.DateTimeFormat().resolvedOptions().timeZone || "local time")})</p><p><strong>Duration:</strong> 45 minutes</p><p><strong>Meeting:</strong> ${esc(draft.meeting_url)}</p><p><strong>Candidate email:</strong> ${draft.send_email ? "Send after scheduling" : "Do not send"}</p><p>Nothing will change until you confirm.</p>`, [
+actionButton("Confirm & Schedule","interviewReply",{value:"confirm"}),
+actionButton("Cancel","interviewReply",{value:"cancel"})
+]);
+return true;
+}
+
+async function executeInterviewDraft(){
+let draft = state.interviewDraft;
+if(!draft) return true;
+let loading = {role:"agent", html:"<em>Scheduling interview and cross-checking the candidate...</em>", actions:[]};
+state.messages.push(loading); renderMessages();
+try{
+let candidate = await candidateRecordForInterview(draft.job_id, draft.candidate_id);
+if(!candidate) throw new Error("Candidate is no longer available for this job.");
+if(String(candidate.stage || "").toLowerCase() !== "interview_scheduling"){
+await fetchJson(`${apiBase()}/move-to-interview-scheduling`, {method:"POST", headers:requestHeaders(), body:JSON.stringify({candidate_id:draft.candidate_id, job_id:draft.job_id, force_without_test:true})});
+}
+let scheduledAt = `${draft.date}T${draft.time}`;
+await fetchJson(`${apiBase()}/schedule-interview-slot`, {method:"POST", headers:requestHeaders(), body:JSON.stringify({candidate_id:draft.candidate_id, job_id:draft.job_id, scheduled_at:scheduledAt, meeting_url:draft.meeting_url, duration_minutes:45})});
+let emailLine = "Candidate email was not requested.";
+if(draft.send_email){
+let email = clean(candidate.email || candidate.contact_email);
+if(!email.includes("@")) emailLine = "Interview scheduled, but candidate email is missing, so no email was sent.";
+else if(typeof window.sendBulkMailFromHelpAgent === "function"){
+let prettyDate = new Date(scheduledAt).toLocaleString([], {dateStyle:"medium", timeStyle:"short"});
+let result = await window.sendBulkMailFromHelpAgent({job_id:draft.job_id, job_title:draft.job_title, candidates:[{...candidate, id:draft.candidate_id, email}], subject:`Interview scheduled — ${draft.job_title}`, body:`Hi ${candidate.name || candidate.full_name || "Candidate"},\n\nYour interview for ${draft.job_title} is scheduled for ${prettyDate}.\nDuration: 45 minutes\nMeeting link: ${draft.meeting_url}\n\nPlease reply to confirm your availability.\n\nRegards,\nHiring Team`, sender_choice:"hirescore"});
+emailLine = Number(result?.sent || 0) ? `Interview email sent to ${email}.` : "Interview was scheduled, but the email could not be sent.";
+}
+}
+removeMessage(loading);
+state.interviewDraft = null; state.pendingContextType = null;
+addMessage("agent", `<strong>Interview scheduled successfully.</strong><p>${esc(draft.candidate_name)} · ${esc(draft.date)} at ${esc(draft.time)}</p><p>${esc(emailLine)}</p>`, [actionButton("Open Interview Dashboard","openPage",{page:"interviewDashboard"}), actionButton("Check Candidate Status","interviewReply",{value:"check candidate status"})]);
+}catch(error){
+removeMessage(loading);
+addMessage("agent", `<strong>Interview could not be completed.</strong><p>${esc(error.message || "Please try again.")}</p>`, [actionButton("Open Interview Dashboard","openPage",{page:"interviewDashboard"})]);
+}
+return true;
+}
+
+async function handleInterviewConversation(raw){
+let normalized = normalizeText(raw);
+if(state.pendingContextType && state.pendingContextType.startsWith("interview_") && state.interviewDraft){
+if(noAnswer(normalized) && state.pendingContextType === "interview_confirm"){
+state.interviewDraft = null; state.pendingContextType = null; addMessage("agent","<strong>Interview scheduling cancelled.</strong><p>No changes were made.</p>"); return true;
+}
+if(state.pendingContextType === "interview_date"){
+let value = interviewDateFromText(raw); if(!value){ addMessage("agent","<strong>Please share a valid interview date.</strong><p>Example: tomorrow or 2026-08-25.</p>"); return true; } state.interviewDraft.date = value;
+}else if(state.pendingContextType === "interview_time"){
+let value = interviewTimeFromText(raw); if(!value){ addMessage("agent","<strong>Please share a valid interview time.</strong><p>Example: 3 PM or 15:30.</p>"); return true; } state.interviewDraft.time = value;
+}else if(state.pendingContextType === "interview_link"){
+let value = meetingLinkFromText(raw); if(!value){ addMessage("agent","<strong>Please paste a complete meeting URL.</strong><p>It must begin with http:// or https://.</p>"); return true; } state.interviewDraft.meeting_url = value;
+}else if(state.pendingContextType === "interview_email"){
+if(!yesAnswer(normalized) && !noAnswer(normalized)){ addMessage("agent","<strong>Candidate ko email bhejni hai?</strong><p>Reply yes or no.</p>"); return true; } state.interviewDraft.send_email = yesAnswer(normalized);
+}else if(state.pendingContextType === "interview_confirm"){
+if(!yesAnswer(normalized)){ addMessage("agent","<strong>Please confirm or cancel.</strong><p>Reply confirm to schedule, or cancel to stop.</p>"); return true; } return executeInterviewDraft();
+}
+return askInterviewNext();
+}
+let local = resolveIntent(raw);
+if(local?.intent !== "schedule_interview") return false;
+let job = selectedJobIdentity();
+let candidateId = state.selectedCandidate?.id || state.conversationContext?.candidate_id || (state.conversationContext?.candidate_ids || [])[0];
+if(!job || !candidateId) return false;
+state.interviewDraft = {job_id:job.id, job_title:job.title, candidate_id:candidateId, candidate_name:state.selectedCandidate?.full_name || state.conversationContext?.candidate_name || "Selected candidate", date:interviewDateFromText(raw), time:interviewTimeFromText(raw), meeting_url:meetingLinkFromText(raw), send_email:null};
+return askInterviewNext();
+}
+
+async function handleApplyPageRequest(raw){
+let local = resolveIntent(raw);
+if(local?.intent !== "share_public_apply_link") return false;
+let job = selectedJobIdentity();
+if(!job) return false;
+let record = state.selectedJob || {};
+let url = record.apply_link || record.apply_links?.main || record.apply_links?.direct || "";
+if(!url){
+try{ let data = await fetchJson(`${apiBase()}/public-job/${encodeURIComponent(job.id)}`, {headers:requestHeaders()}); url = data.apply_link || data.apply_links?.main || `${location.origin}/apply.html?job_id=${encodeURIComponent(job.id)}`; }catch(error){ url = `${location.origin}/apply.html?job_id=${encodeURIComponent(job.id)}`; }
+}
+addMessage("agent", `<strong>Public apply page for ${esc(job.title)}</strong><p>Candidates can apply from this tracked link:</p><p><small>${esc(url)}</small></p>`, [actionButton("Open Apply Page","openApplyLink",{url}), actionButton("Copy Apply Link","copyApplyLink",{url})]);
+return true;
+}
+
+async function requestSourcingForSelectedJob(){
+let job = selectedJobIdentity();
+if(!job){ addMessage("agent","<strong>Select the job first.</strong><p>I need the exact job before sending a sourcing requirement.</p>"); return true; }
+let loading = {role:"agent", html:"<em>Sending the requirement for admin approval...</em>", actions:[]}; state.messages.push(loading); renderMessages();
+try{
+let data = await fetchJson(`${apiBase()}/jobs/${encodeURIComponent(job.id)}/request-candidate-sourcing`, {method:"POST", headers:requestHeaders(), body:JSON.stringify({})});
+removeMessage(loading); state.pendingContextType = null; state.sourcingDraft = null;
+addMessage("agent", `<strong>Sourcing requirement submitted.</strong><p>The complete requirement has been emailed to info@hirescoreai.com for approval. It stays private until approved; the admin team will share pricing and any remaining requirements with you.</p><p><strong>Status:</strong> ${esc(data.status || "pending_approval")}</p>`, [actionButton("Check Sourcing Status","workflow",{workflowId:"view_sourcing_status"})]);
+}catch(error){ removeMessage(loading); addMessage("agent", `<strong>Sourcing request could not be submitted.</strong><p>${esc(error.message || "Please try again.")}</p>`); }
+return true;
+}
+
+async function handleSourcingConversation(raw){
+let text = normalizeText(raw);
+if(state.pendingContextType === "sourcing_confirm" && state.sourcingDraft){
+if(noAnswer(text)){ state.pendingContextType = null; state.sourcingDraft = null; addMessage("agent","<strong>Sourcing request skipped.</strong><p>The job remains active and you can request sourcing later.</p>"); return true; }
+if(yesAnswer(text)) return requestSourcingForSelectedJob();
+}
+if(!text.includes("sourcing") && !/\bsource candidates?\b/.test(text)) return false;
+if(includesAny(text,["status","approved","approval","check"])) return false;
+let job = selectedJobIdentity();
+if(!job) return false;
+state.sourcingDraft = {job_id:job.id}; state.pendingContextType = "sourcing_confirm";
+addMessage("agent", `<strong>Candidate sourcing request bhejni hai?</strong><p>Main ${esc(job.title)} ki requirement info@hirescoreai.com par admin approval ke liye bhejunga. Admin pricing aur agar koi additional requirement ho to share karega. Approval ke baad hi requirement public marketplace par publish hogi.</p>`, [actionButton("Yes, submit for approval","sourcingReply",{value:"yes"}), actionButton("Not now","sourcingReply",{value:"no"})]);
+return true;
+}
+
 async function handleUserText(text){
 let value = clean(text);
 if(!value) return;
@@ -1884,6 +2123,8 @@ if(state.pendingContextType === "job_create_missing" && state.jobDraft){
 let draft = applyJobDraftAnswer(state.jobDraft, value);
 return finishAgentJobDraft(draft);
 }
+if(await handleInterviewConversation(value)) return;
+if(await handleSourcingConversation(value)) return;
 if(state.pendingContextType){
 state.pendingContextType = null;
 state.lastJobOptions = [];
@@ -1896,7 +2137,9 @@ if(handleDnsSetupFromChat(value)) return;
 if(await handleEmailSendConfirmation(value)) return;
 if(handleEmailSenderChoiceFollowUp(value)) return;
 if(await handleCandidateFitExplanation(value)) return;
+if(await handleCandidateStatusRequest(value)) return;
 if(await handleGroupCandidateEmailRequest(value)) return;
+if(await handleApplyPageRequest(value)) return;
 if(await handleProductFeatureQuery(value)) return;
 let localFeatureIntent = resolveIntent(value);
 if(FEATURE_PAGE_INTENTS.has(localFeatureIntent?.intent) && localFeatureIntent.confidence >= 0.9){
@@ -2217,9 +2460,12 @@ let createdJob = Object.assign({}, payload, {id:data.job_id, job_id:data.job_id,
 state.selectedJob = createdJob;
 state.conversationContext = Object.assign({}, state.conversationContext, {job_id:data.job_id, job_title:payload.job_title, candidate_ids:[]});
 state.jobDraft = null;
-state.pendingContextType = null;
+state.pendingContextType = "sourcing_confirm";
+state.sourcingDraft = {job_id:data.job_id};
 let applyLink = data.apply_link || data.apply_links?.main || "";
-addMessage("agent", `<strong>Job created: ${esc(payload.job_title)}</strong>${jobDraftPreviewHtml(payload)}<p>Apply page bhi ready hai. Chahiye to main abhi open kar deta hoon, ya link copy kar sakte ho.</p>${applyLink ? `<p><small>${esc(applyLink)}</small></p>` : ""}`, [
+addMessage("agent", `<strong>Job created: ${esc(payload.job_title)}</strong>${jobDraftPreviewHtml(payload)}<p>Apply page ready hai. Kya is role ke liye HireScoreAI candidate sourcing bhi chahiye?</p><p><small>Sourcing request info@hirescoreai.com par approval ke liye jayegi. Admin pricing aur remaining requirements share karega; approval se pehle listing public nahi hogi.</small></p>${applyLink ? `<p><small>${esc(applyLink)}</small></p>` : ""}`, [
+actionButton("Yes, request sourcing","sourcingReply",{value:"yes"}),
+actionButton("No, source myself","sourcingReply",{value:"no"}),
 actionButton("Open Apply Page","openApplyLink",{url:applyLink}),
 actionButton("Copy Apply Link","copyApplyLink",{url:applyLink}),
 actionButton("Upload Resumes","workflow",{workflowId:"upload_resumes"}),
@@ -2802,6 +3048,8 @@ if(item.action === "copyApplyLink" && item.data.url){
 navigator.clipboard?.writeText(item.data.url);
 addMessage("agent", "<strong>Apply link copied.</strong><p>You can share it with candidates now.</p>");
 }
+if(item.action === "interviewReply") handleUserText(item.data.value || "");
+if(item.action === "sourcingReply") handleUserText(item.data.value || "");
 if(item.action === "workflow"){
 let previousPlan = state.lastParsedPlan || {};
 let preservedEntities = mergeEntities(previousPlan.entities || {}, state.conversationContext || {});
@@ -2871,7 +3119,9 @@ resolveIntent,
 _state: state,
 _workflows: WORKFLOWS,
 _groupEmailPlanFromText: groupEmailPlanFromText,
-_matchJobs: matchJobs
+_matchJobs: matchJobs,
+_interviewDateFromText: interviewDateFromText,
+_interviewTimeFromText: interviewTimeFromText
 };
 
 document.addEventListener("DOMContentLoaded", init);

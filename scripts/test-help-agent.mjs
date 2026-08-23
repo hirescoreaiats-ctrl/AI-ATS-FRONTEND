@@ -7,7 +7,7 @@ const css = readFileSync("help-agent.css", "utf8");
 const app = readFileSync("app.js", "utf8");
 
 assert.match(html, /help-agent\.css\?v=recruiting-agent-20260823-15/, "agent css should be loaded");
-assert.match(html, /help-agent\.js\?v=recruiting-agent-20260823-16/, "agent js should be loaded");
+assert.match(html, /help-agent\.js\?v=recruiting-agent-20260823-18/, "agent js should be loaded");
 assert.doesNotMatch(html, /AI Matching|Pipeline ready/, "legacy AI status block should be removed");
 assert.match(html, /app\.js\?v=recruiting-agent-20260823-01/, "app js cache should match the current frontend bundle");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
@@ -45,6 +45,20 @@ assert.match(help, /function\s+conversationHistory/, "recent conversation memory
 assert.match(help, /function\s+handleCandidateFitExplanation/, "candidate fit follow-ups should use the dedicated Top Candidate explanation flow");
 assert.match(help, /\/top-candidate-recommendation\//, "candidate fit follow-ups should call the existing JD-based Top Candidate recommendation endpoint");
 assert.match(help, /same JD-based explanation used by the Top Candidate AI Explanation flow/, "chat should identify the reused Top Candidate explanation evidence");
+assert.match(help, /function\s+handleCandidateStatusRequest/, "candidate status follow-ups should use the live workflow status endpoint");
+assert.match(help, /\/candidate-workflow\//, "candidate status should retrieve pipeline, email, and response state");
+assert.match(help, /Pipeline stage:[\s\S]*Email status:[\s\S]*Candidate response:/, "candidate status should explain pipeline and outreach state together");
+assert.match(help, /function\s+handleInterviewConversation/, "interview requests should use a typo-tolerant multi-turn conversation");
+assert.match(help, /Interview kis date ko schedule karna hai/, "interview flow should collect the date explicitly");
+assert.match(help, /Interview kitne baje rakhna hai/, "interview flow should collect the time explicitly");
+assert.match(help, /Candidate email:<\/strong>/, "interview flow should cross-check candidate email delivery before mutation");
+assert.match(help, /Nothing will change until you confirm/, "interview scheduling should require a final confirmation");
+assert.match(help, /\/schedule-interview-slot/, "confirmed interview flow should use the persisted schedule endpoint");
+assert.match(help, /function\s+handleApplyPageRequest/, "plain-English apply page requests should return the selected job link");
+assert.match(help, /function\s+handleSourcingConversation/, "candidate sourcing should use an approval-aware conversation");
+assert.match(help, /info@hirescoreai\.com/, "sourcing copy should identify the admin approval mailbox");
+assert.match(help, /jobs\/\$\{encodeURIComponent\(job\.id\)\}\/request-candidate-sourcing/, "existing jobs should submit sourcing through the approval endpoint");
+assert.match(help, /Kya is role ke liye HireScoreAI candidate sourcing bhi chahiye/, "job creation should proactively ask about sourcing");
 assert.match(help, /conversation_history:conversationHistory\(\)/, "conversation memory should be sent to the backend AI");
 assert.match(help, /isCandidateGroup/, "candidate cardinality should distinguish groups from individual profiles");
 assert.match(help, /AI explanation for/, "group score explanations should render candidate-wise evidence");
@@ -133,6 +147,8 @@ assert.deepEqual(typoEmailMatches.map(job => job.id), ["da-1"], "email workflow 
 
 const contextualFit = runtimeWindow.HireScoreHelpAgent.resolveIntent("i want you to please tell me how that candidate is fit for this role");
 assert.equal(contextualFit.intent, "explain_candidate_score", "candidate fit follow-ups should use the stored score explanation workflow");
+const contextualBest = runtimeWindow.HireScoreHelpAgent.resolveIntent("can you tell why this is the best candaite");
+assert.equal(contextualBest.intent, "explain_candidate_score", "why-best follow-ups should use the Top Candidate AI explanation workflow");
 runtimeWindow.HireScoreHelpAgent._state.selectedJob = { id: "fw-1", job_title: "Firmware Engineer" };
 runtimeWindow.HireScoreHelpAgent._state.selectedCandidate = { id: "sunny-1", full_name: "Guang 'Sunny' Yang" };
 runtimeWindow.HireScoreHelpAgent._state.conversationContext = { job_id: "fw-1", job_title: "Firmware Engineer", candidate_id: "sunny-1", candidate_ids: ["sunny-1"] };
@@ -140,6 +156,10 @@ const contextualEmailPlan = runtimeWindow.HireScoreHelpAgent._groupEmailPlanFrom
 assert.equal(contextualEmailPlan.entities.candidate_group, "selected", "pronoun email follow-up should target the focused candidate");
 assert.deepEqual(contextualEmailPlan.entities.candidate_ids, ["sunny-1"], "pronoun email follow-up should preserve the exact candidate id");
 assert.equal(contextualEmailPlan.entities.limit, 1, "focused candidate email should not expand to the top ten");
+assert.equal(runtimeWindow.HireScoreHelpAgent._interviewDateFromText("schedule 25/08/2026"), "2026-08-25", "interview chat should parse Indian-style dates");
+assert.equal(runtimeWindow.HireScoreHelpAgent._interviewDateFromText("schedule 2026-08-25"), "2026-08-25", "interview chat should parse ISO dates");
+assert.equal(runtimeWindow.HireScoreHelpAgent._interviewTimeFromText("at 3:30 PM"), "15:30", "interview chat should parse 12-hour times");
+assert.equal(runtimeWindow.HireScoreHelpAgent._interviewTimeFromText("at 15:30"), "15:30", "interview chat should parse 24-hour times");
 
 const pageIds = new Set([...html.matchAll(/id="([A-Za-z0-9]+)Page"/g)].map(match => match[1]));
 const workflowBlock = help.slice(help.indexOf("const WORKFLOWS"), help.indexOf("const QUICK_ACTIONS"));
