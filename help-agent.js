@@ -226,6 +226,14 @@ const FEATURE_PAGE_INTENTS = new Set([
 "view_shortlist_analytics"
 ]);
 
+const ACTION_ROUTED_FEATURE_WORKFLOWS = new Set([
+"create_job",
+"send_candidate_email",
+"schedule_interview",
+"send_screening_test",
+"invite_pilot_user"
+]);
+
 const PRODUCT_FEATURES = [
 {id:"top10", title:"Top 10 Candidate Page", route:"topCandidate", workflowId:"view_top_candidates", requiresJob:true, tourId:"top_candidates", phrases:["top 10", "top ten", "10 candidate", "10 candidates", "10 candidate page", "10 candidates page", "best 10", "best candidates", "top candidate page", "top candidates page"]},
 {id:"candidate_results", title:"Candidate Results Page", route:"results", workflowId:"review_ai_ranked_candidates", requiresJob:true, tourId:"review_ai_ranked_candidates", phrases:["candidate result", "candidate results", "result page", "results page", "ai score", "ai scores", "ranked candidates", "score page"]},
@@ -473,6 +481,7 @@ let confidence = 0.25;
 let allCandidates = /\b(?:all|every|saare|sare|sabhi|sabi)\s+(?:candidate|candidates|resume|resumes|profile|profiles)\b/.test(text);
 let discoveryMatch = text.match(/^(?:i want|show me|find|search|get|give me|mujhe)?\s*(.+?)\s+(?:candidate|candidates|profiles|resumes)$/);
 let discoveryQuery = discoveryMatch ? normalizeJobTitle(discoveryMatch[1]) : null;
+let candidateActionLanguage = includesAny(text, ["shortlist", "reject", "send", "mail", "email", "message", "outreach", "interview", "schedule", "test", "assessment", "screening", "move", "contact", "invite"]);
 let numberedCandidateRequest = /\b(?:top\s+)?\d{1,3}\s+(?:top\s+)?(?:candidate|candidates|candiate|candiates|resume|resumes|profile|profiles)\b/.test(text);
 let candidateSelection = numberedCandidateRequest || includesAny(text, ["top candidate", "top candidates", "best candidate", "best candidates", "candidate of", "candidates of", "candidate page", "candidates page"]);
 let wantsShortlistAction = includesAny(text, ["shortlist candidate", "shortlist candidates", "shortlist resume", "shortlist resumes", "select candidate", "select candidates"]) || /\b(?:candidate|candidates|resume|resumes)\s+shortlist\b/.test(text);
@@ -492,7 +501,7 @@ intent = "view_shortlist_analytics"; confidence = 0.95;
 intent = "view_ai_hiring_insights"; confidence = 0.94;
 }else if(wantsTopPage || wantsTenCandidatePage || (candidateSelection && text.includes("explain"))){
 intent = "view_top_candidates"; confidence = 0.94;
-}else if(discoveryQuery && !includesAny(text, ["top ", "shortlist", "reject", " job", " of ", " for "])){
+}else if(discoveryQuery && !candidateActionLanguage && !includesAny(text, ["top ", " job", " of ", " for "])){
 intent = "search_talent"; confidence = 0.9;
 }else if(allCandidates){
 intent = "view_candidates_by_stage"; confidence = 0.94;
@@ -1070,11 +1079,26 @@ function renderContextBar(){
 let box = document.getElementById("hsAgentContext");
 if(!box) return;
 let context = currentHelpContext();
+let screenLabels = {
+job:"Creating a new job",
+editJob:"Editing a job",
+editForm:"Editing job details",
+results:"Reviewing recruiter jobs",
+jobResult:"Reviewing candidate results",
+communication:"Preparing candidate outreach",
+communicationResults:"Reviewing outreach candidates",
+interviewDashboard:"Viewing upcoming interviews",
+bulk:"Reviewing the talent pool",
+applyJob:"Managing public apply pages",
+jobPosts:"Managing job posts",
+pilotUsers:"Managing pilot access",
+support:"Viewing support"
+};
 let label = context.candidate_name
 ? `Reviewing ${context.candidate_name}${context.job_title ? ` for ${context.job_title}` : ""}`
 : context.job_title
 ? `Viewing ${context.job_title}${context.candidate_count != null ? ` — ${context.candidate_count} candidates` : ""}`
-: context.current_screen === "interviewDashboard" ? "Viewing upcoming interviews" : "Recruiting workspace";
+: screenLabels[context.current_screen] || "Recruiting workspace";
 box.innerHTML = `<span></span><strong>${esc(label)}</strong>`;
 renderQuickActions();
 renderLauncher();
@@ -1082,6 +1106,12 @@ renderLauncher();
 
 function setContext(nextContext){
 let next = nextContext && typeof nextContext === "object" ? nextContext : {};
+next = Object.assign({}, next);
+if(Object.prototype.hasOwnProperty.call(next,"candidate_id") && !next.candidate_id){
+if(!Object.prototype.hasOwnProperty.call(next,"candidate_name")) next.candidate_name = null;
+if(!Object.prototype.hasOwnProperty.call(next,"candidate_ids")) next.candidate_ids = [];
+}
+if(Object.prototype.hasOwnProperty.call(next,"job_id") && !next.job_id && !Object.prototype.hasOwnProperty.call(next,"job_title")) next.job_title = null;
 state.conversationContext = Object.assign({}, state.conversationContext, next);
 if(next.job_id || next.job_title) state.selectedJob = Object.assign({}, state.selectedJob || {}, {id:next.job_id || state.selectedJob?.id, job_title:next.job_title || state.selectedJob?.job_title});
 if(Object.prototype.hasOwnProperty.call(next,"job_id") && !next.job_id) state.selectedJob = null;
@@ -1101,7 +1131,11 @@ return labels[workflow?.id] || "Open Page";
 }
 
 function isNavigationRequest(text){
-return includesAny(text, ["open", "show", "view", "dekh", "dikha", "kholo", "go", "page", "dashboard"]);
+return /\b(?:open|show|view|dekh|dikha|kholo|go|page|dashboard)\b/.test(text);
+}
+
+function isExplicitNavigationCommand(raw){
+return /^(?:open|show|view|go to|take me to|dekh|dikha|kholo)\b/.test(normalizeText(raw || ""));
 }
 
 function matchProductFeature(raw){
@@ -1125,6 +1159,24 @@ best = {feature, score};
 }
 }
 return best?.feature || null;
+}
+
+function shouldStartConversationalJobCreation(raw){
+if(mode() !== "action" || !actionEnabled()) return false;
+let text = normalizeText(raw || "");
+let asksToCreate = includesAny(text, ["create job", "new job", "job create", "add job", "build this job", "create a role"]);
+let navigationOnly = /^(?:open|show|view|go to|take me to)\b/.test(text) && !includesAny(text, ["for me", "help me", "can you", "please create"]);
+return asksToCreate && !navigationOnly;
+}
+
+function shouldKeepRequestInsideActionAgent(raw, feature){
+if(mode() !== "action" || !actionEnabled() || !ACTION_ROUTED_FEATURE_WORKFLOWS.has(feature?.workflowId)) return false;
+if(feature.workflowId === "create_job") return shouldStartConversationalJobCreation(raw);
+let text = normalizeText(raw || "");
+let navigationOnly = /^(?:open|show|view|go to|take me to)\b/.test(text) && !includesAny(text, ["for me", "can you", "please", "send", "schedule", "invite"]);
+if(navigationOnly) return false;
+let localIntent = resolveIntent(raw);
+return localIntent?.intent === feature.workflowId && Number(localIntent.confidence || 0) >= 0.8;
 }
 
 function productFeatureActions(feature){
@@ -1540,9 +1592,10 @@ actionButton("View Jobs","openPage",{page:"dashboard"})
 return true;
 }
 
-async function handleProductFeatureQuery(raw){
+async function handleProductFeatureQuery(raw, options){
 let feature = matchProductFeature(raw);
 if(!feature) return false;
+if(!options?.forceNavigation && shouldKeepRequestInsideActionAgent(raw, feature)) return false;
 let currentJob = selectedJobIdentity();
 if(feature.requiresJob && !currentJob){
 let jobs = await getJobs();
@@ -1555,13 +1608,15 @@ addMessage("agent", `<strong>Which job should I use for ${esc(feature.title)}?</
 return true;
 }
 }
-if(feature.workflowId && WORKFLOWS[feature.workflowId]){
+if(feature.workflowId && WORKFLOWS[feature.workflowId] && !options?.forceNavigation){
 let workflow = WORKFLOWS[feature.workflowId];
 if(workflow.requiredContext.includes("job") && !currentJob){
-return handleWorkflow({intent:feature.workflowId, entities:{}, confidence:1, clarification_needed:false});
+await handleWorkflow({intent:feature.workflowId, entities:{}, confidence:1, clarification_needed:false});
+return true;
 }
 if(workflow.requiredContext.includes("candidate")){
-return handleWorkflow({intent:feature.workflowId, entities:{}, confidence:1, clarification_needed:false});
+await handleWorkflow({intent:feature.workflowId, entities:{}, confidence:1, clarification_needed:false});
+return true;
 }
 state.lastIntent = feature.workflowId;
 state.lastParsedPlan = {intent:feature.workflowId, entities:{job_id:currentJob?.id || null, job_title:currentJob?.title || null}, confidence:1, clarification_needed:false};
@@ -1640,6 +1695,10 @@ window.applyAgentCandidateFilter(candidateIds);
 
 if(workflow.id === "search_talent"){
 return handleTalentSearch(intentResult);
+}
+
+if(workflow.id === "create_job" && mode() === "action" && actionEnabled()){
+return beginAgentJobCreation(intentResult);
 }
 
 if(workflow.requiredContext.includes("job") && !contextOverride?.job){
@@ -1805,6 +1864,7 @@ if(state.lastJobOptions[map[key]]) return selectJob(map[key]);
 }
 }
 if(state.pendingContextType === "job_create_missing" && state.jobDraft){
+if(looksLikeJDText(value)) return handleAgentJDText(value);
 let draft = applyJobDraftAnswer(state.jobDraft, value);
 return finishAgentJobDraft(draft);
 }
@@ -1814,6 +1874,7 @@ state.lastJobOptions = [];
 state.lastCandidateOptions = [];
 state.pendingGroupEmailRequest = null;
 }
+if(isExplicitNavigationCommand(value) && await handleProductFeatureQuery(value, {forceNavigation:true})) return;
 if(await handleAgentJDText(value)) return;
 if(await handleTalentSearchFollowUp(value)) return;
 if(handleDnsSetupFromChat(value)) return;
@@ -2068,6 +2129,46 @@ jd_text: clean(jdText)
 };
 }
 
+function currentJobFormDraft(){
+let value = id => clean(document.getElementById(id)?.value);
+return {
+job_title:value("jobTitle") || value("legacy_jobTitle"),
+company_name:value("company") || value("legacy_company"),
+department:value("department") || value("legacy_department"),
+location:value("location") || value("legacy_location"),
+work_mode:value("workMode") || value("legacy_workMode"),
+job_type:value("jobType") || value("legacy_jobType") || "Full Time",
+salary_range:value("salary") || value("legacy_salary") || "Not specified",
+experience_required:value("experience") || value("legacy_experience"),
+application_deadline:value("deadline") || value("legacy_deadline"),
+hiring_manager:value("hiringManager") || value("legacy_hiringManager"),
+jd_text:value("jdText") || value("legacy_jdText")
+};
+}
+
+function mergeJobDraft(base, incoming){
+let merged = Object.assign({}, base || {});
+Object.entries(incoming || {}).forEach(([key, value]) => {
+if(clean(value)) merged[key] = value;
+});
+return merged;
+}
+
+function beginAgentJobCreation(intentResult){
+let draft = mergeJobDraft(currentJobFormDraft(), intentResult?.entities || {});
+state.jobDraft = draft;
+state.pendingContextType = "job_create_missing";
+let captured = [
+draft.job_title ? `Job title: ${esc(draft.job_title)}` : "",
+draft.company_name ? `Company: ${esc(draft.company_name)}` : "",
+draft.location ? `Location: ${esc(draft.location)}` : "",
+draft.jd_text ? "Job description" : ""
+].filter(Boolean);
+let existing = captured.length ? `<p><strong>Already captured from this page:</strong> ${captured.join("; ")}.</p>` : "";
+addMessage("agent", `<strong>Yes, I can create the job for you.</strong><p>Can you share your requirements or JD?</p>${existing}<p>You can paste the complete JD here, upload a PDF/DOCX/TXT using the <strong>JD</strong> button below, or send: Job title, Company, Location, and Job description.</p><small>I will review the details and ask only for anything still missing before creating the job.</small>`);
+return true;
+}
+
 function agentJobMissingFields(draft){
 let missing = [];
 if(!clean(draft?.job_title)) missing.push({key:"job_title", label:"Job title"});
@@ -2111,7 +2212,8 @@ state.jobDraft = draft;
 state.pendingContextType = "job_create_missing";
 let missing = agentJobMissingFields(draft);
 let names = missing.map(item => item.label).join(", ");
-addMessage("agent", `<strong>JD read ho gayi. Bas ${esc(names)} missing hai.</strong>${jobDraftPreviewHtml(draft)}<p>Reply in simple format, for example: Company: Techindia, Location: Noida / Remote.</p>`);
+let title = clean(draft?.jd_text) ? `JD read ho gayi. Bas ${esc(names)} missing hai.` : `I still need: ${esc(names)}.`;
+addMessage("agent", `<strong>${title}</strong>${jobDraftPreviewHtml(draft)}<p>Reply in simple format, for example: Company: Techindia, Location: Noida / Remote.</p>`);
 }
 
 async function createJobFromAgentDraft(draft){
@@ -2187,6 +2289,7 @@ state.messages.push(loadingMessage);
 renderMessages();
 try{
 let draft = await parseAgentJDText(raw);
+draft = mergeJobDraft(state.jobDraft, draft);
 removeMessage(loadingMessage);
 return finishAgentJobDraft(draft);
 }catch(error){
@@ -2213,6 +2316,7 @@ if(headers instanceof Headers) headers.delete("Content-Type");
 else delete headers["Content-Type"];
 let data = await fetchJson(`${apiBase()}/parse-jd-file`, {method:"POST", headers, body:formData});
 let draft = agentJobDraftFromParsed(data.jd_text || "", data.fields || {});
+draft = mergeJobDraft(state.jobDraft, draft);
 removeMessage(loadingMessage);
 await finishAgentJobDraft(draft);
 }catch(error){
