@@ -1023,38 +1023,37 @@ function agentPagePresentation(){
 let context = currentHelpContext();
 let screen = context.current_screen || "dashboard";
 if(screen === "candidateProfile" || context.candidate_id) return {
-title: context.candidate_name ? `Review ${context.candidate_name}` : "Review this candidate",
-subtitle: "Explain the score, compare evidence, shortlist, or schedule an interview"
+prompt: context.candidate_name
+? `Need help reviewing ${context.candidate_name}? I can explain the score, compare evidence, shortlist, or schedule an interview.`
+: "Need help reviewing this candidate? I can explain the score, compare evidence, shortlist, or schedule an interview."
 };
 if(["jobResult","topCandidate","insight","shortlistAnalytics","shortlistExplanation"].includes(screen)) return {
-title: context.job_title ? `${context.job_title} Action Agent` : "Candidate Action Agent",
-subtitle: "Find top matches, verify skill gaps, shortlist, or check sourcing"
+prompt: context.job_title
+? `Need help with ${context.job_title}? I can find top matches, verify skill gaps, shortlist candidates, or check sourcing.`
+: "Need help with these candidates? I can find top matches, verify skill gaps, shortlist, or check sourcing."
 };
 let presentations = {
-dashboard:["Jobs Action Agent","Review attention, applicants, active roles, or create a job"],
-job:["Create Job with AI","Get help with role details, JD structure, skills, and sourcing"],
-editJob:["Edit Job with AI","Review role details, requirements, skills, and publishing setup"],
-editForm:["Edit Job with AI","Improve the JD, required skills, experience, and sourcing details"],
-results:["Recruiter Action Agent","Search talent, review shortlists, or open an active job"],
-communication:["Outreach Action Agent","Draft messages and move shortlisted candidates forward"],
-communicationResults:["Candidate Outreach Agent","Review replies, draft follow-ups, and advance candidates"],
-interviewDashboard:["Interview Action Agent","Schedule interviews and review upcoming candidate activity"],
-bulk:["Bulk Hiring Action Agent","Search talent, review top candidates, and inspect hiring insights"],
-applyJob:["Apply Page Action Agent","Manage public apply links and sourcing visibility"],
-jobPosts:["Job Publishing Agent","Prepare job posts, apply links, and sourcing status"],
-pilotUsers:["Pilot Access Agent","Invite users, review plan limits, or manage pilot access"],
-support:["HireScore Support Agent","Ask about this screen or get help with your recruiting workflow"]
+dashboard:"Need help with your jobs? I can review attention, applicants, active roles, or create a new job.",
+job:"Creating a job? I can help structure the JD, required skills, experience, and sourcing details.",
+editJob:"Editing a job? I can review role details, requirements, skills, and publishing setup.",
+editForm:"Improving this job? I can refine the JD, required skills, experience, and sourcing details.",
+results:"Need recruiting help? I can search talent, review shortlists, or open an active job.",
+communication:"Working on outreach? I can draft messages and move shortlisted candidates forward.",
+communicationResults:"Reviewing candidate outreach? I can check replies, draft follow-ups, and advance candidates.",
+interviewDashboard:"Planning interviews? I can schedule interviews and review upcoming candidate activity.",
+bulk:"Working on bulk hiring? I can search talent, review top candidates, and inspect hiring insights.",
+applyJob:"Managing apply pages? I can help with public links and sourcing visibility.",
+jobPosts:"Publishing a job? I can prepare job posts, apply links, and check sourcing status.",
+pilotUsers:"Managing pilot access? I can invite users, review plan limits, or manage access.",
+support:"Need help here? I can guide you through this screen or your recruiting workflow."
 };
-let selected = presentations[screen] || presentations.dashboard;
-return {title:selected[0], subtitle:selected[1]};
+return {prompt:presentations[screen] || presentations.dashboard};
 }
 
 function renderLauncher(){
 let presentation = agentPagePresentation();
-let title = document.querySelector("#hsHelpButton .hs-help-launch-copy strong");
-let subtitle = document.querySelector("#hsHelpButton .hs-help-launch-copy small");
-if(title) title.textContent = presentation.title;
-if(subtitle) subtitle.textContent = presentation.subtitle;
+let prompt = document.getElementById("hsHelpLauncherPrompt");
+if(prompt) prompt.textContent = presentation.prompt;
 }
 
 function renderQuickActions(){
@@ -2525,11 +2524,13 @@ let root = document.createElement("div");
 root.id = "hsHelpRoot";
 root.innerHTML = `
 <button id="hsHelpButton" class="hs-help-button" type="button" data-help-id="help-agent-button" onclick="window.HireScoreHelpAgent.openDrawer()">
-<span>AI</span><span class="hs-help-launch-copy"><strong>Ask HireScore AI</strong><small>Search jobs, review candidates, or run a recruiting action</small></span><b aria-hidden="true">↑</b>
+<span class="hs-help-agent-mark">AI</span><strong class="hs-help-agent-name">HireScoreAI Agent</strong>
+<span id="hsHelpLauncherPrompt" class="hs-help-launch-dialog">Need help with your jobs? I can review attention, applicants, active roles, or create a new job.</span>
+<span class="hs-help-launch-open">Open AI Agent <b aria-hidden="true">→</b></span>
 </button>
 <aside class="hs-help-drawer" aria-label="HireScore AI Recruiting Agent">
 <div class="hs-help-drawer-head">
-<div><strong>HireScore AI Agent</strong><span>Live recruiting workspace</span></div>
+<div><strong>HireScoreAI Agent</strong><span>Live recruiting workspace</span></div>
 <button type="button" aria-label="Collapse Recruiting Agent" onclick="window.HireScoreHelpAgent.closeDrawer()">›</button>
 </div>
 <div id="hsAgentContext" class="hs-agent-context"></div>

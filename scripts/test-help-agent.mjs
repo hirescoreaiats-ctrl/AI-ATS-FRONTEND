@@ -6,8 +6,8 @@ const help = readFileSync("help-agent.js", "utf8");
 const css = readFileSync("help-agent.css", "utf8");
 const app = readFileSync("app.js", "utf8");
 
-assert.match(html, /help-agent\.css\?v=recruiting-agent-20260823-06/, "agent css should be loaded");
-assert.match(html, /help-agent\.js\?v=recruiting-agent-20260823-06/, "agent js should be loaded");
+assert.match(html, /help-agent\.css\?v=recruiting-agent-20260823-07/, "agent css should be loaded");
+assert.match(html, /help-agent\.js\?v=recruiting-agent-20260823-07/, "agent js should be loaded");
 assert.doesNotMatch(html, /AI Matching|Pipeline ready/, "legacy AI status block should be removed");
 assert.match(html, /app\.js\?v=recruiting-agent-20260823-01/, "app js cache should match the current frontend bundle");
 assert.match(html, /data-help-id="dashboard-summary"/, "dashboard summary help target should exist");
@@ -195,15 +195,17 @@ assert.match(css, /\.hs-help-attach/, "JD upload control should be styled inside
 assert.match(css, /\.hs-tour-target/, "tour target highlight styles should exist");
 assert.match(css, /@media \(max-width: 720px\)/, "mobile drawer styles should exist");
 
-assert.match(help, /HireScore AI Agent/, "persistent panel should use product-native agent naming");
-assert.match(help, /Ask HireScore AI/, "collapsed state should use a conversational prompt bar");
+assert.match(help, /<strong>HireScoreAI Agent<\/strong><span>Live recruiting workspace<\/span>/, "persistent panel should use the fixed product-native agent naming");
+assert.match(help, /HireScoreAI Agent/, "sidebar card should keep a fixed HireScoreAI Agent name");
+assert.match(help, /hsHelpLauncherPrompt/, "sidebar card should contain a contextual dialogue box");
+assert.match(help, /Open AI Agent/, "sidebar card should expose a clear open-agent action");
 assert.match(help, /document\.body\.appendChild\(root\)/, "agent panel root should stay at body level above dashboard stacking contexts");
 assert.match(help, /sidebarFooter\.insertBefore\(launcher, sidebarFooter\.firstChild\)/, "only the desktop launcher should mount inside the sidebar footer");
 assert.match(help, /function\s+contextQuickActions/, "quick actions should depend on screen context");
 assert.match(help, /function\s+agentPagePresentation/, "launcher copy should depend on the current page context");
-assert.match(help, /Create Job with AI/, "job creation page should have relevant agent guidance");
-assert.match(help, /Candidate Outreach Agent/, "outreach page should have relevant agent guidance");
-assert.match(help, /Interview Action Agent/, "interview page should have relevant agent guidance");
+assert.match(help, /Creating a job\?/, "job creation page should have relevant agent guidance");
+assert.match(help, /Reviewing candidate outreach\?/, "outreach page should have relevant agent guidance");
+assert.match(help, /Planning interviews\?/, "interview page should have relevant agent guidance");
 assert.match(help, /function\s+setContext/, "frontend should expose structured context updates");
 assert.match(help, /current_screen/, "current screen should reach the backend context");
 assert.match(help, /job_preview/, "structured job results should render");
@@ -215,7 +217,8 @@ assert.match(app, /window\.applyAgentCandidateFilter/, "candidate results should
 assert.match(app, /shouldFilter\s*=\s*Array\.isArray/, "empty real filter results should hide every candidate row");
 assert.match(css, /\.hs-help-drawer\{[\s\S]*?top:72px;[\s\S]*?right:18px;/, "agent should open as a top-right overlay without resizing ATS content");
 assert.match(css, /\.hs-help-button\{[\s\S]*?width:min\(680px,calc\(100vw - 420px\)\)/, "initial agent state should be a wide top prompt bar");
-assert.match(css, /\.ats-sidebar-footer \.hs-help-button\{[\s\S]*?width:100%;[\s\S]*?height:56px;/, "sidebar launcher should be compact");
+assert.match(css, /\.ats-sidebar-footer \.hs-help-button\{[\s\S]*?width:100%;[\s\S]*?min-height:154px;/, "sidebar agent card should have room for contextual dialogue");
+assert.match(css, /\.ats-sidebar-menu\{[\s\S]*?overflow-y:auto/, "sidebar navigation should scroll when the taller agent card needs space");
 assert.doesNotMatch(css, /hs-agent-workspace-open/, "agent must not squeeze or shift the existing ATS layout");
 
 console.log("Help Agent smoke checks passed.");
